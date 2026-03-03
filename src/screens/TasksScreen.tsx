@@ -23,6 +23,7 @@ import { useTheme } from '../context/ThemeContext';
 import { BurgerMenu, PulsingFAB } from '../components/BurgerMenu';
 import { useTaskStore, Note, NoteTag, ChecklistItem } from '../context/TaskStore';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 
 const BLUE = '#4A90D9';
 
@@ -34,6 +35,13 @@ const CARD_COLORS = [
 const TAG_PALETTE = [
   '#7C5CBF', '#2196F3', '#4CAF50', '#F44336',
   '#FF9800', '#009688', '#E91E63', '#607D8B',
+];
+
+const EMOJI_LIST = [
+  '😀','😂','😍','😎','😢','😡','🥳','🤔','🙏','👍','👎','✌️',
+  '❤️','🔥','⭐','✅','❌','⚡','🎉','🎯','💡','📝','💻','📚',
+  '🚀','🌟','💯','🎶','🌈','🍕','☕','🎁','🏆','🌺','😴','🤝',
+  '💪','🌙','☀️','🎨','📅','🔔','🛒','💰','🔑','🌍','🐶','🐱',
 ];
 
 function formatDate(ts: number): string {
@@ -84,6 +92,22 @@ export default function TasksScreen({ navigation }: any) {
   const [newTagName, setNewTagName]               = useState('');
   const [newTagColor, setNewTagColor]             = useState(TAG_PALETTE[0]);
 
+  // ── Undo / Redo history ─────────────────────────────────────────────────
+  const undoStack      = useRef<string[]>([]);
+  const redoStack      = useRef<string[]>([]);
+  const lastUndoPushTs = useRef(0);
+
+  // ── Body cursor tracking ─────────────────────────────────────────────────
+  const bodyRef  = useRef<TextInput>(null);
+  const [bodySel, setBodySel] = useState({ start: 0, end: 0 });
+
+  // ── Formatting toolbar extra state ──────────────────────────────────────
+  const [emojiPickerVisible,  setEmojiPickerVisible]  = useState(false);
+  const [formatPopoverVisible, setFormatPopoverVisible] = useState(false);
+  const [linkModalVisible,    setLinkModalVisible]    = useState(false);
+  const [linkUrl,  setLinkUrl]  = useState('');
+  const [linkText, setLinkText] = useState('');
+
   // ── Manage categories modal ─────────────────────────────────────────────
   const [manageCatVisible, setManageCatVisible] = useState(false);
   const [newCatName, setNewCatName]               = useState('');
@@ -115,6 +139,10 @@ export default function TasksScreen({ navigation }: any) {
     setEdCardColor(CARD_COLORS[0]);
     setEdTags([]);
     setAddTagMode(false);
+    undoStack.current = [];
+    redoStack.current = [];
+    setEmojiPickerVisible(false);
+    setFormatPopoverVisible(false);
     setEditorVisible(true);
   };
 
@@ -128,6 +156,10 @@ export default function TasksScreen({ navigation }: any) {
     setEdCardColor(note.cardColor);
     setEdTags([...note.tags]);
     setAddTagMode(false);
+    undoStack.current = [];
+    redoStack.current = [];
+    setEmojiPickerVisible(false);
+    setFormatPopoverVisible(false);
     setEditorVisible(true);
   };
 
@@ -209,6 +241,94 @@ export default function TasksScreen({ navigation }: any) {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => storeRemoveCat(cat) },
     ]);
+  };
+
+  // ── Undo / Redo ───────────────────────────────────────────────────────────
+  const handleBodyChange = (text: string) => {
+    const now = Date.now();
+    if (now - lastUndoPushTs.current > 600) {
+      undoStack.current = [...undoStack.current.slice(-49), edBody];
+      redoStack.current = [];
+      lastUndoPushTs.current = now;
+    }
+    setEdBody(text);
+  };
+
+  const undo = () => {
+    if (!undoStack.current.length) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    redoStack.current = [edBody, ...redoStack.current.slice(0, 49)];
+    setEdBody(undoStack.current.pop()!);
+  };
+
+  const redo = () => {
+    if (!redoStack.current.length) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    undoStack.current = [...undoStack.current.slice(-49), edBody];
+    const next = redoStack.current.shift()!;
+    setEdBody(next);
+  };
+
+  // ── Text insertion helpers ────────────────────────────────────────────────
+  const insertAtCursor = (text: string) => {
+    const { start, end } = bodySel;
+    const newBody = edBody.slice(0, start) + text + edBody.slice(end);
+    handleBodyChange(newBody);
+    const newPos = start + text.length;
+    setTimeout(() => {
+      bodyRef.current?.focus();
+      (bodyRef.current as any)?.setNativeProps({ selection: { start: newPos, end: newPos } });
+    }, 60);
+  };
+
+  const insertLinePrefix = (prefix: string) => {
+    const { start } = bodySel;
+    const before = edBody.slice(0, start);
+    const lineStart = before.length > 0 && !before.endsWith('\n') ? '\n' : '';
+    insertAtCursor(lineStart + prefix);
+  };
+
+  const wrapText = (open: string, close: string = open) => {
+    const { start, end } = bodySel;
+    if (start !== end) {
+      // wrap selection
+      const selected = edBody.slice(start, end);
+      const newBody = edBody.slice(0, start) + open + selected + close + edBody.slice(end);
+      handleBodyChange(newBody);
+      setTimeout(() => bodyRef.current?.focus(), 60);
+    } else {
+      // insert markers and place cursor between them
+      const newBody = edBody.slice(0, start) + open + close + edBody.slice(start);
+      handleBodyChange(newBody);
+      const newPos = start + open.length;
+      setTimeout(() => {
+        bodyRef.current?.focus();
+        (bodyRef.current as any)?.setNativeProps({ selection: { start: newPos, end: newPos } });
+      }, 60);
+    }
+  };
+
+  // ── Image pick & insert ───────────────────────────────────────────────────
+  const pickAndInsertImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow photo library access to insert images.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]?.uri) {
+      insertAtCursor(`\n📷 ${result.assets[0].uri}`);
+    }
   };
 
   // ── Note Card ─────────────────────────────────────────────────────────────
@@ -363,10 +483,10 @@ export default function TasksScreen({ navigation }: any) {
               <Ionicons name="checkmark" size={24} color="#333" />
             </TouchableOpacity>
             <View style={styles.editorTopCenter}>
-              <TouchableOpacity onPress={() => Alert.alert('Undo', 'Undo not yet supported.')}>
+              <TouchableOpacity onPress={undo}>
                 <Ionicons name="arrow-undo-outline" size={20} color="#555" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => Alert.alert('Redo', 'Redo not yet supported.')}>
+              <TouchableOpacity onPress={redo}>
                 <Ionicons name="arrow-redo-outline" size={20} color="#555" />
               </TouchableOpacity>
             </View>
@@ -472,11 +592,13 @@ export default function TasksScreen({ navigation }: any) {
               {/* ── Note tab ── */}
               {editorTab === 'note' && (
                 <TextInput
+                  ref={bodyRef}
                   style={styles.editorText}
                   placeholder="Note here"
                   placeholderTextColor="#C0C0C0"
                   value={edBody}
-                  onChangeText={setEdBody}
+                  onChangeText={handleBodyChange}
+                  onSelectionChange={e => setBodySel(e.nativeEvent.selection)}
                   multiline
                   textAlignVertical="top"
                 />
@@ -562,37 +684,143 @@ export default function TasksScreen({ navigation }: any) {
               </View>
             )}
 
-            {/* Bottom formatting bar */}
-            <View style={[styles.editorBottomBar, { backgroundColor: edCardColor }]}>
-              {[
-                { name: 'text', icon: 'format-font', lib: 'mc' },
-                { name: 'checkbox', icon: 'checkbox-marked-outline', lib: 'mc' },
-                { name: 'mic', icon: 'mic-outline', lib: 'ion' },
-                { name: 'draw', icon: 'brush-outline', lib: 'ion' },
-                { name: 'image', icon: 'image-outline', lib: 'ion' },
-                { name: 'emoji', icon: 'happy-outline', lib: 'ion' },
-                { name: 'strike', icon: 'format-strikethrough', lib: 'mc' },
-                { name: 'list', icon: 'list-outline', lib: 'ion' },
-                { name: 'numberedlist', icon: 'format-list-numbered', lib: 'mc' },
-                { name: 'link', icon: 'link-outline', lib: 'ion' },
-              ].map(item => (
-                <TouchableOpacity key={item.name} style={styles.editorBarBtn}
-                  onPress={() => {
-                    if (item.name === 'checkbox') {
-                      setEdBody(b => b + (b.length && !b.endsWith('\n') ? '\n' : '') + '☐ ');
-                    } else if (item.name === 'list') {
-                      setEdBody(b => b + (b.length && !b.endsWith('\n') ? '\n' : '') + '• ');
-                    } else if (item.name === 'numberedlist') {
-                      setEdBody(b => b + (b.length && !b.endsWith('\n') ? '\n' : '') + '1. ');
-                    }
-                  }}
-                >
-                  {item.lib === 'mc'
-                    ? <MaterialCommunityIcons name={item.icon as any} size={21} color="#555" />
-                    : <Ionicons name={item.icon as any} size={21} color="#555" />}
+            {/* ── Format popover (B / I / H1 / H2) ── */}
+            {formatPopoverVisible && (
+              <View style={styles.formatPopover}>
+                <TouchableOpacity style={styles.formatBtn}
+                  onPress={() => { wrapText('**'); setFormatPopoverVisible(false); }}>
+                  <Text style={[styles.formatBtnText, { fontWeight: 'bold' }]}>B</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
+                <TouchableOpacity style={styles.formatBtn}
+                  onPress={() => { wrapText('_'); setFormatPopoverVisible(false); }}>
+                  <Text style={[styles.formatBtnText, { fontStyle: 'italic' }]}>I</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.formatBtn}
+                  onPress={() => { insertLinePrefix('# '); setFormatPopoverVisible(false); }}>
+                  <Text style={styles.formatBtnText}>H1</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.formatBtn}
+                  onPress={() => { insertLinePrefix('## '); setFormatPopoverVisible(false); }}>
+                  <Text style={styles.formatBtnText}>H2</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* ── Emoji picker grid ── */}
+            {emojiPickerVisible && (
+              <View style={styles.emojiPicker}>
+                <View style={styles.emojiGrid}>
+                  {EMOJI_LIST.map((em, i) => (
+                    <TouchableOpacity key={i} style={styles.emojiBtn}
+                      onPress={() => { insertAtCursor(em); setEmojiPickerVisible(false); }}>
+                      <Text style={styles.emojiText}>{em}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Bottom formatting bar */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={[styles.editorBottomBar, { backgroundColor: edCardColor }]}
+              contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 4 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Aa — text format */}
+              <TouchableOpacity style={styles.editorBarBtn}
+                onPress={() => { setFormatPopoverVisible(v => !v); setEmojiPickerVisible(false); }}>
+                <MaterialCommunityIcons name="format-font" size={21}
+                  color={formatPopoverVisible ? '#4A90D9' : '#555'} />
+              </TouchableOpacity>
+              {/* Checkbox */}
+              <TouchableOpacity style={styles.editorBarBtn}
+                onPress={() => insertLinePrefix('☐ ')}>
+                <MaterialCommunityIcons name="checkbox-marked-outline" size={21} color="#555" />
+              </TouchableOpacity>
+              {/* Mic */}
+              <TouchableOpacity style={styles.editorBarBtn} onPress={() => {
+                bodyRef.current?.focus();
+                Alert.alert('Voice Input', 'Tap the microphone on your keyboard to dictate.');
+              }}>
+                <Ionicons name="mic-outline" size={21} color="#555" />
+              </TouchableOpacity>
+              {/* Highlight / brush */}
+              <TouchableOpacity style={styles.editorBarBtn} onPress={() => wrapText('==', '==')}>
+                <Ionicons name="brush-outline" size={21} color="#555" />
+              </TouchableOpacity>
+              {/* Image */}
+              <TouchableOpacity style={styles.editorBarBtn} onPress={pickAndInsertImage}>
+                <Ionicons name="image-outline" size={21} color="#555" />
+              </TouchableOpacity>
+              {/* Emoji */}
+              <TouchableOpacity style={styles.editorBarBtn}
+                onPress={() => { setEmojiPickerVisible(v => !v); setFormatPopoverVisible(false); }}>
+                <Ionicons name="happy-outline" size={21}
+                  color={emojiPickerVisible ? '#4A90D9' : '#555'} />
+              </TouchableOpacity>
+              {/* Strikethrough */}
+              <TouchableOpacity style={styles.editorBarBtn} onPress={() => wrapText('~~', '~~')}>
+                <MaterialCommunityIcons name="format-strikethrough" size={21} color="#555" />
+              </TouchableOpacity>
+              {/* Bullet list */}
+              <TouchableOpacity style={styles.editorBarBtn} onPress={() => insertLinePrefix('• ')}>
+                <Ionicons name="list-outline" size={21} color="#555" />
+              </TouchableOpacity>
+              {/* Numbered list */}
+              <TouchableOpacity style={styles.editorBarBtn} onPress={() => insertLinePrefix('1. ')}>
+                <MaterialCommunityIcons name="format-list-numbered" size={21} color="#555" />
+              </TouchableOpacity>
+              {/* Link */}
+              <TouchableOpacity style={styles.editorBarBtn}
+                onPress={() => { setLinkText(''); setLinkUrl(''); setLinkModalVisible(true); }}>
+                <Ionicons name="link-outline" size={21} color="#555" />
+              </TouchableOpacity>
+            </ScrollView>
+
+            {/* ── Link insert sheet ── */}
+            <Modal
+              visible={linkModalVisible}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setLinkModalVisible(false)}
+            >
+              <Pressable style={styles.linkOverlay} onPress={() => setLinkModalVisible(false)}>
+                <Pressable style={styles.linkSheet} onPress={e => e.stopPropagation()}>
+                  <Text style={styles.linkSheetTitle}>Insert Link</Text>
+                  <TextInput
+                    style={styles.linkInput}
+                    placeholder="Display text (optional)"
+                    placeholderTextColor="#aaa"
+                    value={linkText}
+                    onChangeText={setLinkText}
+                  />
+                  <TextInput
+                    style={styles.linkInput}
+                    placeholder="https://..."
+                    placeholderTextColor="#aaa"
+                    value={linkUrl}
+                    onChangeText={setLinkUrl}
+                    keyboardType="url"
+                    autoCapitalize="none"
+                  />
+                  <View style={styles.linkActions}>
+                    <TouchableOpacity style={styles.linkCancel} onPress={() => setLinkModalVisible(false)}>
+                      <Text style={{ color: '#888', fontWeight: '600' }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.linkConfirm} onPress={() => {
+                      if (!linkUrl.trim()) { Alert.alert('URL required', 'Please enter a URL.'); return; }
+                      const display = linkText.trim() || linkUrl.trim();
+                      insertAtCursor(`[${display}](${linkUrl.trim()})`);
+                      setLinkModalVisible(false);
+                    }}>
+                      <Text style={{ color: '#fff', fontWeight: '700' }}>Insert</Text>
+                    </TouchableOpacity>
+                  </View>
+                </Pressable>
+              </Pressable>
+            </Modal>
           </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
@@ -986,4 +1214,107 @@ const styles = StyleSheet.create({
   todoItemText: { flex: 1, fontSize: 15, color: '#333' },
   todoItemDone: { textDecorationLine: 'line-through', color: '#aaa' },
   todoRemoveBtn: { padding: 4 },
+
+  // ── Format popover (bold / italic / headings)
+  formatPopover: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    marginHorizontal: 12,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+    gap: 6,
+  },
+  formatBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#F2F2F7',
+  },
+  formatBtnText: { fontSize: 15, color: '#222' },
+
+  // ── Emoji picker
+  emojiPicker: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginHorizontal: 12,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+    padding: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  emojiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 2,
+  },
+  emojiBtn: {
+    width: '12%',
+    alignItems: 'center',
+    padding: 4,
+  },
+  emojiText: { fontSize: 22 },
+
+  // ── Link insert modal
+  linkOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  linkSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 36,
+    gap: 12,
+  },
+  linkSheetTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111',
+    marginBottom: 4,
+  },
+  linkInput: {
+    borderWidth: 1,
+    borderColor: '#DDD',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 15,
+    color: '#111',
+    backgroundColor: '#FAFAFA',
+  },
+  linkActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  linkCancel: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 13,
+    borderRadius: 14,
+    backgroundColor: '#F0F0F5',
+  },
+  linkConfirm: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 13,
+    borderRadius: 14,
+    backgroundColor: BLUE,
+  },
 });
