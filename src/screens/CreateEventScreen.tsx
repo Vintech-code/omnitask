@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,701 +6,970 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Switch,
   Alert,
+  Modal,
+  Pressable,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { useEvents, AppEvent } from '../context/EventStore';
+import { useTheme } from '../context/ThemeContext';
 
 const BLUE = '#4A90D9';
-const PURPLE = '#7C5CBF';
 
-export default function CreateEventScreen({ navigation }: any) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [locationAlert, setLocationAlert] = useState(false);
-  const [priority, setPriority] = useState<'Low' | 'Medium' | 'High'>('Medium');
-  const [agreed, setAgreed] = useState(false);
+// ─── parse stored time string  "08:00 AM" → wheel indices ────────────────────
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function parseStoredTime(t: string): { hIdx: number; mIdx: number; pIdx: number } {
+  const parts = (t || '').trim().split(' ');
+  const [hStr, mStr] = (parts[0] || '8:00').split(':');
+  const h = Math.max(1, Math.min(12, parseInt(hStr) || 8));
+  const m = Math.max(0, Math.min(59, parseInt(mStr) || 0));
+  const p = (parts[1] || '').toUpperCase() === 'PM' ? 1 : 0;
+  return { hIdx: h - 1, mIdx: m, pIdx: p };
+}
+function parseStoredDate(d: string): { y: number; mo: number; day: number } {
+  const parts = (d || '').replace(',', '').split(' ');
+  const mo = MONTH_ABBR.indexOf(parts[0]);
+  const day = parseInt(parts[1]) || new Date().getDate();
+  const y = parseInt(parts[2]) || new Date().getFullYear();
+  return { y, mo: mo < 0 ? new Date().getMonth() : mo, day };
+}
+
+// ─── Categories ──────────────────────────────────────────────────────────────
+const DEFAULT_CATEGORIES = [
+  'Work', 'Personal', 'Health', 'Education', 'Finance',
+  'Social', 'Shopping', 'Travel', 'Family', 'Fitness',
+  'Meeting', 'Birthday', 'Anniversary', 'Holiday', 'Other',
+];
+
+const PRIORITIES = ['Low', 'Medium', 'High'] as const;
+type Priority = typeof PRIORITIES[number];
+const PRIORITY_COLORS: Record<Priority, string> = {
+  Low: '#52B788', Medium: '#E09C52', High: '#E05252',
+};
+
+type Period = 'AM' | 'PM';
+
+// ─── Wheel Picker (drum-roll) ─────────────────────────────────────────────────
+const ITEM_H = 56;
+const HOURS_LIST   = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+const MINUTES_LIST = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+const PERIODS_LIST = ['AM', 'PM'];
+
+interface WheelColProps {
+  items: string[];
+  selectedIndex: number;
+  onSelect: (i: number) => void;
+  width?: number;
+  wheelKey?: string;
+}
+
+function WheelCol({ items, selectedIndex, onSelect, width = 80, wheelKey }: WheelColProps) {
+  const scrollRef = useRef<ScrollView>(null);
+  const { theme } = useTheme();
+  useEffect(() => {
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: selectedIndex * ITEM_H, animated: false });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [wheelKey]);
+
+  const handleEnd = (e: any) => {
+    const i = Math.round(e.nativeEvent.contentOffset.y / ITEM_H);
+    const c = Math.max(0, Math.min(items.length - 1, i));
+    onSelect(c);
+  };
 
   return (
-    <SafeAreaView style={s.safe}>
-      {/* ── Top Bar ── */}
-      <View style={s.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={s.topCancel}>Cancel</Text>
+    <View style={{ width, height: ITEM_H * 5, overflow: 'hidden' }}>
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute', left: 0, right: 0,
+          top: ITEM_H * 2, height: ITEM_H,
+          backgroundColor: 'rgba(74,144,217,0.10)',
+          borderTopWidth: 1, borderBottomWidth: 1, borderColor: BLUE,
+        }}
+      />
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={ITEM_H}
+        decelerationRate="fast"
+        onMomentumScrollEnd={handleEnd}
+        onScrollEndDrag={handleEnd}
+        contentContainerStyle={{ paddingVertical: ITEM_H * 2 }}
+      >
+        {items.map((item, i) => {
+          const dist = Math.abs(i - selectedIndex);
+          const isSel = dist === 0;
+          const isAdj = dist === 1;
+          return (
+            <TouchableOpacity
+              key={i}
+              style={{ height: ITEM_H, justifyContent: 'center', alignItems: 'center' }}
+              onPress={() => { onSelect(i); scrollRef.current?.scrollTo({ y: i * ITEM_H, animated: true }); }}
+              activeOpacity={0.7}
+            >
+              <Text style={{
+                fontSize: isSel ? 36 : isAdj ? 28 : 22,
+                fontWeight: isSel ? '700' : '400',
+                color: isSel ? theme.text : isAdj ? theme.textSub : theme.border,
+              }}>{item}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─── Calendar helpers ─────────────────────────────────────────────────────────
+const MONTH_NAMES = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+];
+const DAY_SHORTS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+function daysInMonth(year: number, month: number) {
+  return new Date(year, month + 1, 0).getDate();
+}
+function firstWeekday(year: number, month: number) {
+  return new Date(year, month, 1).getDay();
+}
+function formatDateLabel(y: number, m: number, d: number) {
+  return `${MONTH_NAMES[m].slice(0, 3)} ${d}, ${y}`;
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+export default function CreateEventScreen({ navigation, route }: any) {
+  const { addEvent, updateEvent } = useEvents();
+  const { theme, isDark } = useTheme();
+  const editEvent: AppEvent | undefined = route?.params?.event;
+
+  const now = new Date();
+
+  // ── parse existing event if editing
+  const initStart  = editEvent ? parseStoredTime(editEvent.startTime) : { hIdx: 7, mIdx: 0, pIdx: 0 };
+  const initEnd    = editEvent?.endTime ? parseStoredTime(editEvent.endTime) : { hIdx: 8, mIdx: 0, pIdx: 1 };
+  const initDate   = editEvent ? parseStoredDate(editEvent.startDate) : { y: now.getFullYear(), mo: now.getMonth(), day: now.getDate() };
+
+  // — Title / Desc —
+  const [title, setTitle]             = useState(editEvent?.title || '');
+  const [description, setDescription] = useState(editEvent?.description || '');
+
+  // — Start time —
+  const [startHourIdx,   setStartHourIdx]   = useState(initStart.hIdx);
+  const [startMinuteIdx, setStartMinuteIdx] = useState(initStart.mIdx);
+  const [startPeriodIdx, setStartPeriodIdx] = useState(initStart.pIdx);
+
+  // — End time —
+  const [hasEnd, setHasEnd]           = useState(!!editEvent?.endTime);
+  const [endHourIdx,   setEndHourIdx]   = useState(initEnd.hIdx);
+  const [endMinuteIdx, setEndMinuteIdx] = useState(initEnd.mIdx);
+  const [endPeriodIdx, setEndPeriodIdx] = useState(initEnd.pIdx);
+
+  // — Date —
+  const [selYear,  setSelYear]  = useState(initDate.y);
+  const [selMonth, setSelMonth] = useState(initDate.mo);
+  const [selDay,   setSelDay]   = useState(initDate.day);
+
+  // — Location —
+  const [location, setLocation] = useState(editEvent?.location || '');
+
+  // — Category —
+  const [categories, setCategories]   = useState<string[]>(DEFAULT_CATEGORIES);
+  const [category, setCategory]       = useState(editEvent?.category || 'Work');
+  const [customCatInput, setCustomCatInput] = useState('');
+
+  // — Priority / reminders —
+  const [priority, setPriority]   = useState<Priority>((editEvent?.priority as Priority) || 'Medium');
+  const [reminders, setReminders] = useState<string[]>(editEvent?.reminders || ['15 minutes before']);
+
+  // ── Modal visibility ────────────────────────────────────────────────────────
+  const [timeTarget,    setTimeTarget]    = useState<'start' | 'end' | null>(null);
+  const [timeModalKey,  setTimeModalKey]  = useState(0);
+  const [tempHourIdx,   setTempHourIdx]   = useState(0);
+  const [tempMinuteIdx, setTempMinuteIdx] = useState(0);
+  const [tempPeriodIdx, setTempPeriodIdx] = useState(0);
+
+  const [calendarVisible, setCalendarVisible] = useState(false);
+  const [calYear,  setCalYear]  = useState(selYear);
+  const [calMonth, setCalMonth] = useState(selMonth);
+  const [calSel,   setCalSel]   = useState<number | null>(selDay);
+
+  const [mapModalVisible,  setMapModalVisible]  = useState(false);
+  const [categoryModal,    setCategoryModal]    = useState(false);
+  const [addCatMode,       setAddCatMode]       = useState(false);
+
+  // ── Open time picker ────────────────────────────────────────────────────────
+  const openTimePicker = (target: 'start' | 'end') => {
+    setTimeTarget(target);
+    if (target === 'start') {
+      setTempHourIdx(startHourIdx);
+      setTempMinuteIdx(startMinuteIdx);
+      setTempPeriodIdx(startPeriodIdx);
+    } else {
+      setTempHourIdx(endHourIdx);
+      setTempMinuteIdx(endMinuteIdx);
+      setTempPeriodIdx(endPeriodIdx);
+    }
+    setTimeModalKey(k => k + 1);
+  };
+
+  const confirmTime = () => {
+    if (timeTarget === 'start') {
+      setStartHourIdx(tempHourIdx);
+      setStartMinuteIdx(tempMinuteIdx);
+      setStartPeriodIdx(tempPeriodIdx);
+    } else {
+      setEndHourIdx(tempHourIdx);
+      setEndMinuteIdx(tempMinuteIdx);
+      setEndPeriodIdx(tempPeriodIdx);
+    }
+    setTimeTarget(null);
+  };
+
+  const fmtTime = (hIdx: number, mIdx: number, pIdx: number) =>
+    `${HOURS_LIST[hIdx]}:${MINUTES_LIST[mIdx]} ${PERIODS_LIST[pIdx]}`;
+
+  // ── Open calendar ───────────────────────────────────────────────────────────
+  const openCalendar = () => {
+    setCalYear(selYear);
+    setCalMonth(selMonth);
+    setCalSel(selDay);
+    setCalendarVisible(true);
+  };
+  const confirmCalendar = () => {
+    if (calSel) { setSelYear(calYear); setSelMonth(calMonth); setSelDay(calSel); }
+    setCalendarVisible(false);
+  };
+  const calPrevMonth = () => {
+    if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); }
+    else setCalMonth(m => m - 1);
+    setCalSel(null);
+  };
+  const calNextMonth = () => {
+    if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); }
+    else setCalMonth(m => m + 1);
+    setCalSel(null);
+  };
+
+  // ── Render calendar grid ────────────────────────────────────────────────────
+  const renderCalendarGrid = () => {
+    const totalDays = daysInMonth(calYear, calMonth);
+    const startWd   = firstWeekday(calYear, calMonth);
+    const cells: (number | null)[] = [];
+    for (let i = 0; i < startWd; i++) cells.push(null);
+    for (let d = 1; d <= totalDays; d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+
+    const rows: (number | null)[][] = [];
+    for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+    return rows;
+  };
+
+  // ── Category ────────────────────────────────────────────────────────────────
+  const addCustomCategory = () => {
+    const c = customCatInput.trim();
+    if (!c) return;
+    if (!categories.includes(c)) setCategories(prev => [...prev, c]);
+    setCategory(c);
+    setCustomCatInput('');
+    setAddCatMode(false);
+    setCategoryModal(false);
+  };
+
+  // ── Map Picker ──────────────────────────────────────────────────────────────
+  const openGoogleMaps = () => {
+    const query = encodeURIComponent(location || 'Philippines');
+    Linking.openURL(`https://maps.google.com/maps?q=${query}`).catch(() =>
+      Alert.alert('Google Maps not available', 'Please type your location manually.')
+    );
+    setMapModalVisible(false);
+  };
+  const openWaze = () => {
+    const query = encodeURIComponent(location || 'Philippines');
+    Linking.openURL(`https://waze.com/ul?q=${query}`).catch(() =>
+      Alert.alert('Waze not available', 'Please type your location manually.')
+    );
+    setMapModalVisible(false);
+  };
+
+  // ── Reminders ───────────────────────────────────────────────────────────────
+  const removeReminder = (r: string) => setReminders(p => p.filter(x => x !== r));
+  const addReminder = () =>
+    Alert.alert('Add Reminder', 'Choose a notification time', [
+      { text: '5 minutes before',  onPress: () => setReminders(p => [...p, '5 minutes before']) },
+      { text: '15 minutes before', onPress: () => setReminders(p => [...p, '15 minutes before']) },
+      { text: '30 minutes before', onPress: () => setReminders(p => [...p, '30 minutes before']) },
+      { text: '1 hour before',     onPress: () => setReminders(p => [...p, '1 hour before']) },
+      { text: '1 day before',      onPress: () => setReminders(p => [...p, '1 day before']) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+
+  // ── Save ────────────────────────────────────────────────────────────────────
+  const handleSave = () => {
+    if (!title.trim()) { Alert.alert('Missing Title', 'Please enter an event title.'); return; }
+    const event: AppEvent = {
+      id: editEvent?.id || Date.now().toString(),
+      title: title.trim(),
+      description: description.trim(),
+      startTime: fmtTime(startHourIdx, startMinuteIdx, startPeriodIdx),
+      startDate: formatDateLabel(selYear, selMonth, selDay),
+      endTime:   hasEnd ? fmtTime(endHourIdx, endMinuteIdx, endPeriodIdx) : '',
+      location:  location.trim(),
+      category,
+      priority,
+      reminders,
+      alarmActive: editEvent?.alarmActive ?? true,
+    };
+    if (editEvent) {
+      updateEvent(event);
+      Alert.alert('Event Updated!', `"${event.title}" has been updated.`, [
+        { text: 'Done', onPress: () => navigation.goBack() },
+      ]);
+    } else {
+      addEvent(event);
+      Alert.alert('Event Created!', `"${event.title}" has been synced to your calendar.`, [
+        { text: 'Done', onPress: () => navigation.goBack() },
+      ]);
+    }
+  };
+
+  // ── UI ──────────────────────────────────────────────────────────────────────
+  return (
+    <SafeAreaView style={[s.safe, { backgroundColor: theme.bg2 }]} edges={['top']}>
+      {/* Header */}
+      <View style={[s.header, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={s.headerSide}>
+          <Text style={[s.cancelText, { color: theme.textSub }]}>Cancel</Text>
         </TouchableOpacity>
-        <View style={{ alignItems: 'center' }}>
-          <Text style={s.topTitle}>New Event</Text>
-          <Text style={s.topSaved}>Auto-saved 2m ago</Text>
+        <View style={s.headerCenter}>
+          <Text style={[s.headerTitle, { color: theme.text }]}>{editEvent ? 'Edit Event' : 'New Event'}</Text>
+          <Text style={s.autosaved}>Auto-saved</Text>
         </View>
-        <TouchableOpacity>
-          <Text style={s.topDrafts}>Drafts</Text>
+        <TouchableOpacity style={s.headerSide} onPress={() => Alert.alert('Drafts', 'Your drafts will appear here.')}>
+          <Text style={s.draftsText}>Drafts</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={{ paddingBottom: 120 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ── Event Title ── */}
+      <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        {/* Title */}
         <TextInput
-          style={s.titleInput}
+          style={[s.titleInput, { color: theme.text, borderBottomColor: theme.border }]}
           placeholder="Event Title (e.g. Project Sync)"
-          placeholderTextColor="#C5C5C5"
+          placeholderTextColor={theme.textDim}
           value={title}
           onChangeText={setTitle}
+          autoFocus
+          maxLength={80}
         />
 
-        {/* ── Description & Agenda ── */}
+        {/* Description */}
         <View style={s.section}>
-          <Text style={s.sectionLabel}>Description &amp; Agenda</Text>
+          <Text style={[s.sectionLabel, { color: theme.textDim }]}>DESCRIPTION & AGENDA</Text>
           <TextInput
-            style={s.descInput}
-            placeholder="What's the goal for this meeting? Add links, agenda items, or notes..."
-            placeholderTextColor="#C5C5C5"
+            style={[s.descInput, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
+            placeholder={"What's the goal? Add notes, links, or agenda items..."}
+            placeholderTextColor={theme.textDim}
             multiline
             value={description}
             onChangeText={setDescription}
+            maxLength={500}
+            textAlignVertical="top"
           />
-          <View style={s.descToolbar}>
-            <TouchableOpacity style={s.toolbarBtn}>
-              <Ionicons name="list-outline" size={14} color="#555" />
-              <Text style={s.toolbarBtnText}> Rich Text</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.toolbarBtn}>
-              <Ionicons name="add" size={14} color="#555" />
-              <Text style={s.toolbarBtnText}> Add Sub-task</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
-        {/* ── Timing ── */}
-        <View style={s.sectionRow}>
-          <Ionicons name="calendar-outline" size={16} color={BLUE} />
-          <Text style={s.sectionRowTitle}> TIMING</Text>
-          <Text style={s.sectionRowRight}>Today</Text>
-        </View>
-        <View style={s.timingRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.timingLabel}>START</Text>
-            <TouchableOpacity style={s.timingVal}>
-              <Ionicons name="time-outline" size={14} color={BLUE} />
-              <Text style={s.timingValText}> 10:30 AM</Text>
-            </TouchableOpacity>
-            <Text style={s.timingDate}>Oct 24, 2023</Text>
+        {/* ─── Timing ─── */}
+        <View style={s.section}>
+          <View style={s.sectionLabelRow}>
+            <Ionicons name="time-outline" size={15} color={BLUE} />
+            <Text style={[s.sectionLabelInline, { color: theme.text }]}>TIMING</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.timingLabel}>END (OPTIONAL)</Text>
-            <TouchableOpacity style={s.timingAdd}>
-              <Ionicons name="add" size={14} color="#888" />
-              <Text style={s.timingAddText}> Add End Time</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
-        {/* Suggested Times */}
-        <View style={s.suggestedBox}>
-          <View style={s.suggestedTitle}>
-            <MaterialCommunityIcons name="star-four-points-outline" size={13} color={PURPLE} />
-            <Text style={s.suggestedTitleText}> SUGGESTED TIMES</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {['Tomorrow 9:00 AM', 'Wed 2:00 PM', 'Friday 11:…'].map(t => (
-              <TouchableOpacity key={t} style={s.suggestedChip}>
-                <Text style={s.suggestedChipText}>{t}</Text>
+          <View style={[s.timingCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            {/* Start */}
+            <Text style={[s.blockLabel, { color: theme.textDim }]}>START</Text>
+            <View style={s.timePickerRow}>
+              {/* Time touch */}
+              <TouchableOpacity style={[s.timeDisplay, { backgroundColor: isDark ? '#1A2A3A' : '#F2F8FF', borderColor: isDark ? '#2A4A6A' : '#C5DDF5' }]} onPress={() => openTimePicker('start')}>
+                <Text style={[s.timeDisplayText, { color: theme.text }]}>
+                  {fmtTime(startHourIdx, startMinuteIdx, startPeriodIdx)}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={BLUE} style={{ marginLeft: 6 }} />
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+              {/* Date touch */}
+              <TouchableOpacity style={[s.dateDisplay, { backgroundColor: theme.bg2, borderColor: theme.border }]} onPress={openCalendar}>
+                <Ionicons name="calendar-outline" size={15} color={theme.textDim} style={{ marginRight: 6 }} />
+                <Text style={[s.dateDisplayText, { color: theme.textSub }]}>
+                  {formatDateLabel(selYear, selMonth, selDay)}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-        {/* ── Location & Venue ── */}
-        <View style={s.sectionRow}>
-          <Ionicons name="location-outline" size={16} color="#555" />
-          <Text style={s.sectionRowTitle}> LOCATION &amp; VENUE</Text>
-        </View>
-        <View style={s.locationInput}>
-          <Ionicons name="location-outline" size={16} color="#AAA" />
-          <Text style={s.locationPlaceholder}> Enter address or place name</Text>
-        </View>
-        <View style={s.locationTools}>
-          <TouchableOpacity style={s.toolbarBtn}>
-            <Ionicons name="map-outline" size={14} color="#555" />
-            <Text style={s.toolbarBtnText}> Open Map Picker</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.toolbarBtn}>
-            <MaterialCommunityIcons name="star-four-points-outline" size={13} color={BLUE} />
-            <Text style={[s.toolbarBtnText, { color: BLUE }]}> Auto-suggest</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={[s.timingDivider, { backgroundColor: theme.border }]} />
 
-        {/* Map placeholder */}
-        <View style={s.mapPlaceholder}>
-          <Ionicons name="location" size={24} color="#E05252" style={s.mapPin} />
-          <Text style={s.mapMiles}>12.4 miles away</Text>
-        </View>
-
-        {/* Location-Based Alert toggle */}
-        <View style={s.toggleRow}>
-          <Ionicons name="notifications-outline" size={16} color="#555" />
-          <Text style={s.toggleLabel}> Location-Based Alert</Text>
-          <Switch
-            value={locationAlert}
-            onValueChange={setLocationAlert}
-            trackColor={{ false: '#E0E0E0', true: BLUE }}
-            thumbColor="#fff"
-            style={{ marginLeft: 'auto' }}
-          />
-        </View>
-
-        {/* Event Category + Priority */}
-        <View style={s.catPriorityRow}>
-          <View style={{ flex: 1, marginRight: 12 }}>
-            <Text style={s.fieldLabel}>Event Category</Text>
-            <TouchableOpacity style={s.dropdown}>
-              <Text style={s.dropdownText}>Work</Text>
-              <Ionicons name="chevron-down" size={14} color="#555" />
-            </TouchableOpacity>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.fieldLabel}>Priority Level</Text>
-            <View style={s.priorityBtns}>
-              {(['Low', 'Medium', 'High'] as const).map(p => (
-                <TouchableOpacity
-                  key={p}
-                  onPress={() => setPriority(p)}
-                  style={[
-                    s.priorityBtn,
-                    priority === p && {
-                      backgroundColor:
-                        p === 'High' ? '#E05252' : p === 'Medium' ? '#E09C52' : '#52B788',
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      s.priorityBtnText,
-                      priority === p && { color: '#fff' },
-                    ]}
-                  >
-                    {p}
-                  </Text>
+            {/* End */}
+            <View style={s.endLabelRow}>
+              <Text style={[s.blockLabel, { color: theme.textDim }]}>END  (OPTIONAL)</Text>
+              {hasEnd && (
+                <TouchableOpacity onPress={() => setHasEnd(false)}>
+                  <Ionicons name="close-circle-outline" size={16} color={theme.textDim} />
                 </TouchableOpacity>
-              ))}
+              )}
             </View>
+            {hasEnd ? (
+              <TouchableOpacity style={[s.timeDisplay, { backgroundColor: isDark ? '#1A2A3A' : '#F2F8FF', borderColor: isDark ? '#2A4A6A' : '#C5DDF5' }]} onPress={() => openTimePicker('end')}>
+                <Text style={[s.timeDisplayText, { color: theme.text }]}>
+                  {fmtTime(endHourIdx, endMinuteIdx, endPeriodIdx)}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={BLUE} style={{ marginLeft: 6 }} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={s.addEndBtn} onPress={() => setHasEnd(true)}>
+                <Ionicons name="add" size={14} color={theme.textDim} />
+                <Text style={[s.addEndText, { color: theme.textDim }]}>Add End Time</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
-        {/* ── Reminders & Alerts ── */}
-        <View style={s.sectionRow}>
-          <Ionicons name="notifications-outline" size={16} color="#555" />
-          <Text style={s.sectionRowTitle}> REMINDERS &amp; ALERTS</Text>
-          <Text style={s.sectionRowRight}>3 Active</Text>
-        </View>
-        {[
-          { icon: 'timer-outline' as const, label: '15 minutes before' },
-          { icon: 'refresh-outline' as const, label: 'Daily Repeat' },
-        ].map(item => (
-          <View key={item.label} style={s.reminderRow}>
-            <Ionicons name={item.icon} size={16} color="#555" />
-            <Text style={s.reminderText}> {item.label}</Text>
-            <TouchableOpacity style={{ marginLeft: 'auto' }}>
-              <Ionicons name="close" size={16} color="#AAA" />
-            </TouchableOpacity>
+        {/* ─── Location ─── */}
+        <View style={s.section}>
+          <View style={s.sectionLabelRow}>
+            <Ionicons name="location-outline" size={15} color={theme.textDim} />
+            <Text style={[s.sectionLabelInline, { color: theme.text }]}>LOCATION & VENUE</Text>
+            <Text style={s.optionalBadge}>optional</Text>
           </View>
-        ))}
-        <TouchableOpacity style={s.addRowBtn}>
-          <Ionicons name="add" size={15} color={BLUE} />
-          <Text style={[s.addRowBtnText, { color: BLUE }]}> Add Custom Notification</Text>
-        </TouchableOpacity>
 
-        {/* Advanced Notification Settings */}
-        <TouchableOpacity style={s.advancedRow}>
-          <Ionicons name="options-outline" size={15} color="#888" />
-          <Text style={s.advancedText}> ADVANCED NOTIFICATION SETTINGS</Text>
-          <Ionicons name="chevron-down" size={14} color="#888" style={{ marginLeft: 'auto' }} />
-        </TouchableOpacity>
-
-        {/* ── Collaboration ── */}
-        <View style={s.sectionRow}>
-          <Ionicons name="people-outline" size={16} color="#555" />
-          <Text style={s.sectionRowTitle}> COLLABORATION</Text>
-        </View>
-        <View style={s.inviteInput}>
-          <Ionicons name="share-social-outline" size={16} color="#AAA" />
-          <Text style={s.invitePlaceholder}> Invite by email or name...</Text>
-        </View>
-        <View style={s.collaboratorsRow}>
-          {[BLUE, '#E09C52', '#52B788'].map((c, i) => (
-            <View
-              key={i}
-              style={[s.avatar, { backgroundColor: c, marginLeft: i === 0 ? 0 : -8 }]}
+          <View style={[s.locationBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Ionicons name="location-outline" size={16} color={theme.textDim} style={{ marginRight: 8 }} />
+            <TextInput
+              style={[s.locationText, { color: theme.text }]}
+              placeholder="Enter address or place name"
+              placeholderTextColor={theme.textDim}
+              value={location}
+              onChangeText={setLocation}
             />
+          </View>
+
+          <View style={s.mapBtnRow}>
+            <TouchableOpacity style={s.mapBtn} onPress={() => setMapModalVisible(true)}>
+              <Ionicons name="map-outline" size={15} color={BLUE} />
+              <Text style={s.mapBtnText}>Open Map</Text>
+            </TouchableOpacity>
+            <Text style={s.mapHint}>or just type above</Text>
+          </View>
+        </View>
+
+        {/* ─── Category & Priority ─── */}
+        <View style={s.section}>
+          <View style={s.catPriorityRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.fieldLabel, { color: theme.textDim }]}>Event Category</Text>
+              <TouchableOpacity style={[s.categoryDropdown, { backgroundColor: isDark ? '#1A2A3A' : '#EBF4FF', borderColor: BLUE }]} onPress={() => { setAddCatMode(false); setCategoryModal(true); }}>
+                <Text style={s.categoryDropdownText}>{category}</Text>
+                <Ionicons name="chevron-down" size={14} color={BLUE} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flex: 1.3 }}>
+              <Text style={[s.fieldLabel, { color: theme.textDim }]}>Priority Level</Text>
+              <View style={s.priorityPills}>
+                {PRIORITIES.map(p => {
+                  const active = priority === p;
+                  return (
+                    <TouchableOpacity
+                      key={p}
+                      style={[s.priorityPill, { backgroundColor: active ? PRIORITY_COLORS[p] : theme.card, borderColor: active ? PRIORITY_COLORS[p] : theme.border }]}
+                      onPress={() => setPriority(p)}
+                    >
+                      <Text style={[s.priorityPillText, { color: active ? '#fff' : theme.textSub }]}>{p}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* ─── Reminders ─── */}
+        <View style={s.section}>
+          <View style={s.sectionLabelRow}>
+            <Ionicons name="notifications-outline" size={15} color={theme.textSub} />
+            <Text style={[s.sectionLabelInline, { color: theme.text, flex: 1 }]}>REMINDERS & ALERTS</Text>
+            <View style={[s.activeCountBadge, { backgroundColor: isDark ? '#1A2A3A' : '#EBF4FF' }]}>
+              <Text style={s.activeCountText}>{reminders.length} Active</Text>
+            </View>
+          </View>
+          {reminders.map((r, i) => (
+            <View key={i} style={[s.reminderRow, { borderBottomColor: theme.border }]}>
+              <Ionicons name="time-outline" size={16} color="#6B9FD6" style={{ marginRight: 10 }} />
+              <Text style={[s.reminderText, { color: theme.textSub }]}>{r}</Text>
+              <TouchableOpacity onPress={() => removeReminder(r)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={18} color={theme.textDim} />
+              </TouchableOpacity>
+            </View>
           ))}
-          <View style={[s.avatar, { backgroundColor: '#DDD', marginLeft: -8 }]}>
-            <Text style={{ fontSize: 11, color: '#555', fontWeight: '700' }}>+3</Text>
-          </View>
-          <Text style={s.collaboratorsLabel}> 5 people invited · 2 RSVP'd</Text>
-        </View>
-        <TouchableOpacity style={s.shareBtn}>
-          <Ionicons name="add" size={14} color="#555" />
-          <Text style={s.shareBtnText}> Generate Shareable Invite Link</Text>
-        </TouchableOpacity>
-
-        {/* Attachments + Tags */}
-        <View style={s.attTagRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.fieldLabel}>Attachments</Text>
-            <TouchableOpacity style={s.attBox}>
-              <Ionicons name="attach-outline" size={22} color="#AAA" />
-              <Text style={s.attText}>Add Files</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.fieldLabel}>Tags &amp; Labels</Text>
-            <View style={s.tagsRow}>
-              <View style={s.tag}><Text style={s.tagText}>#Urgent</Text></View>
-              <View style={s.tag}><Text style={s.tagText}>#Internal</Text></View>
-            </View>
-            <TouchableOpacity style={s.addTag}>
-              <Ionicons name="add" size={13} color="#888" />
-              <Text style={s.addTagText}> Tag</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* ── Live Widget Preview ── */}
-        <View style={s.widgetPreview}>
-          <View style={s.widgetPreviewLeft}>
-            <Text style={s.widgetPreviewBadge}>LIVE WIDGET PREVIEW</Text>
-            <Text style={s.widgetPreviewTitle}>Board Review</Text>
-            <Text style={s.widgetPreviewSub}>Starts in 2h 45m</Text>
-          </View>
-          <View style={s.widgetPreviewRight}>
-            <View style={s.widgetPreviewIcon}>
-              <Ionicons name="grid-outline" size={13} color={BLUE} />
-              <Text style={{ fontSize: 10, color: BLUE }}> Dashboard</Text>
-            </View>
-            <View style={s.widgetCounters}>
-              <View style={s.widgetCounter}>
-                <Text style={s.widgetCounterVal}>02</Text>
-                <Text style={s.widgetCounterLabel}>HR</Text>
-              </View>
-              <View style={s.widgetCounter}>
-                <Text style={s.widgetCounterVal}>45</Text>
-                <Text style={s.widgetCounterLabel}>Min</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Widget actions */}
-        <View style={s.widgetActions}>
-          <TouchableOpacity style={s.widgetActionBtn}>
-            <Ionicons name="checkmark-circle-outline" size={14} color="#555" />
-            <Text style={s.widgetActionText}> Mark Done</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.widgetActionBtn}>
-            <Ionicons name="alarm-outline" size={14} color="#555" />
-            <Text style={s.widgetActionText}> Snooze 10m</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.widgetActionBtn}>
-            <Ionicons name="refresh-outline" size={14} color="#555" />
-            <Text style={s.widgetActionText}> Every Week</Text>
+          <TouchableOpacity style={s.addRowBtn} onPress={addReminder}>
+            <Ionicons name="add" size={15} color={BLUE} />
+            <Text style={s.addRowBtnText}>Add Custom Notification</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
 
-      {/* ── Create & Sync Button (fixed bottom) ── */}
-      <View style={s.bottomBar}>
-        <TouchableOpacity style={s.createBtn} onPress={() => {
-          if (!title.trim()) {
-            Alert.alert('Validation', 'Please enter an event title.');
-            return;
-          }
-          Alert.alert('Event Created!', `'${title.trim()}' has been synced to your calendar.`, [
-            { text: 'OK', onPress: () => navigation.goBack() },
-          ]);
-        }}>
-          <Text style={s.createBtnText}>Create &amp; Sync Event</Text>
+      {/* Footer */}
+      <View style={[s.footer, { backgroundColor: theme.bg, borderTopColor: theme.border }]}>
+        <TouchableOpacity style={s.createBtn} onPress={handleSave} activeOpacity={0.85}>
+          <Text style={s.createBtnText}>Create & Sync Event</Text>
         </TouchableOpacity>
       </View>
+
+      {/* ══════════════════════════════════════════════════════════
+          TIME PICKER MODAL (drum-roll)
+      ══════════════════════════════════════════════════════════ */}
+      <Modal
+        visible={timeTarget !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setTimeTarget(null)}
+      >
+        <Pressable style={s.overlay} onPress={() => setTimeTarget(null)} />
+        <View style={[s.bottomSheet, { backgroundColor: theme.bg }]}>
+          {/* Handle */}
+          <View style={[s.sheetHandle, { backgroundColor: theme.border }]} />
+
+          <View style={[s.sheetHeader, { borderBottomColor: theme.border }]}>
+            <TouchableOpacity onPress={() => setTimeTarget(null)}>
+              <Text style={[s.sheetCancel, { color: theme.textDim }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[s.sheetTitle, { color: theme.text }]}>
+              {timeTarget === 'start' ? 'Start Time' : 'End Time'}
+            </Text>
+            <TouchableOpacity onPress={confirmTime}>
+              <Text style={s.sheetDone}>Done</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={s.wheelRow}>
+            <WheelCol
+              wheelKey={`h-${timeModalKey}`}
+              items={HOURS_LIST}
+              selectedIndex={tempHourIdx}
+              onSelect={setTempHourIdx}
+              width={90}
+            />
+            <WheelCol
+              wheelKey={`m-${timeModalKey}`}
+              items={MINUTES_LIST}
+              selectedIndex={tempMinuteIdx}
+              onSelect={setTempMinuteIdx}
+              width={90}
+            />
+            <WheelCol
+              wheelKey={`p-${timeModalKey}`}
+              items={PERIODS_LIST}
+              selectedIndex={tempPeriodIdx}
+              onSelect={setTempPeriodIdx}
+              width={80}
+            />
+          </View>
+          <View style={{ height: 24 }} />
+        </View>
+      </Modal>
+
+      {/* ══════════════════════════════════════════════════════════
+          CALENDAR MODAL
+      ══════════════════════════════════════════════════════════ */}
+      <Modal
+        visible={calendarVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setCalendarVisible(false)}
+      >
+        <Pressable style={s.overlay} onPress={() => setCalendarVisible(false)} />
+        <View style={[s.calSheet, { backgroundColor: theme.bg }]}>
+          <View style={[s.sheetHandle, { backgroundColor: theme.border }]} />
+
+          <View style={[s.sheetHeader, { borderBottomColor: theme.border }]}>
+            <TouchableOpacity onPress={() => setCalendarVisible(false)}>
+              <Text style={[s.sheetCancel, { color: theme.textDim }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[s.sheetTitle, { color: theme.text }]}>Select Date</Text>
+            <TouchableOpacity onPress={confirmCalendar}>
+              <Text style={s.sheetDone}>Done</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Month navigation */}
+          <View style={s.calNavRow}>
+            <TouchableOpacity onPress={calPrevMonth} style={s.calNavBtn}>
+              <Ionicons name="chevron-back" size={22} color={theme.textSub} />
+            </TouchableOpacity>
+            <Text style={[s.calMonthTitle, { color: theme.text }]}>{MONTH_NAMES[calMonth]} {calYear}</Text>
+            <TouchableOpacity onPress={calNextMonth} style={s.calNavBtn}>
+              <Ionicons name="chevron-forward" size={22} color={theme.textSub} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Weekday headers */}
+          <View style={s.calDayHeaders}>
+            {DAY_SHORTS.map(d => (
+              <Text key={d} style={[s.calDayHeader, { color: theme.textDim }]}>{d}</Text>
+            ))}
+          </View>
+
+          {/* Day grid */}
+          {renderCalendarGrid().map((row, ri) => (
+            <View key={ri} style={s.calRow}>
+              {row.map((day, ci) => {
+                if (!day) return <View key={ci} style={s.calCell} />;
+                const isToday =
+                  day === now.getDate() &&
+                  calMonth === now.getMonth() &&
+                  calYear === now.getFullYear();
+                const isSel = day === calSel;
+                return (
+                  <TouchableOpacity
+                    key={ci}
+                    style={[
+                      s.calCell,
+                      isToday && s.calCellToday,
+                      isSel && s.calCellSelected,
+                    ]}
+                    onPress={() => setCalSel(day)}
+                  >
+                    <Text style={[
+                      s.calCellText,
+                      { color: theme.text },
+                      isToday && !isSel && s.calCellTodayText,
+                      isSel && s.calCellSelectedText,
+                    ]}>{day}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ))}
+          <View style={{ height: 20 }} />
+        </View>
+      </Modal>
+
+      {/* ══════════════════════════════════════════════════════════
+          MAP PICKER MODAL
+      ══════════════════════════════════════════════════════════ */}
+      <Modal
+        visible={mapModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setMapModalVisible(false)}
+      >
+        <Pressable style={s.overlay} onPress={() => setMapModalVisible(false)} />
+        <View style={[s.mapSheet, { backgroundColor: theme.bg }]}>
+          <View style={[s.sheetHandle, { backgroundColor: theme.border }]} />
+          <Text style={[s.sheetTitle2, { color: theme.text }]}>Open Map</Text>
+          <Text style={[s.mapSubtext, { color: theme.textDim }]}>
+            {location.trim()
+              ? `Searching for: "${location}"`
+              : 'Type an address above, then open a map.'}
+          </Text>
+
+          <TouchableOpacity style={[s.mapOptionBtn, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={openGoogleMaps}>
+            <View style={s.mapOptionIcon}>
+              <Ionicons name="navigate-circle-outline" size={26} color="#4285F4" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.mapOptionTitle, { color: theme.text }]}>Google Maps</Text>
+              <Text style={[s.mapOptionSub, { color: theme.textDim }]}>Open in Google Maps</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.textDim} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[s.mapOptionBtn, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={openWaze}>
+            <View style={[s.mapOptionIcon, { backgroundColor: isDark ? '#1A2A3A' : '#EDF5FF' }]}>
+              <Ionicons name="car-outline" size={24} color="#33CCFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.mapOptionTitle, { color: theme.text }]}>Waze</Text>
+              <Text style={[s.mapOptionSub, { color: theme.textDim }]}>Navigate with Waze</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.textDim} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={s.mapCancelBtn} onPress={() => setMapModalVisible(false)}>
+            <Text style={[s.mapCancelText, { color: theme.textDim }]}>Cancel, type manually</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* ══════════════════════════════════════════════════════════
+          CATEGORY PICKER MODAL
+      ══════════════════════════════════════════════════════════ */}
+      <Modal
+        visible={categoryModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setCategoryModal(false)}
+      >
+        <Pressable style={s.overlay} onPress={() => setCategoryModal(false)} />
+        <View style={[s.catSheet, { backgroundColor: theme.bg }]}>
+          <View style={[s.sheetHandle, { backgroundColor: theme.border }]} />
+          <View style={[s.sheetHeader, { borderBottomColor: theme.border }]}>
+            <TouchableOpacity onPress={() => setCategoryModal(false)}>
+              <Text style={[s.sheetCancel, { color: theme.textDim }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[s.sheetTitle, { color: theme.text }]}>Event Category</Text>
+            <View style={{ width: 60 }} />
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
+            {categories.map(c => (
+              <TouchableOpacity
+                key={c}
+                style={[s.catRow, { borderBottomColor: theme.border }]}
+                onPress={() => { setCategory(c); setCategoryModal(false); }}
+              >
+                <Text style={[s.catRowText, { color: theme.textSub }, c === category && { color: BLUE, fontWeight: '700' }]}>{c}</Text>
+                {c === category && <Ionicons name="checkmark" size={18} color={BLUE} />}
+              </TouchableOpacity>
+            ))}
+
+            {/* Add custom */}
+            {addCatMode ? (
+              <View style={[s.addCatRow, { borderBottomColor: theme.border }]}>
+                <TextInput
+                  style={[s.addCatInput, { backgroundColor: theme.bg2, borderColor: theme.border, color: theme.text }]}
+                  placeholder="New category name"
+                  placeholderTextColor={theme.textDim}
+                  value={customCatInput}
+                  onChangeText={setCustomCatInput}
+                  autoFocus
+                  maxLength={30}
+                />
+                <TouchableOpacity style={s.addCatConfirmBtn} onPress={addCustomCategory}>
+                  <Text style={s.addCatConfirmText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={[s.catRow, { borderBottomColor: theme.border }]} onPress={() => setAddCatMode(true)}>
+                <Ionicons name="add-circle-outline" size={18} color={BLUE} style={{ marginRight: 10 }} />
+                <Text style={[s.catRowText, { color: BLUE }]}>Add Custom Category</Text>
+              </TouchableOpacity>
+            )}
+            <View style={{ height: 16 }} />
+          </ScrollView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
+// ─── Styles ─────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 1 },
 
-  /* Top bar */
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
-  topCancel: { fontSize: 15, color: '#555', fontWeight: '500' },
-  topTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
-  topSaved: { fontSize: 11, color: '#3DAE7C', marginTop: 2 },
-  topDrafts: { fontSize: 15, color: BLUE, fontWeight: '600' },
+  headerSide: { width: 60 },
+  headerCenter: { flex: 1, alignItems: 'center' },
+  headerTitle: { fontSize: 16, fontWeight: '700' },
+  autosaved: { fontSize: 11, color: '#52B788', fontWeight: '500', marginTop: 1 },
+  cancelText: { fontSize: 15, fontWeight: '500' },
+  draftsText: { fontSize: 15, color: BLUE, fontWeight: '700', textAlign: 'right' },
+
   scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 },
 
-  /* Title input */
   titleInput: {
-    fontSize: 20,
-    fontWeight: '300',
-    color: '#1A1A1A',
-    paddingHorizontal: 16,
-    paddingVertical: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    fontSize: 22, fontWeight: '700',
+    borderBottomWidth: 2,
+    paddingBottom: 12, marginBottom: 20,
   },
 
-  /* Section box */
-  section: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: '#EBEBEB',
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  sectionLabel: {
-    fontSize: 12,
-    color: '#999',
-    paddingHorizontal: 12,
-    paddingTop: 10,
-  },
+  section: { marginBottom: 24 },
+  sectionLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: 10 },
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  sectionLabelInline: { fontSize: 11, fontWeight: '800', letterSpacing: 1, marginLeft: 6 },
+  fieldLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 },
+  optionalBadge: { marginLeft: 8, fontSize: 10, color: '#bbb', fontWeight: '600', fontStyle: 'italic' },
+
   descInput: {
-    fontSize: 14,
-    color: '#444',
-    paddingHorizontal: 12,
-    paddingTop: 6,
-    paddingBottom: 10,
-    minHeight: 70,
-  },
-  descToolbar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    padding: 10,
-    gap: 10,
-  },
-  toolbarBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  toolbarBtnText: { fontSize: 12, color: '#555' },
-
-  /* Section row header */
-  sectionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 10,
-  },
-  sectionRowTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#444',
-    letterSpacing: 0.5,
-  },
-  sectionRowRight: { marginLeft: 'auto', fontSize: 13, color: '#888' },
-
-  /* Timing */
-  timingRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 16,
-    marginBottom: 10,
-  },
-  timingLabel: { fontSize: 11, color: '#AAA', fontWeight: '600', marginBottom: 4 },
-  timingVal: { flexDirection: 'row', alignItems: 'center' },
-  timingValText: { fontSize: 18, fontWeight: '700', color: BLUE },
-  timingDate: { fontSize: 12, color: '#999', marginTop: 2 },
-  timingAdd: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  timingAddText: { fontSize: 14, color: '#999' },
-
-  /* Suggested times */
-  suggestedBox: {
-    marginHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E8E4FF',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 6,
-    backgroundColor: '#FAFAFE',
-  },
-  suggestedTitle: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  suggestedTitleText: { fontSize: 12, fontWeight: '700', color: PURPLE, letterSpacing: 0.5 },
-  suggestedChip: {
-    borderWidth: 1,
-    borderColor: '#C8B8E8',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
-  },
-  suggestedChipText: { fontSize: 13, color: PURPLE },
-
-  /* Location */
-  locationInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 10,
-  },
-  locationPlaceholder: { fontSize: 14, color: '#C5C5C5' },
-  locationTools: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 10,
-    marginBottom: 10,
+    borderRadius: 12, borderWidth: 1,
+    padding: 14, fontSize: 14, minHeight: 90, lineHeight: 20,
   },
 
-  /* Map placeholder */
-  mapPlaceholder: {
-    marginHorizontal: 16,
-    height: 110,
-    borderRadius: 10,
-    backgroundColor: '#EDEDED',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-    position: 'relative',
-    overflow: 'hidden',
+  // Timing
+  timingCard: {
+    borderRadius: 14, borderWidth: 1, padding: 16,
   },
-  mapPin: { marginTop: 10 },
-  mapMiles: {
-    position: 'absolute',
-    bottom: 8,
-    right: 10,
-    fontSize: 11,
-    color: '#555',
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    paddingHorizontal: 6,
-    borderRadius: 4,
-  },
-
-  /* Toggle */
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F5F5F5',
-  },
-  toggleLabel: { fontSize: 14, color: '#333' },
-
-  /* Category + Priority */
-  catPriorityRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginBottom: 4,
-    marginTop: 4,
-    alignItems: 'flex-start',
-  },
-  fieldLabel: { fontSize: 12, color: '#888', marginBottom: 6 },
-  dropdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  dropdownText: { fontSize: 14, color: '#333' },
-  priorityBtns: { flexDirection: 'row', gap: 4 },
-  priorityBtn: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  priorityBtnText: { fontSize: 12, color: '#555' },
-
-  /* Reminders */
-  reminderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F5F5F5',
-  },
-  reminderText: { fontSize: 14, color: '#333' },
-  addRowBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  addRowBtnText: { fontSize: 14 },
-  advancedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F5F5F5',
-    marginBottom: 4,
-  },
-  advancedText: { fontSize: 12, color: '#888', fontWeight: '600', letterSpacing: 0.5 },
-
-  /* Collaboration */
-  inviteInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 12,
-  },
-  invitePlaceholder: { fontSize: 14, color: '#C5C5C5' },
-  collaboratorsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 10,
-  },
-  avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 2,
-    borderColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  collaboratorsLabel: { fontSize: 13, color: '#555', marginLeft: 8 },
-  shareBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    paddingVertical: 10,
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  shareBtnText: { fontSize: 13, color: '#555' },
-
-  /* Attachments + Tags */
-  attTagRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginTop: 4,
-    marginBottom: 16,
-    gap: 16,
-  },
-  attBox: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderStyle: 'dashed',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-  },
-  attText: { fontSize: 12, color: '#AAA', marginTop: 4 },
-  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
-  tag: {
-    backgroundColor: '#F0EFFE',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  tagText: { fontSize: 12, color: PURPLE },
-  addTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  blockLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10 },
+  timePickerRow: { gap: 10, marginBottom: 4 },
+  timeDisplay: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: 12, borderWidth: 1,
+    paddingHorizontal: 16, paddingVertical: 14, marginBottom: 8,
     alignSelf: 'flex-start',
   },
-  addTagText: { fontSize: 12, color: '#888' },
+  timeDisplayText: { fontSize: 26, fontWeight: '700' },
+  dateDisplay: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: 12, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 11,
+    alignSelf: 'flex-start',
+  },
+  dateDisplayText: { fontSize: 14, fontWeight: '500' },
+  timingDivider: { height: 1, marginVertical: 14 },
+  endLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  addEndBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 },
+  addEndText: { fontSize: 14, fontWeight: '500' },
 
-  /* Live Widget Preview */
-  widgetPreview: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
+  // Location
+  locationBox: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: 12, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 12, marginBottom: 10,
+  },
+  locationText: { flex: 1, fontSize: 14 },
+  mapBtnRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  mapBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1, borderColor: BLUE, borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#EBF4FF',
+  },
+  mapBtnText: { fontSize: 13, color: BLUE, fontWeight: '600' },
+  mapHint: { fontSize: 12, color: '#BBB', fontStyle: 'italic' },
+
+  // Category + Priority
+  catPriorityRow: { flexDirection: 'row', gap: 14 },
+  categoryDropdown: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1.5, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 11,
+  },
+  categoryDropdownText: { fontSize: 14, fontWeight: '700', color: BLUE, flex: 1, marginRight: 4 },
+  priorityPills: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  priorityPill: {
+    paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 0,
   },
-  widgetPreviewLeft: { flex: 1 },
-  widgetPreviewBadge: { fontSize: 10, color: '#3DAE7C', fontWeight: '700', letterSpacing: 0.5, marginBottom: 4 },
-  widgetPreviewTitle: { fontSize: 16, fontWeight: '800', color: '#1A1A1A', marginBottom: 2 },
-  widgetPreviewSub: { fontSize: 12, color: '#888' },
-  widgetPreviewRight: { alignItems: 'flex-end' },
-  widgetPreviewIcon: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  widgetCounters: { flexDirection: 'row', gap: 8 },
-  widgetCounter: { alignItems: 'center' },
-  widgetCounterVal: { fontSize: 20, fontWeight: '800', color: '#1A1A1A' },
-  widgetCounterLabel: { fontSize: 10, color: '#888' },
+  priorityPillText: { fontSize: 12, fontWeight: '600' },
 
-  /* Widget actions */
-  widgetActions: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderTopWidth: 0,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    marginBottom: 20,
-    overflow: 'hidden',
+  // Reminders
+  activeCountBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  activeCountText: { fontSize: 11, color: BLUE, fontWeight: '700' },
+  reminderRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 12, borderBottomWidth: 1,
   },
-  widgetActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRightWidth: 1,
-    borderRightColor: '#E5E7EB',
-  },
-  widgetActionText: { fontSize: 12, color: '#555' },
+  reminderText: { flex: 1, fontSize: 14, fontWeight: '500' },
+  addRowBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 12 },
+  addRowBtnText: { fontSize: 14, color: BLUE, fontWeight: '600' },
 
-  /* Bottom bar */
-  bottomBar: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  // Footer
+  footer: {
+    paddingHorizontal: 16, paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    backgroundColor: '#fff',
   },
   createBtn: {
-    backgroundColor: BLUE,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
+    backgroundColor: BLUE, borderRadius: 14,
+    paddingVertical: 16, alignItems: 'center',
   },
-  createBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  createBtnText: { fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
+
+  // Shared overlay / sheet
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheetHandle: {
+    width: 40, height: 4, borderRadius: 2,
+    alignSelf: 'center', marginTop: 10, marginBottom: 4,
+  },
+  sheetHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 18, paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  sheetCancel: { fontSize: 15, fontWeight: '500', width: 60 },
+  sheetTitle: { fontSize: 16, fontWeight: '700' },
+  sheetDone: { fontSize: 15, color: BLUE, fontWeight: '700', width: 60, textAlign: 'right' },
+
+  // Time picker sheet
+  bottomSheet: {
+    borderTopLeftRadius: 22, borderTopRightRadius: 22,
+  },
+  wheelRow: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    gap: 4, paddingVertical: 8,
+  },
+
+  // Calendar sheet
+  calSheet: {
+    borderTopLeftRadius: 22, borderTopRightRadius: 22,
+    paddingHorizontal: 14,
+  },
+  calNavRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 8, paddingVertical: 14,
+  },
+  calNavBtn: { padding: 4 },
+  calMonthTitle: { fontSize: 18, fontWeight: '700' },
+  calDayHeaders: { flexDirection: 'row', marginBottom: 4 },
+  calDayHeader: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '700' },
+  calRow: { flexDirection: 'row', marginBottom: 2 },
+  calCell: {
+    flex: 1, height: 44, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  calCellToday: { borderWidth: 1.5, borderColor: BLUE },
+  calCellSelected: { backgroundColor: BLUE },
+  calCellText: { fontSize: 15, fontWeight: '500' },
+  calCellTodayText: { color: BLUE, fontWeight: '700' },
+  calCellSelectedText: { color: '#fff', fontWeight: '700' },
+
+  // Map sheet
+  mapSheet: {
+    borderTopLeftRadius: 22, borderTopRightRadius: 22,
+    paddingHorizontal: 16, paddingBottom: 32,
+  },
+  sheetTitle2: { fontSize: 18, fontWeight: '700', textAlign: 'center', marginVertical: 10 },
+  mapSubtext: { fontSize: 13, textAlign: 'center', marginBottom: 20 },
+  mapOptionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    borderRadius: 14, padding: 14, marginBottom: 12,
+    borderWidth: 1,
+  },
+  mapOptionIcon: {
+    width: 46, height: 46, borderRadius: 14,
+    backgroundColor: '#EAF3FF', alignItems: 'center', justifyContent: 'center',
+  },
+  mapOptionTitle: { fontSize: 15, fontWeight: '700' },
+  mapOptionSub: { fontSize: 12, marginTop: 2 },
+  mapCancelBtn: { alignItems: 'center', paddingVertical: 14 },
+  mapCancelText: { fontSize: 14, fontWeight: '500' },
+
+  // Category sheet
+  catSheet: {
+    borderTopLeftRadius: 22, borderTopRightRadius: 22,
+  },
+  catRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 18, paddingVertical: 15,
+    borderBottomWidth: 1,
+  },
+  catRowText: { fontSize: 15, fontWeight: '500' },
+  addCatRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 18, paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  addCatInput: {
+    flex: 1, borderWidth: 1, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 9, fontSize: 14,
+  },
+  addCatConfirmBtn: {
+    backgroundColor: BLUE, borderRadius: 10,
+    paddingHorizontal: 16, paddingVertical: 9,
+  },
+  addCatConfirmText: { fontSize: 14, color: '#fff', fontWeight: '700' },
 });

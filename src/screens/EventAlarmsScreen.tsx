@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,340 +7,330 @@ import {
   Switch,
   StyleSheet,
   Alert,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useEvents, AppEvent } from '../context/EventStore';
+import { useTheme } from '../context/ThemeContext';
+import { BurgerMenu, PulsingFAB } from '../components/BurgerMenu';
 
 const BLUE = '#4A90D9';
 
-const EVENT_ALARMS = [
-  {
-    id: '1',
-    time: '08:30',
-    period: 'AM',
-    active: true,
-    title: 'Product Sync: Q3 Roadmap',
-    eventTime: 'Today • 9:00 AM',
-    status: 'going',
-    locationAlert: true,
-    ringtone: 'Chimes',
-    repeat: 'MON,WED,FRI',
-    timeBefore: ['15m before', '5m before'],
-    avatars: ['A', 'B', 'C', '+2'],
-  },
-  {
-    id: '2',
-    time: '06:15',
-    period: 'PM',
-    active: false,
-    title: 'Dinner at Blue Bayou',
-    eventTime: 'Tomorrow • 7:00 PM',
-    status: 'pending',
-    locationAlert: false,
-    ringtone: 'Piano Bloom',
-    repeat: 'ONCE',
-    timeBefore: ['1h before'],
-    avatars: [],
-  },
-  {
-    id: '3',
-    time: '09:00',
-    period: 'AM',
-    active: true,
-    title: 'Morning Yoga Session',
-    eventTime: 'Daily',
-    status: 'going',
-    locationAlert: false,
-    ringtone: 'Zen Flute',
-    repeat: 'EVERYDAY',
-    timeBefore: ['10m before'],
-    avatars: [],
-  },
-];
+function parseTime(timeStr: string): { time: string; period: 'AM' | 'PM' } {
+  const parts = timeStr.trim().split(' ');
+  const period: 'AM' | 'PM' = (parts[1] || '').toUpperCase() === 'PM' ? 'PM' : 'AM';
+  return { time: parts[0] || '--:--', period };
+}
 
-export default function EventAlarmsScreen() {
-  const [alarms, setAlarms] = useState(EVENT_ALARMS);
-  const [waterPlantsActive, setWaterPlantsActive] = useState(true);
+export default function EventAlarmsScreen({ navigation }: any) {
+  const { theme, isDark } = useTheme();
+  const { events, isLoading, toggleAlarmActive, removeEvent } = useEvents();
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 700); };
 
-  const toggleAlarm = (id: string) => {
-    setAlarms(prev => prev.map(a => a.id === id ? { ...a, active: !a.active } : a));
-  };
+  const activeCount = events.filter(e => e.alarmActive).length;
+  const nextEvent   = events.find(e => e.alarmActive);
 
-  const deleteAlarm = (id: string) => {
-    setAlarms(prev => prev.filter(a => a.id !== id));
-  };
-
-  const handleAddAlarm = () => {
-    Alert.alert('New Event Alarm', 'Event alarm creation coming soon.');
-  };
-
-  const handleSettings = () => {
-    Alert.alert('Alarm Settings', 'Default ringtone, vibration, and snooze settings coming soon.');
-  };
-
-  const handleManageAll = () => {
+  const handleManageAll = () =>
     Alert.alert('Manage All Alarms', 'Bulk options', [
-      { text: 'Disable All', onPress: () => setAlarms(prev => prev.map(a => ({ ...a, active: false }))) },
-      { text: 'Enable All', onPress: () => setAlarms(prev => prev.map(a => ({ ...a, active: true }))) },
+      { text: 'Disable All',  onPress: () => events.forEach(e => { if (e.alarmActive)  toggleAlarmActive(e.id); }) },
+      { text: 'Enable All',   onPress: () => events.forEach(e => { if (!e.alarmActive) toggleAlarmActive(e.id); }) },
       { text: 'Cancel', style: 'cancel' },
     ]);
-  };
 
-  const activeCount = alarms.filter(a => a.active).length;
-  const nextEvent = alarms.filter(a => a.active)[0];
+  const handleSettings = () =>
+    Alert.alert('Alarm Settings', 'Default ringtone, vibration and snooze settings coming soon.');
+
+  const openEventMenu = (event: AppEvent) =>
+    Alert.alert(event.title, undefined, [
+      { text: 'Edit Event',    onPress: () => navigation?.navigate('CreateEvent', { event }) },
+      { text: 'Toggle Alarm',  onPress: () => toggleAlarmActive(event.id) },
+      { text: 'Delete Event',  style: 'destructive', onPress: () => removeEvent(event.id) },
+      { text: 'Cancel',        style: 'cancel' },
+    ]);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg2 }]} edges={['top']}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color="#4A90D9" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg2 }]} edges={['top']}>
       {/* Top Bar */}
-      <View style={styles.topBar}>
-        <Text style={styles.topBarTitle}>Event Alarms</Text>
+      <View style={[styles.topBar, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+        <BurgerMenu navigation={navigation} />
+        <Text style={[styles.topBarTitle, { color: theme.text }]}>Event Alarms</Text>
         <View style={styles.topBarRight}>
-          <TouchableOpacity style={styles.iconBtn} onPress={handleAddAlarm}>
-            <Ionicons name="add-outline" size={24} color="#333" />
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation?.navigate('CreateEvent')}>
+            <Ionicons name="add-outline" size={24} color={theme.text} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={handleSettings}>
-            <Ionicons name="settings-outline" size={22} color="#333" />
+            <Ionicons name="settings-outline" size={22} color={theme.text} />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.textDim} />}
+      >
         {/* Stat Cards */}
         <View style={styles.statRow}>
-          <View style={[styles.statCard, styles.statCardBlue]}>
-            <Text style={styles.statLabel}>ACTIVE ALARMS</Text>
-            <Text style={styles.statValueBlue}>{activeCount}</Text>
+          <View style={[styles.statCard, { backgroundColor: isDark ? '#1A2A3A' : '#EBF4FF' }]}>
+            <Text style={[styles.statLabel, { color: theme.textDim }]}>ACTIVE ALARMS</Text>
+            <Text style={[styles.statValueBlue, { color: theme.text }]}>{activeCount}</Text>
           </View>
-          <View style={[styles.statCard, styles.statCardWhite]}>
-            <Text style={styles.statLabel}>NEXT EVENT</Text>
-            <Text style={styles.statValueDark}>{nextEvent ? nextEvent.title.split(':')[0].split(' ').slice(0, 2).join(' ') : 'None'}</Text>
+          <View style={[styles.statCard, { backgroundColor: theme.card }]}>
+            <Text style={[styles.statLabel, { color: theme.textDim }]}>NEXT EVENT</Text>
+            <Text style={[styles.statValueDark, { color: theme.text }]} numberOfLines={1}>
+              {nextEvent ? nextEvent.title : 'None'}
+            </Text>
           </View>
         </View>
 
         {/* EVENT ALARMS header */}
         <View style={styles.sectionHeader}>
           <View style={styles.blueDot} />
-          <Text style={styles.sectionTitle}>EVENT ALARMS</Text>
-          <TouchableOpacity style={styles.manageAllBtn} onPress={handleManageAll}>
-            <Text style={styles.manageAllText}>Manage All</Text>
-          </TouchableOpacity>
+          <Text style={[styles.sectionTitle, { color: theme.textDim }]}>EVENT ALARMS</Text>
+          {events.length > 0 && (
+            <TouchableOpacity style={styles.manageAllBtn} onPress={handleManageAll}>
+              <Text style={styles.manageAllText}>Manage All</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
+        {/* Empty state */}
+        {events.length === 0 && (
+          <View style={styles.emptyState}>
+            <Ionicons name="calendar-outline" size={40} color={theme.textDim} />
+            <Text style={[styles.emptyTitle, { color: theme.textDim }]}>No events yet</Text>
+            <Text style={[styles.emptySub, { color: theme.textDim }]}>Create an event to see it here</Text>
+            <TouchableOpacity
+              style={styles.emptyAddBtn}
+              onPress={() => navigation?.navigate('CreateEvent')}
+            >
+              <Text style={styles.emptyAddText}>+ New Event</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Event Alarm Cards */}
-        {alarms.map(alarm => (
-          <View key={alarm.id} style={styles.alarmCard}>
-            {/* Blue left border */}
-            <View style={styles.alarmLeftBorder} />
-            <View style={styles.alarmCardBody}>
-              {/* Time + Toggle row */}
-              <View style={styles.alarmTopRow}>
-                <View style={styles.alarmTimeBlock}>
-                  <Text style={[styles.alarmTime, !alarm.active && styles.alarmTimeInactive]}>
-                    {alarm.time}
-                  </Text>
-                  <Text style={[styles.alarmPeriod, !alarm.active && styles.alarmTimeInactive]}>
-                    {' '}{alarm.period}
-                  </Text>
-                </View>
-                <Switch
-                  value={alarm.active}
-                  onValueChange={() => toggleAlarm(alarm.id)}
-                  trackColor={{ false: '#E0E0E0', true: '#B8D4F5' }}
-                  thumbColor={alarm.active ? BLUE : '#f0f0f0'}
-                  style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
-                />
-              </View>
+        {events.map(event => {
+          const { time, period } = parseTime(event.startTime);
+          const repeat = event.reminders.includes('Daily Repeat') ? 'EVERYDAY' : 'ONCE';
+          const notificationChips = event.reminders.filter(r => r !== 'Daily Repeat');
 
-              {/* Event Name + Meta */}
-              <Text style={[styles.alarmTitle, !alarm.active && styles.alarmTitleInactive]}>
-                {alarm.title}
-              </Text>
-              <View style={styles.alarmEventRow}>
-                <Ionicons name="calendar-outline" size={12} color="#888" />
-                <Text style={styles.alarmEventText}>{alarm.eventTime}</Text>
-                <View style={[styles.statusBadge, alarm.status === 'going' ? styles.statusGoing : styles.statusPending]}>
-                  <Text style={[styles.statusText, alarm.status === 'going' ? styles.statusTextGoing : styles.statusTextPending]}>
-                    {alarm.status}
+          return (
+            <TouchableOpacity
+              key={event.id}
+              style={[styles.alarmCard, { backgroundColor: theme.card }]}
+              onPress={() => navigation?.navigate('EventDetail', { event })}
+              onLongPress={() => openEventMenu(event)}
+              delayLongPress={400}
+              activeOpacity={0.97}
+            >
+              <View style={styles.alarmLeftBorder} />
+              <View style={styles.alarmCardBody}>
+                {/* Time + Toggle */}
+                <View style={styles.alarmTopRow}>
+                  <View style={styles.alarmTimeBlock}>
+                    <Text style={[styles.alarmTime, { color: theme.text }, !event.alarmActive && styles.alarmTimeInactive]}>
+                      {time}
+                    </Text>
+                    <Text style={[styles.alarmPeriod, { color: theme.textSub }, !event.alarmActive && styles.alarmTimeInactive]}>
+                      {' '}{period}
+                    </Text>
+                  </View>
+                  <View style={styles.alarmTopActions}>
+                    <Switch
+                      value={event.alarmActive}
+                      onValueChange={() => toggleAlarmActive(event.id)}
+                      trackColor={{ false: '#E0E0E0', true: '#B8D4F5' }}
+                      thumbColor={event.alarmActive ? BLUE : '#f0f0f0'}
+                      style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
+                    />
+                    <TouchableOpacity
+                      onPress={() => openEventMenu(event)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="ellipsis-vertical" size={16} color={theme.textDim} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Event Name + Meta */}
+                <Text style={[styles.alarmTitle, { color: theme.text }, !event.alarmActive && styles.alarmTitleInactive]}>
+                  {event.title}
+                </Text>
+
+                <View style={styles.alarmEventRow}>
+                  <Ionicons name="calendar-outline" size={12} color={theme.textDim} />
+                  <Text style={[styles.alarmEventText, { color: theme.textDim }]}>
+                    {event.startDate}{event.startDate && event.startTime ? ' • ' : ''}{event.startTime}
                   </Text>
+                  <View style={[styles.statusBadge, styles.statusGoing]}>
+                    <Text style={[styles.statusText, styles.statusTextGoing]}>confirmed</Text>
+                  </View>
                 </View>
-              </View>
 
-              {/* Ringtone + Repeat row */}
-              <View style={styles.alarmMetaRow}>
-                {alarm.locationAlert && (
-                  <>
-                    <Ionicons name="location-outline" size={12} color={BLUE} />
-                    <Text style={styles.alarmMetaBlue}>Location Alert</Text>
-                    <Text style={styles.alarmMetaDot}>·</Text>
-                  </>
-                )}
-                <MaterialCommunityIcons name="music-note" size={12} color="#888" />
-                <Text style={styles.alarmMetaText}>{alarm.ringtone}</Text>
-                <Text style={styles.alarmMetaDot}>·</Text>
-                <View style={styles.repeatBadge}>
-                  <Text style={styles.repeatBadgeText}>{alarm.repeat}</Text>
+                {/* Meta row */}
+                <View style={styles.alarmMetaRow}>
+                  {event.location ? (
+                    <>
+                      <Ionicons name="location-outline" size={12} color={BLUE} />
+                      <Text style={styles.alarmMetaBlue} numberOfLines={1}>{event.location}</Text>
+                      <Text style={[styles.alarmMetaDot, { color: theme.textDim }]}>·</Text>
+                    </>
+                  ) : null}
+                  <MaterialCommunityIcons name="music-note" size={12} color={theme.textDim} />
+                  <Text style={[styles.alarmMetaText, { color: theme.textDim }]}>Chimes</Text>
+                  <Text style={[styles.alarmMetaDot, { color: theme.textDim }]}>·</Text>
+                  <View style={[styles.repeatBadge, { backgroundColor: isDark ? '#2A2A2A' : '#F0F0F0' }]}>
+                    <Text style={[styles.repeatBadgeText, { color: theme.textSub }]}>{repeat}</Text>
+                  </View>
                 </View>
-              </View>
 
-              {/* Time Before Chips + Avatars */}
-              <View style={styles.alarmBottomRow}>
-                <View style={styles.chipsRow}>
-                  {alarm.timeBefore.map((chip, i) => (
-                    <View key={i} style={styles.chip}>
-                      <Ionicons name="alarm-outline" size={11} color="#888" />
-                      <Text style={styles.chipText}>{chip}</Text>
+                {/* Category badge + notification chips */}
+                <View style={styles.alarmBottomRow}>
+                  <View style={styles.chipsRow}>
+                    <View style={[styles.categoryChip, { backgroundColor: isDark ? '#1A2A3A' : '#EBF4FF' }]}>
+                      <Text style={styles.categoryChipText}>{event.category}</Text>
                     </View>
-                  ))}
-                </View>
-                {alarm.avatars.length > 0 && (
-                  <View style={styles.avatarStack}>
-                    {alarm.avatars.map((a, i) => (
-                      <View key={i} style={[styles.avatar, { marginLeft: i > 0 ? -8 : 0 }, a.startsWith('+') && styles.avatarMore]}>
-                        <Text style={a.startsWith('+') ? styles.avatarMoreText : styles.avatarText}>{a}</Text>
+                    {notificationChips.slice(0, 2).map((chip, i) => (
+                      <View key={i} style={[styles.chip, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
+                        <Ionicons name="alarm-outline" size={11} color={theme.textDim} />
+                        <Text style={[styles.chipText, { color: theme.textSub }]}>{chip}</Text>
                       </View>
                     ))}
                   </View>
-                )}
+                  <View style={[styles.priorityBadge, {
+                    backgroundColor:
+                      event.priority === 'High' ? '#FDECEA' :
+                      event.priority === 'Medium' ? '#FEF9E7' : '#E9F7EF',
+                  }]}>
+                    <Text style={[styles.priorityBadgeText, {
+                      color:
+                        event.priority === 'High' ? '#E05252' :
+                        event.priority === 'Medium' ? '#E09C52' : '#52B788',
+                    }]}>
+                      {event.priority}
+                    </Text>
+                  </View>
+                </View>
               </View>
-            </View>
-          </View>
-        ))}
-
-        {/* OTHER REMINDERS */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>OTHER REMINDERS</Text>
-        </View>
-
-        <View style={styles.reminderRow}>
-          <View style={styles.reminderIconWrap}>
-            <Ionicons name="notifications-outline" size={20} color={BLUE} />
-          </View>
-          <View style={styles.reminderBody}>
-            <Text style={styles.reminderTitle}>Water Plants</Text>
-            <Text style={styles.reminderSub}>Every Sat at 10:00 AM</Text>
-          </View>
-          <Switch
-            value={waterPlantsActive}
-            onValueChange={setWaterPlantsActive}
-            trackColor={{ false: '#E0E0E0', true: '#B8D4F5' }}
-            thumbColor={waterPlantsActive ? BLUE : '#f0f0f0'}
-            style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
-          />
-        </View>
+            </TouchableOpacity>
+          );
+        })}
 
         <View style={{ height: 80 }} />
       </ScrollView>
 
       {/* FAB */}
-      <TouchableOpacity style={styles.fab} onPress={handleAddAlarm}>
-        <Ionicons name="add" size={26} color="#fff" />
-      </TouchableOpacity>
+      <View style={styles.fab}>
+        <PulsingFAB onPress={() => navigation?.navigate('CreateEvent')} />
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F5F6FA' },
+  safeArea: { flex: 1 },
 
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 14, paddingVertical: 12,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#EBEBEB',
+    borderBottomWidth: 1,
   },
-  topBarTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: '#111', textAlign: 'center' },
+  topBarTitle: { flex: 1, fontSize: 17, fontWeight: '700', textAlign: 'center' },
   topBarRight: { flexDirection: 'row', alignItems: 'center' },
   iconBtn: { marginLeft: 14 },
 
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 20 },
+  scrollContent: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 20 },
 
-  statRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
-  statCard: {
-    flex: 1, borderRadius: 14, padding: 14,
-  },
-  statCardBlue: { backgroundColor: '#EBF4FF' },
-  statCardWhite: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
-  statLabel: { fontSize: 10, fontWeight: '800', color: '#888', letterSpacing: 1, marginBottom: 6 },
-  statValueBlue: { fontSize: 28, fontWeight: '800', color: '#111' },
-  statValueDark: { fontSize: 16, fontWeight: '800', color: '#111', marginTop: 4 },
+  statRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  statCard: { flex: 1, borderRadius: 12, padding: 10 },
+  statCardBlue: {},
+  statCardWhite: { shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  statLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8, marginBottom: 3 },
+  statValueBlue: { fontSize: 22, fontWeight: '800' },
+  statValueDark: { fontSize: 13, fontWeight: '700', marginTop: 2 },
 
   sectionHeader: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, marginTop: 4,
   },
   blueDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: BLUE },
-  sectionTitle: { flex: 1, fontSize: 11, fontWeight: '800', color: '#999', letterSpacing: 1 },
+  sectionTitle: { flex: 1, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   manageAllBtn: {},
   manageAllText: { fontSize: 12, color: BLUE, fontWeight: '600' },
 
+  emptyState: { alignItems: 'center', paddingVertical: 48, gap: 8 },
+  emptyTitle: { fontSize: 15, fontWeight: '700' },
+  emptySub: { fontSize: 12 },
+  emptyAddBtn: {
+    backgroundColor: BLUE, borderRadius: 10,
+    paddingHorizontal: 20, paddingVertical: 10, marginTop: 8,
+  },
+  emptyAddText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
   alarmCard: {
-    flexDirection: 'row', backgroundColor: '#fff', borderRadius: 14,
-    marginBottom: 12, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
-  },
-  alarmLeftBorder: { width: 4, backgroundColor: BLUE },
-  alarmCardBody: { flex: 1, padding: 14 },
-
-  alarmTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  alarmTimeBlock: { flexDirection: 'row', alignItems: 'flex-end' },
-  alarmTime: { fontSize: 26, fontWeight: '800', color: '#111', lineHeight: 30 },
-  alarmPeriod: { fontSize: 14, fontWeight: '700', color: '#555', marginBottom: 2 },
-  alarmTimeInactive: { color: '#CCC' },
-
-  alarmTitle: { fontSize: 14, fontWeight: '700', color: '#111', marginBottom: 5 },
-  alarmTitleInactive: { color: '#BBB' },
-
-  alarmEventRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 8 },
-  alarmEventText: { fontSize: 12, color: '#888' },
-  statusBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
-  statusGoing: { backgroundColor: '#E9F7EF' },
-  statusPending: { backgroundColor: '#FEF9E7' },
-  statusText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
-  statusTextGoing: { color: '#27AE60' },
-  statusTextPending: { color: '#F39C12' },
-
-  alarmMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 10, flexWrap: 'wrap' },
-  alarmMetaBlue: { fontSize: 12, color: BLUE, fontWeight: '600' },
-  alarmMetaText: { fontSize: 12, color: '#888' },
-  alarmMetaDot: { fontSize: 12, color: '#ccc' },
-  repeatBadge: {
-    backgroundColor: '#F0F0F0', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
-  },
-  repeatBadgeText: { fontSize: 10, fontWeight: '700', color: '#666' },
-
-  alarmBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  chipsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#F5F5F5', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
-  },
-  chipText: { fontSize: 11, color: '#555', fontWeight: '600' },
-
-  avatarStack: { flexDirection: 'row', alignItems: 'center' },
-  avatar: {
-    width: 24, height: 24, borderRadius: 12, backgroundColor: '#B8D4F5',
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#fff',
-  },
-  avatarMore: { backgroundColor: '#E0E0E0' },
-  avatarText: { fontSize: 9, fontWeight: '700', color: BLUE },
-  avatarMoreText: { fontSize: 9, fontWeight: '700', color: '#666' },
-
-  reminderRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#fff', borderRadius: 12, padding: 14,
+    flexDirection: 'row', borderRadius: 12,
+    marginBottom: 8, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 3, elevation: 1,
   },
-  reminderIconWrap: {
-    width: 38, height: 38, borderRadius: 19, backgroundColor: '#EBF4FF',
-    alignItems: 'center', justifyContent: 'center',
+  alarmLeftBorder: { width: 4, backgroundColor: BLUE },
+  alarmCardBody: { flex: 1, paddingHorizontal: 12, paddingVertical: 10 },
+
+  alarmTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
+  alarmTimeBlock: { flexDirection: 'row', alignItems: 'flex-end' },
+  alarmTime: { fontSize: 22, fontWeight: '700', lineHeight: 26 },
+  alarmPeriod: { fontSize: 12, fontWeight: '600', marginBottom: 2 },
+  alarmTimeInactive: { color: '#CCC' },
+  alarmTopActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+
+  alarmTitle: { fontSize: 14, fontWeight: '700', marginBottom: 3 },
+  alarmTitleInactive: { color: '#BBB' },
+
+  alarmEventRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 },
+  alarmEventText: { fontSize: 12, flex: 1 },
+  statusBadge: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  statusGoing: { backgroundColor: '#E9F7EF' },
+  statusText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
+  statusTextGoing: { color: '#27AE60' },
+
+  alarmMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 7, flexWrap: 'wrap' },
+  alarmMetaBlue: { fontSize: 11, color: BLUE, fontWeight: '600', maxWidth: 120 },
+  alarmMetaText: { fontSize: 11 },
+  alarmMetaDot: { fontSize: 11 },
+  repeatBadge: {
+    borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2,
   },
-  reminderBody: { flex: 1 },
-  reminderTitle: { fontSize: 14, fontWeight: '700', color: '#111' },
-  reminderSub: { fontSize: 12, color: '#888', marginTop: 2 },
+  repeatBadgeText: { fontSize: 10, fontWeight: '700' },
+
+  alarmBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  chipsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', flex: 1 },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
+  },
+  chipText: { fontSize: 11, fontWeight: '600' },
+  categoryChip: {
+    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
+  },
+  categoryChipText: { fontSize: 11, color: BLUE, fontWeight: '700' },
+  priorityBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  priorityBadgeText: { fontSize: 11, fontWeight: '700' },
 
   fab: {
     position: 'absolute', right: 20, bottom: 20,
-    width: 54, height: 54, borderRadius: 27,
-    backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center',
-    shadowColor: BLUE, shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
   },
 });

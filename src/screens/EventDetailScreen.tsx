@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,217 +9,254 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
+import { useEvents, AppEvent } from '../context/EventStore';
+import * as Haptics from 'expo-haptics';
 
 const BLUE = '#4A90D9';
+const PRIORITY_COLOR: Record<string, { bg: string; text: string }> = {
+  High:   { bg: '#FDECEA', text: '#D32F2F' },
+  Medium: { bg: '#EBF4FF', text: BLUE },
+  Low:    { bg: '#E6F9F1', text: '#2E7D52' },
+};
 
-const REMINDERS = [
-  { id: '1', label: '10 min before', ringtone: 'Digital Chime', checked: true },
-  { id: '2', label: '1 hour before', ringtone: 'Crystal Breeze', checked: true },
-  { id: '3', label: 'At time of event', ringtone: 'Default', checked: false },
-];
+export default function EventDetailScreen({ route, navigation }: any) {
+  const { theme, isDark } = useTheme();
+  const { removeEvent, toggleAlarmActive } = useEvents();
 
-export default function EventDetailScreen({ navigation }: any) {
-  const [reminders, setReminders] = useState(REMINDERS);
+  const event: AppEvent | undefined = route?.params?.event;
 
-  const toggleReminder = (id: string) => {
-    setReminders(prev => prev.map(r => r.id === id ? { ...r, checked: !r.checked } : r));
+  const [alarmActive, setAlarmActive] = useState(event?.alarmActive ?? false);
+
+  if (!event) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg }]} edges={['top']}>
+        <View style={[styles.topBar, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={22} color={theme.text} />
+          </TouchableOpacity>
+          <Text style={[styles.topBarTitle, { color: theme.text }]}>Event Detail</Text>
+          <View style={{ width: 44 }} />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <Ionicons name="calendar-outline" size={48} color={theme.textDim} />
+          <Text style={{ fontSize: 16, color: theme.textDim, fontWeight: '600' }}>No event data found</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={{ color: BLUE, fontWeight: '700', fontSize: 15 }}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const priorityStyle = PRIORITY_COLOR[event.priority] ?? PRIORITY_COLOR.Medium;
+
+  const handleDelete = () =>
+    Alert.alert('Delete Event', 'Are you sure you want to delete this event?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        removeEvent(event.id);
+        navigation.goBack();
+      }},
+    ]);
+
+  const handleEdit = () => navigation.navigate('CreateEvent', { event });
+
+  const handleToggleAlarm = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    toggleAlarmActive(event.id);
+    setAlarmActive(v => !v);
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* Top Bar */}
-      <View style={styles.topBar}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg2 }]} edges={['top']}>
+      {/* â”€â”€ Top Bar â”€â”€ */}
+      <View style={[styles.topBar, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color="#333" />
+          <Ionicons name="arrow-back" size={22} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.topBarTitle}>Project Sync</Text>
+        <Text style={[styles.topBarTitle, { color: theme.text }]} numberOfLines={1}>{event.title}</Text>
         <View style={styles.topBarRight}>
-          <TouchableOpacity onPress={() => {
-            Alert.alert('Mark as Done', 'Mark this event as completed?', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Mark Done', onPress: () => { navigation.goBack(); } },
-            ]);
-          }} style={styles.iconBtn}>
-            <Ionicons name="checkmark-circle-outline" size={22} color="#333" />
+          <TouchableOpacity onPress={handleEdit} style={styles.iconBtn}>
+            <Ionicons name="create-outline" size={22} color={theme.text} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => Alert.alert('Event Options', undefined, [
-            { text: 'Edit Event', onPress: () => navigation.navigate('CreateEvent') },
-            { text: 'Share', onPress: () => Alert.alert('Share', 'Shareable link copied to clipboard.') },
-            { text: 'Duplicate', onPress: () => Alert.alert('Duplicated', 'Event has been duplicated.') },
+          <TouchableOpacity onPress={() => Alert.alert(event.title, undefined, [
+            { text: 'Edit Event',   onPress: handleEdit },
+            { text: 'Toggle Alarm', onPress: handleToggleAlarm },
+            { text: 'Delete Event', style: 'destructive', onPress: handleDelete },
             { text: 'Cancel', style: 'cancel' },
           ])} style={styles.iconBtn}>
-            <Ionicons name="ellipsis-vertical" size={22} color="#333" />
+            <Ionicons name="ellipsis-vertical" size={22} color={theme.text} />
           </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Priority + Category tags */}
+
+        {/* â”€â”€ Priority + Category tags â”€â”€ */}
         <View style={styles.tagRow}>
-          <View style={[styles.tag, { backgroundColor: '#FDECEA' }]}>
-            <Text style={[styles.tagText, { color: '#D32F2F' }]}>High Priority</Text>
+          <View style={[styles.tag, { backgroundColor: priorityStyle.bg }]}>
+            <Text style={[styles.tagText, { color: priorityStyle.text }]}>{event.priority} Priority</Text>
           </View>
-          <View style={[styles.tag, { backgroundColor: '#E8F0FD' }]}>
-            <Text style={[styles.tagText, { color: BLUE }]}>Business</Text>
+          <View style={[styles.tag, { backgroundColor: isDark ? '#1A2A3A' : '#E8F0FD' }]}>
+            <Text style={[styles.tagText, { color: BLUE }]}>{event.category}</Text>
           </View>
-        </View>
-
-        {/* Event Title */}
-        <Text style={styles.eventTitle}>Q4 Roadmap Review</Text>
-
-        {/* Date Row */}
-        <View style={styles.infoRow}>
-          <View style={styles.infoIconWrap}>
-            <Ionicons name="calendar-outline" size={18} color={BLUE} />
-          </View>
-          <View>
-            <Text style={styles.infoMain}>Monday, Oct 24, 2024</Text>
-            <Text style={styles.infoSub}>Starts in 2 hours</Text>
-          </View>
-        </View>
-
-        {/* Time Row */}
-        <View style={styles.infoRow}>
-          <View style={styles.infoIconWrap}>
-            <Ionicons name="time-outline" size={18} color={BLUE} />
-          </View>
-          <View>
-            <Text style={styles.infoMain}>10:30 AM — 11:45 AM</Text>
-            <Text style={styles.infoSub}>GMT-7 Pacific Time</Text>
-          </View>
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => Alert.alert('Mark Done', 'Event marked as completed!')}>
-            <Ionicons name="checkmark-done-outline" size={18} color="#333" />
-            <Text style={styles.actionBtnText}>Mark Done</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => Alert.alert('Snooze Event', 'Snooze for how long?', [
-            { text: '5 minutes', onPress: () => Alert.alert('Snoozed', 'Event snoozed for 5 minutes.') },
-            { text: '15 minutes', onPress: () => Alert.alert('Snoozed', 'Event snoozed for 15 minutes.') },
-            { text: '1 hour', onPress: () => Alert.alert('Snoozed', 'Event snoozed for 1 hour.') },
-            { text: 'Cancel', style: 'cancel' },
-          ])}>
-            <Ionicons name="alarm-outline" size={18} color="#333" />
-            <Text style={styles.actionBtnText}>Snooze</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => Alert.alert('Repeat Event', 'Recurrence options', [
-            { text: 'Weekly', onPress: () => Alert.alert('Set', 'Event set to repeat weekly.') },
-            { text: 'Monthly', onPress: () => Alert.alert('Set', 'Event set to repeat monthly.') },
-            { text: 'Remove Repeat', onPress: () => Alert.alert('Removed', 'Repeat removed.') },
-            { text: 'Cancel', style: 'cancel' },
-          ])}>
-            <Ionicons name="repeat-outline" size={18} color="#333" />
-            <Text style={styles.actionBtnText}>Repeat</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.divider} />
-
-        {/* NOTES */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>NOTES</Text>
-          <View style={styles.notesBox}>
-            <Text style={styles.notesText}>
-              Review Q4 roadmap priorities and align on key deliverables. Discuss resource allocation, blockers, and upcoming milestones. Prepare slide deck with current progress metrics.
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.divider} />
-
-        {/* LOCATION */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>LOCATION</Text>
-          {/* Map placeholder */}
-          <View style={styles.mapPlaceholder}>
-            <View style={styles.mapOverlay}>
-              <TouchableOpacity style={styles.directionsBtn} onPress={() => Alert.alert('Directions', 'Opening maps for HQ Conference Room 4B...')}>
-                <Ionicons name="navigate-outline" size={14} color={BLUE} />
-                <Text style={styles.directionsBtnText}>Directions</Text>
-              </TouchableOpacity>
+          {alarmActive && (
+            <View style={[styles.tag, { backgroundColor: isDark ? '#1A2A1A' : '#E6F9F1' }]}>
+              <Ionicons name="alarm-outline" size={11} color="#3DAE7C" />
+              <Text style={[styles.tagText, { color: '#3DAE7C', marginLeft: 3 }]}>Alarm On</Text>
             </View>
-            {/* Map grid lines (greyscale placeholder) */}
-            <View style={styles.mapGrid}>
-              {[...Array(5)].map((_, i) => (
-                <View key={i} style={styles.mapGridLine} />
-              ))}
+          )}
+        </View>
+
+        {/* â”€â”€ Event Title â”€â”€ */}
+        <Text style={[styles.eventTitle, { color: theme.text }]}>{event.title}</Text>
+
+        {/* â”€â”€ Date â”€â”€ */}
+        {event.startDate ? (
+          <View style={styles.infoRow}>
+            <View style={[styles.infoIconWrap, { backgroundColor: isDark ? '#1A2A3A' : '#EBF4FF' }]}>
+              <Ionicons name="calendar-outline" size={18} color={BLUE} />
             </View>
-            <Ionicons name="location" size={28} color="#E53935" style={styles.mapPin} />
-          </View>
-          <TouchableOpacity style={styles.locationRow}>
             <View>
-              <Text style={styles.locationName}>HQ Conference Room 4B</Text>
-              <Text style={styles.locationAddr}>101 Tech Way, San Francisco, CA</Text>
+              <Text style={[styles.infoMain, { color: theme.text }]}>{event.startDate}</Text>
+              {event.endTime ? (
+                <Text style={[styles.infoSub, { color: theme.textDim }]}>Ends at {event.endTime}</Text>
+              ) : null}
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          </View>
+        ) : null}
+
+        {/* â”€â”€ Time â”€â”€ */}
+        {event.startTime ? (
+          <View style={styles.infoRow}>
+            <View style={[styles.infoIconWrap, { backgroundColor: isDark ? '#1A2A3A' : '#EBF4FF' }]}>
+              <Ionicons name="time-outline" size={18} color={BLUE} />
+            </View>
+            <View>
+              <Text style={[styles.infoMain, { color: theme.text }]}>
+                {event.startTime}{event.endTime ? ` â€” ${event.endTime}` : ''}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* â”€â”€ Action Buttons â”€â”€ */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+            onPress={handleEdit}
+          >
+            <Ionicons name="create-outline" size={18} color={theme.text} />
+            <Text style={[styles.actionBtnText, { color: theme.text }]}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: alarmActive ? (isDark ? '#1A2A3A' : '#EBF4FF') : theme.card, borderColor: alarmActive ? BLUE : theme.border }]}
+            onPress={handleToggleAlarm}
+          >
+            <Ionicons name="alarm-outline" size={18} color={alarmActive ? BLUE : theme.text} />
+            <Text style={[styles.actionBtnText, { color: alarmActive ? BLUE : theme.text }]}>
+              {alarmActive ? 'Alarm On' : 'Alarm Off'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+            onPress={handleDelete}
+          >
+            <Ionicons name="trash-outline" size={18} color="#E05252" />
+            <Text style={[styles.actionBtnText, { color: '#E05252' }]}>Delete</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-        {/* REMINDERS */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>REMINDERS</Text>
-            <TouchableOpacity>
-              <Text style={styles.addCustomText}>+ Add Custom</Text>
-            </TouchableOpacity>
+        {/* â”€â”€ Description / Notes â”€â”€ */}
+        {event.description ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.textDim }]}>NOTES</Text>
+            <View style={[styles.notesBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Text style={[styles.notesText, { color: theme.textSub }]}>{event.description}</Text>
+            </View>
           </View>
+        ) : null}
 
-          {reminders.map(r => (
-            <View key={r.id} style={styles.reminderRow}>
-              <TouchableOpacity onPress={() => toggleReminder(r.id)} style={styles.reminderCheckbox}>
-                {r.checked
-                  ? <Ionicons name="checkbox" size={20} color={BLUE} />
-                  : <Ionicons name="square-outline" size={20} color="#ccc" />}
-              </TouchableOpacity>
-              <View style={styles.reminderBody}>
-                <Text style={styles.reminderLabel}>{r.label}</Text>
-                <View style={styles.reminderMeta}>
-                  <MaterialCommunityIcons name="music-note" size={12} color="#888" />
-                  <Text style={styles.reminderRingtone}>{r.ringtone}</Text>
+        {event.description ? <View style={[styles.divider, { backgroundColor: theme.border }]} /> : null}
+
+        {/* â”€â”€ Location â”€â”€ */}
+        {event.location ? (
+          <>
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.textDim }]}>LOCATION</Text>
+              {/* Map placeholder */}
+              <View style={[styles.mapPlaceholder, { backgroundColor: isDark ? '#1A2530' : '#E8EEF4' }]}>
+                <View style={styles.mapOverlay}>
+                  <TouchableOpacity
+                    style={styles.directionsBtn}
+                    onPress={() => Alert.alert('Directions', `Opening maps for ${event.location}...`)}
+                  >
+                    <Ionicons name="navigate-outline" size={14} color={BLUE} />
+                    <Text style={styles.directionsBtnText}>Directions</Text>
+                  </TouchableOpacity>
                 </View>
+                <View style={styles.mapGrid}>
+                  {[...Array(5)].map((_, i) => (
+                    <View key={i} style={[styles.mapGridLine, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)' }]} />
+                  ))}
+                </View>
+                <Ionicons name="location" size={28} color="#E53935" style={styles.mapPin} />
+              </View>
+              <View style={[styles.locationRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View>
+                  <Text style={[styles.locationName, { color: theme.text }]}>{event.location}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.textDim} />
               </View>
             </View>
-          ))}
-        </View>
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          </>
+        ) : null}
 
-        <View style={styles.divider} />
+        {/* â”€â”€ Reminders â”€â”€ */}
+        {event.reminders.length > 0 ? (
+          <>
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: theme.textDim }]}>REMINDERS</Text>
+              {event.reminders.map((r, i) => (
+                <View key={i} style={[styles.reminderRow, { borderBottomColor: theme.border }]}>
+                  <Ionicons name="alarm-outline" size={16} color={alarmActive ? BLUE : theme.textDim} />
+                  <Text style={[styles.reminderLabel, { color: theme.text }]}>{r}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          </>
+        ) : null}
 
-        {/* Recurrence */}
-        <TouchableOpacity style={styles.metaRow} onPress={() => Alert.alert('Recurrence', 'Recurrence options', [
-          { text: 'Daily', onPress: () => {} }, { text: 'Weekly on Mondays', onPress: () => {} },
-          { text: 'Monthly', onPress: () => {} }, { text: 'Cancel', style: 'cancel' },
-        ])}>
-          <Ionicons name="repeat-outline" size={18} color="#555" />
+        {/* â”€â”€ Meta (category / priority summary) â”€â”€ */}
+        <TouchableOpacity style={[styles.metaRow, { borderBottomColor: theme.border }]} onPress={handleEdit}>
+          <Ionicons name="pricetag-outline" size={18} color={theme.textSub} />
           <View style={styles.metaBody}>
-            <Text style={styles.metaLabel}>Recurrence</Text>
-            <Text style={styles.metaValue}>Weekly on Mondays</Text>
+            <Text style={[styles.metaLabel, { color: theme.textDim }]}>Category</Text>
+            <Text style={[styles.metaValue, { color: theme.text }]}>{event.category}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color="#ccc" />
+          <Ionicons name="chevron-forward" size={16} color={theme.textDim} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.metaRow} onPress={() => Alert.alert('Vibration Profile', 'Choose vibration pattern', [
-          { text: 'None', onPress: () => {} }, { text: 'Staccato', onPress: () => {} },
-          { text: 'Rumble', onPress: () => {} }, { text: 'Cancel', style: 'cancel' },
-        ])}>
-          <Ionicons name="phone-portrait-outline" size={18} color="#555" />
+        <TouchableOpacity style={[styles.metaRow, { borderBottomColor: theme.border }]} onPress={handleEdit}>
+          <Ionicons name="flag-outline" size={18} color={theme.textSub} />
           <View style={styles.metaBody}>
-            <Text style={styles.metaLabel}>Vibration Profile</Text>
-            <Text style={styles.metaValue}>Staccato</Text>
+            <Text style={[styles.metaLabel, { color: theme.textDim }]}>Priority</Text>
+            <Text style={[styles.metaValue, { color: priorityStyle.text }]}>{event.priority}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color="#ccc" />
+          <Ionicons name="chevron-forward" size={16} color={theme.textDim} />
         </TouchableOpacity>
 
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-        {/* Delete */}
-        <TouchableOpacity style={styles.deleteBtn} onPress={() => Alert.alert('Delete Event', 'Are you sure you want to delete this event? This cannot be undone.', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: () => navigation.goBack() },
-        ])}>
+        {/* â”€â”€ Delete â”€â”€ */}
+        <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+          <Ionicons name="trash-outline" size={18} color="#E53935" />
           <Text style={styles.deleteBtnText}>Delete Event</Text>
         </TouchableOpacity>
 
@@ -230,67 +267,56 @@ export default function EventDetailScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff' },
+  safeArea: { flex: 1 },
 
   topBar: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 14, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#EBEBEB',
+    borderBottomWidth: 1,
   },
-  backBtn: { marginRight: 8 },
-  topBarTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: '#111' },
+  backBtn: { marginRight: 8, padding: 2 },
+  topBarTitle: { flex: 1, fontSize: 17, fontWeight: '700' },
   topBarRight: { flexDirection: 'row', alignItems: 'center' },
   iconBtn: { marginLeft: 14 },
 
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 30 },
 
-  tagRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  tag: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
+  tagRow: { flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
+  tag: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
   tagText: { fontSize: 12, fontWeight: '700' },
 
-  eventTitle: { fontSize: 24, fontWeight: '800', color: '#111', marginBottom: 18, lineHeight: 30 },
+  eventTitle: { fontSize: 24, fontWeight: '800', marginBottom: 18, lineHeight: 30 },
 
-  infoRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14,
-  },
+  infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14 },
   infoIconWrap: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#EBF4FF', alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
-  infoMain: { fontSize: 14, fontWeight: '700', color: '#111' },
-  infoSub: { fontSize: 12, color: '#888', marginTop: 2 },
+  infoMain: { fontSize: 14, fontWeight: '700' },
+  infoSub: { fontSize: 12, marginTop: 2 },
 
-  actionRow: {
-    flexDirection: 'row', gap: 10, marginTop: 6, marginBottom: 16,
-  },
+  actionRow: { flexDirection: 'row', gap: 10, marginTop: 6, marginBottom: 16 },
   actionBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10,
-    paddingVertical: 10, backgroundColor: '#F9F9F9',
+    borderWidth: 1, borderRadius: 10, paddingVertical: 10,
   },
-  actionBtnText: { fontSize: 12, fontWeight: '700', color: '#333' },
+  actionBtnText: { fontSize: 12, fontWeight: '700' },
 
-  divider: { height: 1, backgroundColor: '#F0F0F0', marginVertical: 16 },
+  divider: { height: 1, marginVertical: 16 },
 
   section: { marginBottom: 4 },
-  sectionTitle: { fontSize: 11, fontWeight: '800', color: '#999', letterSpacing: 1, marginBottom: 12 },
-  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  addCustomText: { fontSize: 13, color: BLUE, fontWeight: '600' },
+  sectionTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: 12 },
 
-  notesBox: {
-    backgroundColor: '#F8F9FA', borderRadius: 10, padding: 14,
-    borderWidth: 1, borderColor: '#EBEBEB',
-  },
-  notesText: { fontSize: 13, color: '#444', lineHeight: 20 },
+  notesBox: { borderRadius: 10, padding: 14, borderWidth: 1 },
+  notesText: { fontSize: 13, lineHeight: 20 },
 
   mapPlaceholder: {
     height: 140, borderRadius: 12, overflow: 'hidden',
-    backgroundColor: '#E8EEF4', marginBottom: 10,
-    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 10, alignItems: 'center', justifyContent: 'center',
   },
   mapGrid: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'space-around', padding: 12 },
-  mapGridLine: { height: 1, backgroundColor: 'rgba(0,0,0,0.08)' },
+  mapGridLine: { height: 1 },
   mapOverlay: { position: 'absolute', top: 10, right: 10, zIndex: 10 },
   directionsBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -299,33 +325,27 @@ const styles = StyleSheet.create({
   },
   directionsBtnText: { fontSize: 12, fontWeight: '700', color: BLUE },
   mapPin: { zIndex: 5 },
-
   locationRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#F8F9FA', borderRadius: 10, padding: 12,
-    borderWidth: 1, borderColor: '#EBEBEB',
+    borderRadius: 10, padding: 12, borderWidth: 1,
   },
-  locationName: { fontSize: 14, fontWeight: '700', color: '#111', marginBottom: 2 },
-  locationAddr: { fontSize: 12, color: '#888' },
+  locationName: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
 
   reminderRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 11, borderBottomWidth: 1,
   },
-  reminderCheckbox: { paddingTop: 1 },
-  reminderBody: { flex: 1 },
-  reminderLabel: { fontSize: 14, fontWeight: '600', color: '#111', marginBottom: 3 },
-  reminderMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  reminderRingtone: { fontSize: 12, color: '#888' },
+  reminderLabel: { fontSize: 14, fontWeight: '500' },
 
   metaRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
+    paddingVertical: 14, borderBottomWidth: 1,
   },
   metaBody: { flex: 1 },
-  metaLabel: { fontSize: 12, color: '#888', marginBottom: 1 },
-  metaValue: { fontSize: 14, fontWeight: '600', color: '#111' },
+  metaLabel: { fontSize: 12, marginBottom: 1 },
+  metaValue: { fontSize: 14, fontWeight: '600' },
 
-  deleteBtn: { alignItems: 'center', paddingVertical: 16 },
+  deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
   deleteBtnText: { fontSize: 15, fontWeight: '600', color: '#E53935' },
 });
+

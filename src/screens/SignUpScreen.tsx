@@ -8,9 +8,11 @@ import {
   Alert,
   Image,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
 
 const BLUE = '#4A90D9';
 
@@ -70,20 +72,30 @@ const fs = StyleSheet.create({
 });
 
 export default function SignUpScreen({ navigation }: any) {
+  const { signUp } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [agreed, setAgreed] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!name.trim()) { Alert.alert('Validation', 'Please enter your full name.'); return; }
     if (!email.trim()) { Alert.alert('Validation', 'Please enter your email address.'); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { Alert.alert('Validation', 'Please enter a valid email address.'); return; }
     if (password.length < 6) { Alert.alert('Validation', 'Password must be at least 6 characters.'); return; }
     if (password !== confirm) { Alert.alert('Validation', 'Passwords do not match.'); return; }
     if (!agreed) { Alert.alert('Validation', 'Please agree to the Terms of Service and Privacy Policy.'); return; }
-    navigation.navigate('Main');
+    try {
+      setLoading(true);
+      await signUp(name.trim(), email.trim(), password);
+      navigation.replace('Onboarding');
+    } catch (e) {
+      Alert.alert('Sign Up Failed', 'Unable to create your account. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -131,8 +143,11 @@ export default function SignUpScreen({ navigation }: any) {
         </TouchableOpacity>
 
         {/* Create Account button */}
-        <TouchableOpacity style={s.btnPrimary} onPress={handleCreate} activeOpacity={0.85}>
-          <Text style={s.btnText}>Create Account</Text>
+        <TouchableOpacity style={s.btnPrimary} onPress={handleCreate} activeOpacity={0.85} disabled={loading}>
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={s.btnText}>Create Account</Text>
+          }
         </TouchableOpacity>
 
         <View style={s.signInRow}>

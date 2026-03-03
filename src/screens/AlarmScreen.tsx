@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,215 +10,360 @@ import {
   Modal,
   TextInput,
   Pressable,
+  Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
+import { BurgerMenu } from '../components/BurgerMenu';
+import { useAlarmStore, Alarm, Period } from '../context/AlarmStore';
+import * as Haptics from 'expo-haptics';
 
 const BLUE = '#4A90D9';
-const DAYS_ALL = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-const RINGTONES = ['Chimes', 'Early Riser', 'Lullaby', 'Radar', 'Ripple', 'Silk', 'Zen'];
-const VOLUME_LEVELS = ['Off', 'Low', 'Medium', 'High'];
 
-type Period = 'AM' | 'PM';
-interface Alarm {
-  id: string;
-  time: string;
-  period: Period;
-  label: string;
-  ringtone: string;
-  days: boolean[];
-  active: boolean;
-  badge: string | null;
-}
-interface AlarmForm {
-  time: string;
-  period: Period;
-  label: string;
-  ringtone: string;
-  days: boolean[];
-  active: boolean;
-}
-
-const INITIAL_ALARMS: Alarm[] = [
-  { id: '1', time: '07:00', period: 'AM', label: 'Morning Workout',  ringtone: 'Chimes',      days: [true,  true,  true,  true,  true,  false, false], active: true,  badge: 'Scheduled' },
-  { id: '2', time: '08:30', period: 'AM', label: 'Weekend Wakeup',   ringtone: 'Early Riser', days: [false, false, false, false, false, true,  true ], active: false, badge: null },
-  { id: '3', time: '10:15', period: 'PM', label: 'Prep for Bed',     ringtone: 'Lullaby',     days: [true,  true,  true,  true,  true,  true,  true ], active: true,  badge: 'Scheduled' },
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const SOUNDS = [
+  'Silent',
+  'Default alarm sound',
+  'Alarm',
+  'Alarm Clock',
+  'Classic Alarm 01',
+  'Classic Alarm 02',
+  'Confident',
+  'Crisp',
+  'Early Riser',
+  'Lullaby',
+  'Radar',
+  'Ripple',
+  'Silk',
+  'Zen',
 ];
+const SNOOZE_OPTIONS = [5, 10, 15, 20, 25, 30];
+const HOURS_LIST   = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+const MINUTES_LIST = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+const PERIODS_LIST = ['AM', 'PM'];
 
-const defaultForm = (): AlarmForm => ({
-  time: '08:00', period: 'AM', label: '', ringtone: 'Chimes',
-  days: [true, true, true, true, true, false, false], active: true,
-});
+const ITEM_H = 58;
 
-function toMinutes(time: string, period: Period): number {
-  const [hStr, mStr] = time.split(':');
-  let h = parseInt(hStr, 10);
-  const m = parseInt(mStr, 10);
+function toMinutes(hour: number, minute: number, period: Period): number {
+  let h = hour;
   if (period === 'PM' && h !== 12) h += 12;
   if (period === 'AM' && h === 12) h = 0;
-  return h * 60 + m;
+  return h * 60 + minute;
 }
 
-function timeUntil(time: string, period: Period): string {
+function timeUntil(hour: number, minute: number, period: Period): string {
   const now = new Date();
-  const [hStr, mStr] = time.split(':');
-  let h = parseInt(hStr, 10);
-  const m = parseInt(mStr, 10);
+  let h = hour;
   if (period === 'PM' && h !== 12) h += 12;
   if (period === 'AM' && h === 12) h = 0;
   const target = new Date(now);
-  target.setHours(h, m, 0, 0);
-  if (target <= now) target.setDate(target.getDate() + 1);
+  target.setHours(h, minute, 0, 0);
+  if (target.getTime() <= now.getTime()) target.setDate(target.getDate() + 1);
   const diff = Math.floor((target.getTime() - now.getTime()) / 60000);
   const hrs = Math.floor(diff / 60);
   const mins = diff % 60;
-  if (hrs === 0) return `In ${mins}m`;
-  return `In ${hrs}h ${mins}m`;
+  if (hrs === 0) return `${mins} minute${mins !== 1 ? 's' : ''}`;
+  if (mins === 0) return `${hrs} hour${hrs !== 1 ? 's' : ''}`;
+  return `${hrs} hour${hrs !== 1 ? 's' : ''} and ${mins} minute${mins !== 1 ? 's' : ''}`;
 }
 
-function parseAlarmTime(value: string): boolean {
-  const match = value.match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return false;
-  const h = parseInt(match[1], 10);
-  const m = parseInt(match[2], 10);
-  return h >= 1 && h <= 12 && m >= 0 && m <= 59;
+function getRepeatLabel(days: boolean[]): string {
+  const count = days.filter(Boolean).length;
+  if (count === 0) return 'Once';
+  if (count === 7) return 'Every day';
+  const weekdays = [false, true, true, true, true, true, false];
+  const weekends = [true, false, false, false, false, false, true];
+  if (days.every((d, i) => d === weekdays[i])) return 'Weekdays';
+  if (days.every((d, i) => d === weekends[i])) return 'Weekends';
+  return days.map((d, i) => (d ? DAY_NAMES[i].slice(0, 3) : null)).filter(Boolean).join(', ');
 }
 
-export default function AlarmScreen() {
-  const [alarms, setAlarms] = useState<Alarm[]>(INITIAL_ALARMS);
-  const [volume, setVolume] = useState('High');
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<AlarmForm>(defaultForm());
+function padTime(hour: number, minute: number): string {
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
 
-  // Derived
+// ─── Wheel Picker Column ────────────────────────────────────────────────────
+interface WheelColProps {
+  items: string[];
+  selectedIndex: number;
+  onSelect: (i: number) => void;
+  width?: number;
+}
+
+function WheelCol({ items, selectedIndex, onSelect, width = 80 }: WheelColProps) {
+  const scrollRef = useRef<ScrollView>(null);
+  const { theme } = useTheme();
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: selectedIndex * ITEM_H, animated: false });
+    }, 50);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleEnd = (e: any) => {
+    const i = Math.round(e.nativeEvent.contentOffset.y / ITEM_H);
+    const clamped = Math.max(0, Math.min(items.length - 1, i));
+    onSelect(clamped);
+  };
+
+  return (
+    <View style={{ width, height: ITEM_H * 5, overflow: 'hidden' }}>
+      {/* centre-selection highlight band */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute', left: 0, right: 0,
+          top: ITEM_H * 2, height: ITEM_H,
+          backgroundColor: 'rgba(74,144,217,0.10)',
+          borderTopWidth: 1, borderBottomWidth: 1, borderColor: BLUE,
+        }}
+      />
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={ITEM_H}
+        decelerationRate="fast"
+        onMomentumScrollEnd={handleEnd}
+        onScrollEndDrag={handleEnd}
+        contentContainerStyle={{ paddingVertical: ITEM_H * 2 }}
+      >
+        {items.map((item, i) => {
+          const dist = Math.abs(i - selectedIndex);
+          const isSelected = dist === 0;
+          const isAdjacent = dist === 1;
+          return (
+            <TouchableOpacity
+              key={i}
+              style={{ height: ITEM_H, justifyContent: 'center', alignItems: 'center' }}
+              onPress={() => {
+                onSelect(i);
+                scrollRef.current?.scrollTo({ y: i * ITEM_H, animated: true });
+              }}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={{
+                  fontSize: isSelected ? 38 : isAdjacent ? 30 : 24,
+                  fontWeight: isSelected ? '700' : '400',
+                  color: isSelected ? theme.text : isAdjacent ? theme.textSub : theme.textDim,
+                }}
+              >
+                {item}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─── Settings Row ────────────────────────────────────────────────────────────
+function SettingRow({
+  label, value, onPress, isSwitch, switchVal, onSwitch,
+}: {
+  label: string;
+  value?: string;
+  onPress?: () => void;
+  isSwitch?: boolean;
+  switchVal?: boolean;
+  onSwitch?: (v: boolean) => void;
+}) {
+  const { theme } = useTheme();
+  return (
+    <TouchableOpacity
+      style={styles.settingRow}
+      onPress={!isSwitch ? onPress : undefined}
+      activeOpacity={isSwitch ? 1 : 0.6}
+    >
+      <Text style={[styles.settingLabel, { color: theme.text }]}>{label}</Text>
+      {isSwitch ? (
+        <Switch
+          value={switchVal}
+          onValueChange={onSwitch}
+          trackColor={{ false: '#E0E0E0', true: '#B8D4F5' }}
+          thumbColor={switchVal ? BLUE : '#f0f0f0'}
+        />
+      ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Text style={[styles.settingValue, { color: theme.textDim }]}>{value}</Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.textDim} />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+// ─── Animated icon button ────────────────────────────────────────────────────
+function AnimIconBtn({ onPress, children }: { onPress: () => void; children: React.ReactNode }) {
+  const sc = useRef(new Animated.Value(1)).current;
+  const pi = () => Animated.spring(sc, { toValue: 0.82, useNativeDriver: true, speed: 30 }).start();
+  const po = () => Animated.spring(sc, { toValue: 1,    useNativeDriver: true, speed: 20 }).start();
+  return (
+    <Animated.View style={{ transform: [{ scale: sc }] }}>
+      <TouchableOpacity onPressIn={pi} onPressOut={po} onPress={onPress} activeOpacity={1}>
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+export default function AlarmScreen({ navigation }: any) {
+  const { alarms, isLoading, addAlarm, updateAlarm, removeAlarm, toggleAlarm: storeToggleAlarm } = useAlarmStore();
+  const { theme } = useTheme();
+
+  // ── Edit modal ──────────────────────────────────────────────────────────
+  const [modalVisible, setModalVisible]     = useState(false);
+  const [editingId, setEditingId]           = useState<string | null>(null);
+  const [modalKey, setModalKey]             = useState(0);
+
+  // wheel state
+  const [formHourIdx,   setFormHourIdx]   = useState(0);
+  const [formMinuteIdx, setFormMinuteIdx] = useState(0);
+  const [formPeriodIdx, setFormPeriodIdx] = useState(0);
+  // settings state
+  const [formLabel,        setFormLabel]        = useState('');
+  const [formSound,        setFormSound]        = useState('Default alarm sound');
+  const [formDays,         setFormDays]         = useState<boolean[]>([true,true,true,true,true,true,true]);
+  const [formSnooze,       setFormSnooze]       = useState(5);
+  const [formSkipHolidays, setFormSkipHolidays] = useState(false);
+  const [formVibrate,      setFormVibrate]      = useState(true);
+
+  // ── Sub-modals ──────────────────────────────────────────────────────────
+  const [repeatModal, setRepeatModal] = useState(false);
+  const [repeatDraft, setRepeatDraft] = useState<boolean[]>([true,true,true,true,true,true,true]);
+  const [snoozeModal, setSnoozeModal] = useState(false);
+  const [soundModal,  setSoundModal]  = useState(false);
+  const [labelModal,  setLabelModal]  = useState(false);
+  const [tempLabel,   setTempLabel]   = useState('');
+
+  // ── Derived ─────────────────────────────────────────────────────────────
   const activeCount = alarms.filter(a => a.active).length;
   const nextAlarm = useMemo(() => {
     const active = alarms.filter(a => a.active);
     if (!active.length) return null;
-    return [...active].sort((a, b) => toMinutes(a.time, a.period) - toMinutes(b.time, b.period))[0];
+    return [...active].sort(
+      (a, b) => toMinutes(a.hour, a.minute, a.period) - toMinutes(b.hour, b.minute, b.period)
+    )[0];
   }, [alarms]);
 
-  // Toggle alarm on/off
-  const toggleAlarm = (id: string) =>
-    setAlarms(prev =>
-      prev.map(a =>
-        a.id === id ? { ...a, active: !a.active, badge: !a.active ? 'Scheduled' : null } : a
-      )
-    );
+  // ── Handlers ────────────────────────────────────────────────────────────
+  const toggleAlarm = (id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    storeToggleAlarm(id);
+  };
 
-  // Toggle a specific day on an alarm card
-  const toggleDay = (alarmId: string, dayIndex: number) =>
-    setAlarms(prev =>
-      prev.map(a =>
-        a.id === alarmId
-          ? { ...a, days: a.days.map((d, i) => (i === dayIndex ? !d : d)) }
-          : a
-      )
-    );
-
-  // Delete with confirmation
   const confirmDelete = (id: string, label: string) =>
-    Alert.alert('Delete Alarm', `Delete "${label}"? This cannot be undone.`, [
+    Alert.alert('Delete Alarm', `Delete "${label}"?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => setAlarms(prev => prev.filter(a => a.id !== id)) },
+      { text: 'Delete', style: 'destructive', onPress: () => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); removeAlarm(id); } },
     ]);
 
-  // Duplicate
   const duplicateAlarm = (alarm: Alarm) => {
-    const copy: Alarm = { ...alarm, id: Date.now().toString(), label: `${alarm.label} (copy)`, active: false, badge: null };
-    setAlarms(prev => [...prev, copy]);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    addAlarm({ ...alarm, id: Date.now().toString(), label: `${alarm.label} (copy)`, active: false });
   };
 
-  // Ringtone picker for a card
-  const changeRingtone = (alarmId: string, current: string) => {
-    Alert.alert('Ringtone', `Current: ${current}`, [
-      ...RINGTONES.map(r => ({
-        text: r === current ? `\u2713  ${r}` : r,
-        onPress: () => setAlarms(prev => prev.map(a => (a.id === alarmId ? { ...a, ringtone: r } : a))),
-      })),
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
-  // Ringtone picker for modal form
-  const pickFormRingtone = () => {
-    Alert.alert('Ringtone', `Current: ${form.ringtone}`, [
-      ...RINGTONES.map(r => ({
-        text: r === form.ringtone ? `\u2713  ${r}` : r,
-        onPress: () => setForm(f => ({ ...f, ringtone: r })),
-      })),
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
-  // Three-dot menu
   const openAlarmMenu = (alarm: Alarm) =>
     Alert.alert(alarm.label, undefined, [
-      { text: 'Edit', onPress: () => openEdit(alarm) },
+      { text: 'Edit',      onPress: () => openEdit(alarm) },
       { text: 'Duplicate', onPress: () => duplicateAlarm(alarm) },
-      { text: 'Change Ringtone', onPress: () => changeRingtone(alarm.id, alarm.ringtone) },
       { text: alarm.active ? 'Disable' : 'Enable', onPress: () => toggleAlarm(alarm.id) },
       { text: 'Delete', style: 'destructive', onPress: () => confirmDelete(alarm.id, alarm.label) },
       { text: 'Cancel', style: 'cancel' },
     ]);
 
-  // Volume picker
-  const handleVolume = () => {
-    Alert.alert('Alarm Volume', `Current: ${volume}`, [
-      ...VOLUME_LEVELS.map(v => ({
-        text: v === volume ? `\u2713  ${v}` : v,
-        onPress: () => setVolume(v),
-      })),
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
-  // Open add modal
-  const openAdd = () => { setEditingId(null); setForm(defaultForm()); setModalVisible(true); };
-
-  // Open edit modal
-  const openEdit = (alarm: Alarm) => {
-    setEditingId(alarm.id);
-    setForm({ time: alarm.time, period: alarm.period, label: alarm.label, ringtone: alarm.ringtone, days: [...alarm.days], active: alarm.active });
+  const openAdd = () => {
+    setEditingId(null);
+    setFormHourIdx(6);        // 07
+    setFormMinuteIdx(0);
+    setFormPeriodIdx(0);      // AM
+    setFormLabel('');
+    setFormSound('Default alarm sound');
+    setFormDays([false,true,true,true,true,true,false]);
+    setFormSnooze(5);
+    setFormSkipHolidays(false);
+    setFormVibrate(true);
+    setModalKey(k => k + 1);
     setModalVisible(true);
   };
 
-  // Save from modal
+  const openEdit = (alarm: Alarm) => {
+    setEditingId(alarm.id);
+    setFormHourIdx(alarm.hour - 1);
+    setFormMinuteIdx(alarm.minute);
+    setFormPeriodIdx(alarm.period === 'AM' ? 0 : 1);
+    setFormLabel(alarm.label);
+    setFormSound(alarm.sound);
+    setFormDays([...alarm.days]);
+    setFormSnooze(alarm.snooze);
+    setFormSkipHolidays(alarm.skipHolidays);
+    setFormVibrate(alarm.vibrate);
+    setModalKey(k => k + 1);
+    setModalVisible(true);
+  };
+
   const handleSave = () => {
-    if (!form.label.trim()) { Alert.alert('Validation', 'Please enter an alarm label.'); return; }
-    if (!parseAlarmTime(form.time)) { Alert.alert('Validation', 'Enter a valid time in H:MM format (1\u201312), e.g. 07:30.'); return; }
-    if (!form.days.some(Boolean)) { Alert.alert('Validation', 'Select at least one repeat day.'); return; }
+    const hour   = formHourIdx + 1;
+    const minute = formMinuteIdx;
+    const period: Period = formPeriodIdx === 0 ? 'AM' : 'PM';
+    const label = formLabel.trim() || 'Alarm';
+    const alarm: Alarm = {
+      id: editingId || Date.now().toString(),
+      hour, minute, period, label,
+      sound: formSound, days: formDays, snooze: formSnooze,
+      skipHolidays: formSkipHolidays, vibrate: formVibrate, active: true,
+    };
     if (editingId) {
-      setAlarms(prev => prev.map(a =>
-        a.id === editingId ? { ...a, ...form, badge: form.active ? 'Scheduled' : null } : a
-      ));
+      updateAlarm(alarm);
     } else {
-      setAlarms(prev => [...prev, { ...form, id: Date.now().toString(), badge: form.active ? 'Scheduled' : null }]);
+      addAlarm(alarm);
     }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setModalVisible(false);
   };
 
-  const toggleFormDay = (i: number) =>
-    setForm(f => ({ ...f, days: f.days.map((d, idx) => (idx === i ? !d : d)) }));
+  // ── Repeat sub-modal helpers
+  const openRepeatModal = () => {
+    setRepeatDraft([...formDays]);
+    setRepeatModal(true);
+  };
+  const toggleRepeatDay = (i: number) =>
+    setRepeatDraft(d => d.map((v, idx) => idx === i ? !v : v));
+  const confirmRepeat = () => { setFormDays(repeatDraft); setRepeatModal(false); };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg2 }]} edges={['top']}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color="#4A90D9" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg2 }]} edges={['top']}>
       {/* Top Bar */}
-      <View style={styles.topBar}>
-        <Text style={styles.topBarTitle}>Alarms</Text>
-        <View style={styles.topBarIcons}>
-          <TouchableOpacity style={styles.iconBtn} onPress={handleVolume}>
-            <Ionicons name="volume-medium-outline" size={22} color="#333" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={openAdd}>
-            <Ionicons name="add-circle-outline" size={24} color={BLUE} />
-          </TouchableOpacity>
-        </View>
+      <View style={[styles.topBar, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+        <BurgerMenu navigation={navigation} />
+        <Text style={[styles.topBarTitle, { color: theme.text }]}>Alarms</Text>
+        <AnimIconBtn onPress={openAdd}>
+          <Ionicons name="add-circle-outline" size={26} color={BLUE} />
+        </AnimIconBtn>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Next Alarm Banner */}
+      <ScrollView
+        style={[styles.scroll, { backgroundColor: theme.bg2 }]}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── NEXT ALARM Banner ─────────────────────────────────── */}
         <View style={styles.nextAlarmBanner}>
           <View style={styles.nextAlarmLeft}>
             <Ionicons name="alarm-outline" size={28} color="#fff" />
@@ -226,15 +371,19 @@ export default function AlarmScreen() {
           <View style={styles.nextAlarmBody}>
             <Text style={styles.nextAlarmLabel}>NEXT ALARM</Text>
             <Text style={styles.nextAlarmTime}>
-              {nextAlarm ? `${nextAlarm.time} ${nextAlarm.period} \u00b7 ${nextAlarm.label}` : 'No active alarms'}
+              {nextAlarm
+                ? `${padTime(nextAlarm.hour, nextAlarm.minute)} ${nextAlarm.period}  ·  ${nextAlarm.label}`
+                : 'No active alarms'}
             </Text>
             <Text style={styles.nextAlarmSub}>
-              {nextAlarm ? timeUntil(nextAlarm.time, nextAlarm.period) : 'Enable an alarm to see it here'}
+              {nextAlarm
+                ? `Alarm in ${timeUntil(nextAlarm.hour, nextAlarm.minute, nextAlarm.period)}`
+                : 'Enable an alarm to see it here'}
             </Text>
           </View>
         </View>
 
-        {/* YOUR ALARMS header */}
+        {/* ── YOUR ALARMS header ────────────────────────────────── */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>YOUR ALARMS</Text>
           <View style={styles.sectionBadge}>
@@ -242,312 +391,518 @@ export default function AlarmScreen() {
           </View>
         </View>
 
-        {/* Empty state */}
+        {/* ── Empty state ───────────────────────────────────────── */}
         {alarms.length === 0 && (
           <View style={styles.emptyState}>
-            <Ionicons name="alarm-outline" size={40} color="#ccc" />
-            <Text style={styles.emptyStateText}>No alarms yet</Text>
-            <TouchableOpacity style={styles.emptyAddBtn} onPress={openAdd}>
-              <Text style={styles.emptyAddText}>+ Add Alarm</Text>
+            <Ionicons name="alarm-outline" size={42} color="#ccc" />
+            <Text style={styles.emptyText}>No alarms yet</Text>
+            <TouchableOpacity style={styles.emptyBtn} onPress={openAdd}>
+              <Text style={styles.emptyBtnText}>+ Add Alarm</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Alarm Cards */}
-        {alarms.map(alarm => (
-          <View key={alarm.id} style={styles.alarmCard}>
-            <View style={styles.alarmTop}>
-              <View style={styles.alarmTimeBlock}>
-                <Text style={[styles.alarmTime, !alarm.active && styles.alarmTimeInactive]}>
-                  {alarm.time}
-                </Text>
-                <Text style={[styles.alarmPeriod, !alarm.active && styles.alarmTimeInactive]}>
-                  {alarm.period}
+        {/* ── Alarm List ────────────────────────────────────────── */}
+        {alarms.map((alarm, idx) => (
+          <View key={alarm.id}>
+            <TouchableOpacity
+              style={[styles.alarmRow, { backgroundColor: theme.card }]}
+              onPress={() => openEdit(alarm)}
+              onLongPress={() => confirmDelete(alarm.id, alarm.label)}
+              delayLongPress={500}
+              activeOpacity={0.85}
+            >
+              {/* Left: time + label */}
+              <View style={styles.alarmLeft}>
+                <View style={styles.alarmTimeRow}>
+                  <Text style={[styles.alarmTime, { color: theme.text }, !alarm.active && styles.dimText]}>
+                    {padTime(alarm.hour, alarm.minute)}
+                  </Text>
+                  <Text style={[styles.alarmPeriod, { color: theme.textSub }, !alarm.active && styles.dimText]}>
+                    {alarm.period}
+                  </Text>
+                  {alarm.label.length > 0 && (
+                    <Text
+                      style={[styles.alarmLabel, { color: theme.textSub }, !alarm.active && styles.dimText]}
+                      numberOfLines={1}
+                    >
+                      {alarm.label}
+                    </Text>
+                  )}
+                </View>
+                <Text style={[styles.alarmSub, { color: theme.textDim }, !alarm.active && styles.dimText]}>
+                  {getRepeatLabel(alarm.days)}
+                  {alarm.active
+                    ? `  ·  Alarm in ${timeUntil(alarm.hour, alarm.minute, alarm.period)}`
+                    : '  ·  Off'}
                 </Text>
               </View>
-              <View style={styles.alarmTopRight}>
+
+              {/* Right: toggle + menu */}
+              <View style={styles.alarmRight}>
                 <Switch
                   value={alarm.active}
                   onValueChange={() => toggleAlarm(alarm.id)}
                   trackColor={{ false: '#E0E0E0', true: '#B8D4F5' }}
                   thumbColor={alarm.active ? BLUE : '#f0f0f0'}
-                  style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
                 />
-                <TouchableOpacity style={styles.dotMenuBtn} onPress={() => openAlarmMenu(alarm)}>
-                  <Ionicons name="ellipsis-vertical" size={18} color="#ccc" />
+                <TouchableOpacity
+                  style={styles.menuBtn}
+                  onPress={() => openAlarmMenu(alarm)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="ellipsis-vertical" size={18} color="#BBB" />
                 </TouchableOpacity>
               </View>
-            </View>
-
-            {/* Label tap = edit */}
-            <TouchableOpacity onPress={() => openEdit(alarm)}>
-              <Text style={[styles.alarmLabel, !alarm.active && styles.alarmLabelInactive]}>
-                {alarm.label}
-              </Text>
             </TouchableOpacity>
 
-            {/* Ringtone tap = picker */}
-            <TouchableOpacity style={styles.alarmMeta} onPress={() => changeRingtone(alarm.id, alarm.ringtone)}>
-              <MaterialCommunityIcons name="music-note" size={13} color="#888" />
-              <Text style={styles.alarmMetaText}>{alarm.ringtone}</Text>
-              <Ionicons name="chevron-down" size={12} color="#bbb" style={{ marginLeft: 3 }} />
-            </TouchableOpacity>
-
-            {/* Day pills — tap to toggle */}
-            <View style={styles.alarmDaysRow}>
-              {DAYS_ALL.map((d, i) => (
-                <TouchableOpacity
-                  key={i}
-                  onPress={() => toggleDay(alarm.id, i)}
-                  style={[
-                    styles.dayPill,
-                    alarm.days[i] && alarm.active && styles.dayPillActive,
-                    alarm.days[i] && !alarm.active && styles.dayPillInactive,
-                  ]}
-                >
-                  <Text style={[styles.dayPillText, alarm.days[i] && alarm.active && styles.dayPillTextActive]}>
-                    {d}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              {alarm.badge && alarm.active && (
-                <View style={styles.scheduledBadge}>
-                  <Text style={styles.scheduledBadgeText}>{alarm.badge}</Text>
-                </View>
-              )}
-            </View>
+            {/* Divider (not after last item) */}
+            {idx < alarms.length - 1 && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
           </View>
         ))}
 
-        {/* Sleep Tip */}
-        <View style={styles.sleepTipCard}>
-          <View style={styles.sleepTipLeft}>
+        {/* ── Sleep Tip ─────────────────────────────────────────── */}
+        <View style={[styles.sleepTipCard, { backgroundColor: theme.dark ? '#1A2A3A' : '#EBF4FF' }]}>
+          <View style={styles.sleepTipIcon}>
             <Ionicons name="moon-outline" size={22} color={BLUE} />
           </View>
-          <View style={styles.sleepTipBody}>
-            <Text style={styles.sleepTipTitle}>Sleep Tip</Text>
-            <Text style={styles.sleepTipText}>
-              Try to maintain a consistent sleep schedule. Going to bed and waking up at the same time each day improves sleep quality.
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.sleepTipTitle, { color: theme.text }]}>Sleep Tip</Text>
+            <Text style={[styles.sleepTipText, { color: theme.textSub }]}>
+              Try to maintain a consistent sleep schedule. Going to bed and waking up at the same
+              time each day improves sleep quality.
             </Text>
           </View>
         </View>
-
-        <View style={{ height: 30 }} />
+        <View style={{ height: 32 }} />
       </ScrollView>
 
-      {/* Add / Edit Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)} />
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Text style={styles.modalCancel}>Cancel</Text>
+      {/* ════════════════════════════════════════════════════════════
+          ADD / EDIT ALARM MODAL
+      ════════════════════════════════════════════════════════════ */}
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <SafeAreaView style={[styles.editSafe, { backgroundColor: theme.bg2 }]} edges={['top', 'bottom']}>
+          {/* Header */}
+          <View style={[styles.editHeader, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+            <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.editHeaderBtn}>
+              <Ionicons name="close" size={24} color={theme.textSub} />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>{editingId ? 'Edit Alarm' : 'New Alarm'}</Text>
-            <TouchableOpacity onPress={handleSave}>
-              <Text style={styles.modalSave}>Save</Text>
+            <Text style={[styles.editHeaderTitle, { color: theme.text }]}>
+              {editingId ? 'Edit Alarm' : 'New Alarm'}
+            </Text>
+            <TouchableOpacity onPress={handleSave} style={styles.editHeaderBtn}>
+              <Ionicons name="checkmark" size={26} color={BLUE} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {/* Time */}
-            <Text style={styles.formLabel}>TIME</Text>
-            <View style={styles.timeRow}>
-              <TextInput
-                style={styles.timeInput}
-                value={form.time}
-                onChangeText={v => setForm(f => ({ ...f, time: v }))}
-                placeholder="07:00"
-                placeholderTextColor="#bbb"
-                keyboardType="numbers-and-punctuation"
-                maxLength={5}
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* ── Drum-roll time picker ─────────────────────── */}
+            <View style={[styles.pickerContainer, { backgroundColor: theme.bg }]}>
+              <WheelCol
+                key={`h-${modalKey}`}
+                items={HOURS_LIST}
+                selectedIndex={formHourIdx}
+                onSelect={setFormHourIdx}
+                width={90}
               />
-              <View style={styles.periodToggle}>
-                {(['AM', 'PM'] as const).map(p => (
-                  <TouchableOpacity
-                    key={p}
-                    style={[styles.periodBtn, form.period === p && styles.periodBtnActive]}
-                    onPress={() => setForm(f => ({ ...f, period: p }))}
-                  >
-                    <Text style={[styles.periodBtnText, form.period === p && styles.periodBtnTextActive]}>{p}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <WheelCol
+                key={`m-${modalKey}`}
+                items={MINUTES_LIST}
+                selectedIndex={formMinuteIdx}
+                onSelect={setFormMinuteIdx}
+                width={90}
+              />
+              <WheelCol
+                key={`p-${modalKey}`}
+                items={PERIODS_LIST}
+                selectedIndex={formPeriodIdx}
+                onSelect={setFormPeriodIdx}
+                width={80}
+              />
             </View>
 
-            {/* Label */}
-            <Text style={styles.formLabel}>LABEL</Text>
-            <TextInput
-              style={styles.labelInput}
-              placeholder="e.g. Morning Workout"
-              placeholderTextColor="#bbb"
-              value={form.label}
-              onChangeText={v => setForm(f => ({ ...f, label: v }))}
-              maxLength={40}
-            />
+            {/* ── Settings panel ───────────────────────────── */}
+            <View style={[styles.settingsPanel, { backgroundColor: theme.card }]}>
+              <SettingRow
+                label="Repeat"
+                value={getRepeatLabel(formDays)}
+                onPress={openRepeatModal}
+              />
+              <View style={styles.settingDivider} />
 
-            {/* Repeat days */}
-            <Text style={styles.formLabel}>REPEAT</Text>
-            <View style={styles.formDaysRow}>
-              {DAYS_ALL.map((d, i) => (
-                <TouchableOpacity
-                  key={i}
-                  onPress={() => toggleFormDay(i)}
-                  style={[styles.formDayPill, form.days[i] && styles.formDayPillActive]}
-                >
-                  <Text style={[styles.formDayText, form.days[i] && styles.formDayTextActive]}>{d}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+              <SettingRow
+                label="Skip Public Holidays"
+                isSwitch
+                switchVal={formSkipHolidays}
+                onSwitch={setFormSkipHolidays}
+              />
+              <View style={styles.settingDivider} />
 
-            {/* Ringtone */}
-            <Text style={styles.formLabel}>RINGTONE</Text>
-            <TouchableOpacity style={styles.ringtoneRow} onPress={pickFormRingtone}>
-              <MaterialCommunityIcons name="music-note" size={16} color="#555" />
-              <Text style={styles.ringtoneText}>{form.ringtone}</Text>
-              <Ionicons name="chevron-forward" size={16} color="#bbb" style={{ marginLeft: 'auto' }} />
-            </TouchableOpacity>
+              <SettingRow
+                label="Alarm Sound"
+                value={formSound}
+                onPress={() => setSoundModal(true)}
+              />
+              <View style={styles.settingDivider} />
 
-            {/* Active toggle */}
-            <View style={styles.formToggleRow}>
-              <Text style={styles.formToggleLabel}>Active</Text>
-              <Switch
-                value={form.active}
-                onValueChange={v => setForm(f => ({ ...f, active: v }))}
-                trackColor={{ false: '#E0E0E0', true: '#B8D4F5' }}
-                thumbColor={form.active ? BLUE : '#f0f0f0'}
+              <SettingRow
+                label="Label"
+                value={formLabel || 'None'}
+                onPress={() => { setTempLabel(formLabel); setLabelModal(true); }}
+              />
+              <View style={styles.settingDivider} />
+
+              <SettingRow
+                label="Snooze"
+                value={`${formSnooze} minutes`}
+                onPress={() => setSnoozeModal(true)}
+              />
+              <View style={styles.settingDivider} />
+
+              <SettingRow
+                label="Vibrate while Ringing"
+                isSwitch
+                switchVal={formVibrate}
+                onSwitch={setFormVibrate}
               />
             </View>
           </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ════════════════════════════════════════════════════════════
+          REPEAT MODAL
+      ════════════════════════════════════════════════════════════ */}
+      <Modal
+        visible={repeatModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setRepeatModal(false)}
+      >
+        <Pressable style={styles.subOverlay} onPress={() => setRepeatModal(false)} />
+        <View style={styles.subSheet}>
+          <Text style={styles.subTitle}>Repeat</Text>
+          {DAY_NAMES.map((day, i) => (
+            <TouchableOpacity
+              key={day}
+              style={styles.checkRow}
+              onPress={() => toggleRepeatDay(i)}
+            >
+              <Text style={styles.checkLabel}>{day}</Text>
+              <View
+                style={[
+                  styles.checkbox,
+                  repeatDraft[i] && styles.checkboxChecked,
+                ]}
+              >
+                {repeatDraft[i] && (
+                  <Ionicons name="checkmark" size={16} color="#fff" />
+                )}
+              </View>
+            </TouchableOpacity>
+          ))}
+          <View style={styles.subActions}>
+            <TouchableOpacity onPress={() => setRepeatModal(false)} style={styles.subActionBtn}>
+              <Text style={styles.subActionCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <View style={styles.subActionDivider} />
+            <TouchableOpacity onPress={confirmRepeat} style={styles.subActionBtn}>
+              <Text style={styles.subActionDone}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ════════════════════════════════════════════════════════════
+          SNOOZE MODAL
+      ════════════════════════════════════════════════════════════ */}
+      <Modal
+        visible={snoozeModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSnoozeModal(false)}
+      >
+        <Pressable style={styles.subOverlay} onPress={() => setSnoozeModal(false)} />
+        <View style={styles.subSheet}>
+          <Text style={styles.subTitle}>Snooze</Text>
+          {SNOOZE_OPTIONS.map(opt => (
+            <TouchableOpacity
+              key={opt}
+              style={styles.checkRow}
+              onPress={() => { setFormSnooze(opt); setSnoozeModal(false); }}
+            >
+              <Text style={styles.checkLabel}>{opt} minutes</Text>
+              <View
+                style={[
+                  styles.radioOuter,
+                  formSnooze === opt && styles.radioOuterSelected,
+                ]}
+              >
+                {formSnooze === opt && <View style={styles.radioInner} />}
+              </View>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity
+            onPress={() => setSnoozeModal(false)}
+            style={[styles.subActions, { justifyContent: 'center' }]}
+          >
+            <Text style={styles.subActionCancel}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* ════════════════════════════════════════════════════════════
+          ALARM SOUND MODAL
+      ════════════════════════════════════════════════════════════ */}
+      <Modal
+        visible={soundModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setSoundModal(false)}
+      >
+        <SafeAreaView style={[styles.editSafe, { backgroundColor: theme.bg2 }]} edges={['top', 'bottom']}>
+          <View style={[styles.editHeader, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+            <TouchableOpacity onPress={() => setSoundModal(false)} style={styles.editHeaderBtn}>
+              <Ionicons name="arrow-back" size={22} color={theme.textSub} />
+            </TouchableOpacity>
+            <Text style={[styles.editHeaderTitle, { color: theme.text }]}>Alarm Sound</Text>
+            <View style={styles.editHeaderBtn} />
+          </View>
+
+          <ScrollView>
+            <Text style={[styles.soundSection, { color: theme.textDim }]}>Your sounds</Text>
+            <View style={[styles.settingsPanel, { backgroundColor: theme.card }]}>
+              <TouchableOpacity style={styles.checkRow}>
+                <Text style={[styles.checkLabel, { color: theme.text }]}>Add new</Text>
+                <Ionicons name="add" size={22} color={theme.textDim} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.soundSection, { color: theme.textDim }]}>Device sounds</Text>
+            <View style={[styles.settingsPanel, { backgroundColor: theme.card }]}>
+              {SOUNDS.map((s, i) => (
+                <View key={s}>
+                  <TouchableOpacity
+                    style={styles.checkRow}
+                    onPress={() => { setFormSound(s); setSoundModal(false); }}
+                  >
+                    <Text style={[styles.checkLabel, { color: theme.text }]}>{s}</Text>
+                    <View
+                      style={[
+                        styles.radioOuter,
+                        formSound === s && styles.radioOuterSelected,
+                      ]}
+                    >
+                      {formSound === s && <View style={styles.radioInner} />}
+                    </View>
+                  </TouchableOpacity>
+                  {i < SOUNDS.length - 1 && <View style={[styles.settingDivider, { backgroundColor: theme.border }]} />}
+                </View>
+              ))}
+            </View>
+            <View style={{ height: 32 }} />
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ════════════════════════════════════════════════════════════
+          LABEL MODAL
+      ════════════════════════════════════════════════════════════ */}
+      <Modal
+        visible={labelModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setLabelModal(false)}
+      >
+        <Pressable style={styles.subOverlay} onPress={() => setLabelModal(false)} />
+        <View style={[styles.labelSheet, { backgroundColor: theme.card }]}>
+          <Text style={[styles.subTitle, { color: theme.text }]}>Label</Text>
+          <TextInput
+            style={[styles.labelInput, { color: theme.text, backgroundColor: theme.bg2, borderColor: theme.border }]}
+            value={tempLabel}
+            onChangeText={setTempLabel}
+            placeholder="e.g. Morning Workout"
+            placeholderTextColor={theme.textDim}
+            autoFocus
+            maxLength={40}
+          />
+          <View style={styles.subActions}>
+            <TouchableOpacity onPress={() => setLabelModal(false)} style={styles.subActionBtn}>
+              <Text style={styles.subActionCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <View style={styles.subActionDivider} />
+            <TouchableOpacity
+              onPress={() => { setFormLabel(tempLabel.trim()); setLabelModal(false); }}
+              style={styles.subActionBtn}
+            >
+              <Text style={styles.subActionDone}>Save</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F5F6FA' },
+  safeArea: { flex: 1 },
 
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#EBEBEB',
+    paddingHorizontal: 18, paddingVertical: 13,
+    borderBottomWidth: 1,
   },
-  topBarTitle: { fontSize: 18, fontWeight: '700', color: '#111' },
-  topBarIcons: { flexDirection: 'row', alignItems: 'center' },
-  iconBtn: { marginLeft: 14 },
+  topBarTitle: { fontSize: 20, fontWeight: '700', flex: 1, textAlign: 'center' },
+  iconBtn: { padding: 4 },
 
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 20 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
 
+  // Next Alarm banner
   nextAlarmBanner: {
-    backgroundColor: BLUE, borderRadius: 14, padding: 16,
-    flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20,
+    backgroundColor: BLUE, borderRadius: 16, padding: 18,
+    flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 22,
+    shadowColor: BLUE, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
   },
   nextAlarmLeft: {
     width: 52, height: 52, borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
   },
   nextAlarmBody: { flex: 1 },
-  nextAlarmLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 3 },
-  nextAlarmTime: { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 2 },
-  nextAlarmSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
+  nextAlarmLabel: {
+    color: 'rgba(255,255,255,0.75)', fontSize: 10,
+    fontWeight: '800', letterSpacing: 1.2, marginBottom: 4,
+  },
+  nextAlarmTime: { color: '#fff', fontSize: 17, fontWeight: '800', marginBottom: 2 },
+  nextAlarmSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
 
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  sectionTitle: { fontSize: 11, fontWeight: '800', color: '#999', letterSpacing: 1 },
-  sectionBadge: { backgroundColor: '#E6F0FB', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  // Section header
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  sectionTitle: { fontSize: 11, fontWeight: '800', color: '#999', letterSpacing: 1.1 },
+  sectionBadge: {
+    backgroundColor: '#E6F0FB', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2,
+  },
   sectionBadgeText: { fontSize: 11, color: BLUE, fontWeight: '700' },
 
-  emptyState: { alignItems: 'center', paddingVertical: 40, gap: 10 },
-  emptyStateText: { fontSize: 14, color: '#bbb', fontWeight: '600' },
-  emptyAddBtn: { backgroundColor: BLUE, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10, marginTop: 4 },
-  emptyAddText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  // Empty state
+  emptyState: { alignItems: 'center', paddingVertical: 40, gap: 12 },
+  emptyText: { fontSize: 15, color: '#bbb', fontWeight: '600' },
+  emptyBtn: {
+    backgroundColor: BLUE, borderRadius: 10,
+    paddingHorizontal: 24, paddingVertical: 11, marginTop: 2,
+  },
+  emptyBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
-  alarmCard: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12,
+  // Alarm list item
+  alarmRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 16, paddingHorizontal: 16,
+  },
+  alarmLeft: { flex: 1 },
+  alarmTimeRow: { flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', gap: 6 },
+  alarmTime: { fontSize: 40, fontWeight: '300', lineHeight: 44 },
+  alarmPeriod: { fontSize: 18, fontWeight: '400', marginBottom: 4 },
+  alarmLabel: { fontSize: 15, marginBottom: 4, flexShrink: 1 },
+  alarmSub: { fontSize: 12, marginTop: 4 },
+  alarmRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  menuBtn: { padding: 6 },
+  dimText: { color: '#CCC' },
+  divider: { height: 1, marginHorizontal: 16 },
+
+  // Sleep tip
+  sleepTipCard: {
+    borderRadius: 16, padding: 16,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginTop: 18,
+  },
+  sleepTipIcon: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(74,144,217,0.15)', alignItems: 'center', justifyContent: 'center',
+  },
+  sleepTipTitle: { fontSize: 14, fontWeight: '800', marginBottom: 4 },
+  sleepTipText: { fontSize: 12, lineHeight: 19 },
+
+  // Edit modal
+  editSafe: { flex: 1 },
+  editHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  editHeaderBtn: { width: 40, alignItems: 'center' },
+  editHeaderTitle: { fontSize: 17, fontWeight: '700' },
+
+  // Wheel picker
+  pickerContainer: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    paddingVertical: 12, gap: 4,
+  },
+
+  // Settings panel
+  settingsPanel: {
+    marginHorizontal: 16, marginTop: 16,
+    borderRadius: 14, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
   },
-  alarmTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  alarmTimeBlock: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
-  alarmTime: { fontSize: 34, fontWeight: '800', color: '#111', lineHeight: 38 },
-  alarmPeriod: { fontSize: 16, fontWeight: '700', color: '#555', marginBottom: 4 },
-  alarmTimeInactive: { color: '#CCC' },
-  alarmTopRight: { flexDirection: 'row', alignItems: 'center' },
-  dotMenuBtn: { padding: 4, marginLeft: 4 },
-
-  alarmLabel: { fontSize: 14, fontWeight: '700', color: '#111', marginBottom: 4 },
-  alarmLabelInactive: { color: '#BBB' },
-
-  alarmMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
-  alarmMetaText: { fontSize: 12, color: '#888' },
-
-  alarmDaysRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
-  dayPill: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center' },
-  dayPillActive: { backgroundColor: BLUE },
-  dayPillInactive: { backgroundColor: '#E8E8E8' },
-  dayPillText: { fontSize: 12, fontWeight: '700', color: '#AAA' },
-  dayPillTextActive: { color: '#fff' },
-  scheduledBadge: { backgroundColor: '#E6F0FB', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginLeft: 4 },
-  scheduledBadgeText: { fontSize: 11, color: BLUE, fontWeight: '700' },
-
-  sleepTipCard: {
-    backgroundColor: '#EBF4FF', borderRadius: 14, padding: 14,
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginTop: 8,
-  },
-  sleepTipLeft: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  sleepTipBody: { flex: 1 },
-  sleepTipTitle: { fontSize: 14, fontWeight: '800', color: '#222', marginBottom: 4 },
-  sleepTipText: { fontSize: 12, color: '#555', lineHeight: 18 },
-
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
-  modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 22, borderTopRightRadius: 22, maxHeight: '80%' },
-  modalHeader: {
+  settingRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 18, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#EBEBEB',
+    paddingHorizontal: 16, paddingVertical: 14,
   },
-  modalCancel: { fontSize: 15, color: '#888', fontWeight: '500' },
-  modalTitle: { fontSize: 16, fontWeight: '700', color: '#111' },
-  modalSave: { fontSize: 15, color: BLUE, fontWeight: '700' },
-  modalBody: { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 40 },
+  settingLabel: { fontSize: 15, fontWeight: '500' },
+  settingValue: { fontSize: 14 },
+  settingDivider: { height: 1, marginHorizontal: 16 },
 
-  formLabel: { fontSize: 11, fontWeight: '800', color: '#999', letterSpacing: 1, marginBottom: 8, marginTop: 18 },
-
-  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  timeInput: {
-    flex: 1, fontSize: 32, fontWeight: '800', color: '#111',
-    borderBottomWidth: 2, borderBottomColor: BLUE,
-    paddingBottom: 4, letterSpacing: 2,
+  // Sub-modals (Repeat, Snooze)
+  subOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  subSheet: {
+    backgroundColor: '#2A2A2A', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingTop: 20, paddingBottom: 8, paddingHorizontal: 20,
   },
-  periodToggle: { flexDirection: 'row', borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: '#E0E0E0' },
-  periodBtn: { paddingHorizontal: 18, paddingVertical: 10, backgroundColor: '#F5F5F5' },
-  periodBtnActive: { backgroundColor: BLUE },
-  periodBtnText: { fontSize: 14, fontWeight: '700', color: '#888' },
-  periodBtnTextActive: { color: '#fff' },
+  subTitle: { fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 12 },
+  checkRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)',
+  },
+  checkLabel: { fontSize: 16, color: '#DDD' },
+  checkbox: {
+    width: 26, height: 26, borderRadius: 6,
+    borderWidth: 2, borderColor: '#555',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  checkboxChecked: { backgroundColor: BLUE, borderColor: BLUE },
+  radioOuter: {
+    width: 26, height: 26, borderRadius: 13,
+    borderWidth: 2, borderColor: '#555',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  radioOuterSelected: { borderColor: BLUE },
+  radioInner: { width: 14, height: 14, borderRadius: 7, backgroundColor: BLUE },
+  subActions: { flexDirection: 'row', marginTop: 10, marginBottom: 6 },
+  subActionBtn: { flex: 1, paddingVertical: 14, alignItems: 'center' },
+  subActionDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 8 },
+  subActionCancel: { fontSize: 16, color: '#888' },
+  subActionDone: { fontSize: 16, color: BLUE, fontWeight: '700' },
 
+  // Sound modal
+  soundSection: {
+    fontSize: 12, fontWeight: '700', color: '#999',
+    letterSpacing: 0.8, marginHorizontal: 24, marginTop: 20, marginBottom: 6,
+  },
+
+  // Label modal
+  labelSheet: {
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: 24,
+  },
   labelInput: {
-    borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10,
-    paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 15, color: '#111', backgroundColor: '#FAFAFA',
+    borderWidth: 1, borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 12, fontSize: 16,
+    marginBottom: 8,
   },
-
-  formDaysRow: { flexDirection: 'row', gap: 8 },
-  formDayPill: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center' },
-  formDayPillActive: { backgroundColor: BLUE },
-  formDayText: { fontSize: 13, fontWeight: '700', color: '#AAA' },
-  formDayTextActive: { color: '#fff' },
-
-  ringtoneRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10,
-    paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#FAFAFA',
-  },
-  ringtoneText: { fontSize: 15, color: '#111', flex: 1 },
-
-  formToggleRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginTop: 20, paddingVertical: 4,
-  },
-  formToggleLabel: { fontSize: 15, fontWeight: '600', color: '#111' },
 });

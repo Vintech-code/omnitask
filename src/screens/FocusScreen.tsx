@@ -1,55 +1,172 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   StyleSheet,
+  Animated,
+  Easing,
   Alert,
+  ScrollView,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
+import { BurgerMenu } from '../components/BurgerMenu';
+import { Storage, KEYS } from '../services/StorageService';
+import * as Haptics from 'expo-haptics';
 
-const BLUE = '#4A90D9';
+const ACCENT = '#4A90D9';
 
-const MODES = ['Focus', 'Short Break', 'Long Break'] as const;
-type Mode = typeof MODES[number];
+type Tab = 'pomodoro' | 'stopwatch';
+type PomMode = 'Focus' | 'Short Break' | 'Long Break';
 
-const MODE_DURATIONS: Record<Mode, number> = {
+const MODE_DURATIONS: Record<PomMode, number> = {
   'Focus': 25 * 60,
   'Short Break': 5 * 60,
   'Long Break': 15 * 60,
 };
+const MODE_COLORS: Record<PomMode, string> = {
+  'Focus': '#4A90D9',
+  'Short Break': '#3DAE7C',
+  'Long Break': '#9B6DD4',
+};
 
-export default function FocusScreen({ navigation }: any) {
-  const [activeMode, setActiveMode] = useState<Mode>('Focus');
+function pad(n: number) { return n.toString().padStart(2, '0'); }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Animated FAB helper
+// ──────────────────────────────────────────────────────────────────────────────
+function useFabScale() {
+  const scale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () => Animated.spring(scale, { toValue: 0.88, useNativeDriver: true, speed: 30 }).start();
+  const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20 }).start();
+  return { scale, onPressIn, onPressOut };
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Circular progress ring (SVG-free, using two rotated borders)
+// ──────────────────────────────────────────────────────────────────────────────
+function ProgressRing({ pct, color, size, strokeWidth, trackColor }: { pct: number; color: string; size: number; strokeWidth: number; trackColor: string }) {
+  const r = (size - strokeWidth) / 2;
+  const circum = 2 * Math.PI * r;
+  const progress = useRef(new Animated.Value(pct)).current;
+
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: pct,
+      duration: 600,
+      useNativeDriver: false,
+      easing: Easing.out(Easing.quad),
+    }).start();
+  }, [pct]);
+
+  const dashOffset = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [circum, 0],
+  });
+
+  // Fallback: use a solid arc via rotation trick with View borders
+  const clampedPct = Math.max(0, Math.min(1, pct));
+  const deg = clampedPct * 360;
+  const half = size / 2;
+  const outerR = half;
+  const innerR = half - strokeWidth;
+
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Track */}
+      <View style={{
+        position: 'absolute', width: size, height: size, borderRadius: outerR,
+        borderWidth: strokeWidth, borderColor: trackColor,
+      }} />
+      {/* Progress arc using clip trick */}
+      {deg <= 180 ? (
+        <View style={{ position: 'absolute', width: size, height: size }}>
+          <View style={{
+            position: 'absolute', width: size, height: size,
+            borderRadius: outerR, borderWidth: strokeWidth,
+            borderColor: 'transparent', borderTopColor: color, borderRightColor: color,
+            transform: [{ rotate: `-90deg` }],
+            opacity: deg > 0 ? 1 : 0,
+          }} />
+          <View style={{
+            position: 'absolute', width: size, height: size,
+            borderRadius: outerR, borderWidth: strokeWidth,
+            borderColor: 'transparent', borderTopColor: color,
+            transform: [{ rotate: `${deg - 90}deg` }],
+            opacity: deg >= 90 ? 0 : 1,
+          }} />
+        </View>
+      ) : (
+        <View style={{ position: 'absolute', width: size, height: size }}>
+          <View style={{
+            position: 'absolute', width: size, height: size,
+            borderRadius: outerR, borderWidth: strokeWidth,
+            borderColor: color,
+            borderBottomColor: deg < 270 ? 'transparent' : color,
+            borderLeftColor: deg < 360 ? 'transparent' : color,
+            transform: [{ rotate: `-90deg` }],
+          }} />
+          <View style={{
+            position: 'absolute', width: size, height: size,
+            borderRadius: outerR, borderWidth: strokeWidth,
+            borderColor: 'transparent', borderTopColor: color, borderRightColor: color,
+            transform: [{ rotate: `${deg - 270}deg` }],
+            opacity: deg <= 180 ? 0 : 1,
+          }} />
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// POMODORO TAB
+// ──────────────────────────────────────────────────────────────────────────────
+function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] }) {
+  const [mode, setMode] = useState<PomMode>('Focus');
   const [running, setRunning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(MODE_DURATIONS['Focus']);
-  const [completedSessions, setCompletedSessions] = useState(4);
+  const [sessions, setSessions] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { scale: playScale, onPressIn: playIn, onPressOut: playOut } = useFabScale();
 
-  const switchMode = useCallback((mode: Mode) => {
-    setRunning(false);
-    setActiveMode(mode);
-    setTimeLeft(MODE_DURATIONS[mode]);
+  // Load persisted count on mount
+  useEffect(() => {
+    Storage.get<number>(KEYS.SESSIONS).then(n => { if (n != null) setSessions(n); });
   }, []);
 
-  const handleTimerEnd = useCallback(() => {
+  const persistSessions = (n: number) => {
+    setSessions(n);
+    Storage.set(KEYS.SESSIONS, n);
+  };
+
+  const switchMode = useCallback((m: PomMode) => {
     setRunning(false);
-    if (activeMode === 'Focus') {
-      setCompletedSessions(prev => prev + 1);
-      Alert.alert('Session Complete! 🎉', 'Great work! Time for a break.', [
+    setMode(m);
+    setTimeLeft(MODE_DURATIONS[m]);
+  }, []);
+
+  const handleEnd = useCallback(() => {
+    setRunning(false);
+    if (mode === 'Focus') {
+      const next = sessions + 1;
+      persistSessions(next);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Session complete!', undefined, [
         { text: 'Short Break', onPress: () => switchMode('Short Break') },
         { text: 'Long Break', onPress: () => switchMode('Long Break') },
-        { text: 'Keep Focusing', onPress: () => switchMode('Focus') },
+        { text: 'Stay focused', onPress: () => switchMode('Focus') },
       ]);
     } else {
-      Alert.alert('Break Over!', 'Ready to get back to work?', [
+      Alert.alert('Break over!', undefined, [
         { text: 'Start Focus', onPress: () => switchMode('Focus') },
-        { text: 'Not Yet', style: 'cancel', onPress: () => switchMode(activeMode) },
+        { text: 'Not yet', style: 'cancel', onPress: () => switchMode(mode) },
       ]);
     }
-  }, [activeMode, switchMode]);
+  }, [mode, switchMode]);
 
   useEffect(() => {
     if (running) {
@@ -57,7 +174,7 @@ export default function FocusScreen({ navigation }: any) {
         setTimeLeft(prev => {
           if (prev <= 1) {
             if (intervalRef.current) clearInterval(intervalRef.current);
-            handleTimerEnd();
+            handleEnd();
             return 0;
           }
           return prev - 1;
@@ -67,275 +184,362 @@ export default function FocusScreen({ navigation }: any) {
       if (intervalRef.current) clearInterval(intervalRef.current);
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [running, handleTimerEnd]);
+  }, [running, handleEnd]);
 
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60).toString().padStart(2, '0');
-    const s = (secs % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
+  const total = MODE_DURATIONS[mode];
+  const pct = 1 - timeLeft / total;
+  const color = MODE_COLORS[mode];
+  const mins = Math.floor(timeLeft / 60);
+  const secs = timeLeft % 60;
+  const dailyGoal = 8;
+
+  return (
+    <ScrollView contentContainerStyle={pom.scroll} showsVerticalScrollIndicator={false}>
+      {/* Mode pills */}
+      <View style={pom.modePills}>
+        {(['Focus', 'Short Break', 'Long Break'] as PomMode[]).map(m => (
+          <TouchableOpacity
+            key={m}
+            style={[pom.modePill, { backgroundColor: mode === m ? MODE_COLORS[m] : theme.segBg }]}
+            onPress={() => switchMode(m)}
+          >
+            <Text style={[pom.modePillText, { color: mode === m ? '#fff' : theme.textDim }]}>{m}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Main ring */}
+      <View style={pom.ringWrap}>
+        <ProgressRing pct={pct} color={color} size={240} strokeWidth={10} trackColor={theme.border} />
+        <View style={pom.ringCenter}>
+          <Text style={[pom.modeLabel, { color: theme.textDim }]}>{mode.toUpperCase()}</Text>
+          <Text style={[pom.digits, { color }]}>
+            {pad(mins)}:{pad(secs)}
+          </Text>
+          <Text style={[pom.runSub, { color: theme.textDim }]}>{running ? 'Running…' : 'Paused'}</Text>
+        </View>
+      </View>
+
+      {/* Controls */}
+      <View style={pom.controls}>
+        <TouchableOpacity
+          style={[pom.ctrlBtn, { borderColor: theme.border }]}
+          onPress={() => { setRunning(false); setTimeLeft(MODE_DURATIONS[mode]); }}
+        >
+          <Ionicons name="refresh" size={22} color={theme.textDim} />
+        </TouchableOpacity>
+
+        <Animated.View style={{ transform: [{ scale: playScale }] }}>
+          <TouchableOpacity
+            style={[pom.playBtn, { backgroundColor: color }]}
+            onPressIn={playIn}
+            onPressOut={playOut}
+            onPress={() => setRunning(r => !r)}
+            activeOpacity={1}
+          >
+            <Ionicons name={running ? 'pause' : 'play'} size={30} color="#fff" style={{ marginLeft: running ? 0 : 3 }} />
+          </TouchableOpacity>
+        </Animated.View>
+
+        <TouchableOpacity
+          style={[pom.ctrlBtn, { borderColor: theme.border }]}
+          onPress={() => {
+            setRunning(false);
+            if (mode === 'Focus') { setSessions(s => s + 1); switchMode('Short Break'); }
+            else switchMode('Focus');
+          }}
+        >
+          <Ionicons name="play-skip-forward" size={22} color={theme.textDim} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Stats strip */}
+      <View style={[pom.statsRow, { backgroundColor: theme.bg2, borderColor: theme.border }]}>
+        <View style={pom.statItem}>
+          <Text style={[pom.statVal, { color: theme.text }]}>{sessions}</Text>
+          <Text style={[pom.statLabel, { color: theme.textDim }]}>Completed</Text>
+        </View>
+        <View style={[pom.statDivider, { backgroundColor: theme.border }]} />
+        <View style={pom.statItem}>
+          <Text style={[pom.statVal, { color: theme.text }]}>{dailyGoal}</Text>
+          <Text style={[pom.statLabel, { color: theme.textDim }]}>Daily Goal</Text>
+        </View>
+        <View style={[pom.statDivider, { backgroundColor: theme.border }]} />
+        <View style={pom.statItem}>
+          <Text style={[pom.statVal, { color: theme.text }]}>{Math.round((sessions / dailyGoal) * 100)}%</Text>
+          <Text style={[pom.statLabel, { color: theme.textDim }]}>Progress</Text>
+        </View>
+      </View>
+
+      {/* Progress bar */}
+      <View style={[pom.progressTrack, { backgroundColor: theme.border }]}>
+        <View style={[pom.progressFill, { width: `${Math.min((sessions / dailyGoal) * 100, 100)}%` as any, backgroundColor: color }]} />
+      </View>
+
+      <View style={{ height: 40 }} />
+    </ScrollView>
+  );
+}
+
+const pom = StyleSheet.create({
+  scroll: { alignItems: 'center', paddingTop: 28, paddingHorizontal: 24 },
+  modePills: { flexDirection: 'row', gap: 8, marginBottom: 32 },
+  modePill: {
+    paddingHorizontal: 16, paddingVertical: 9,
+    borderRadius: 20, backgroundColor: '#F0F0F0',
+  },
+  modePillText: { fontSize: 13, fontWeight: '600', color: '#888' },
+  ringWrap: { width: 240, height: 240, alignItems: 'center', justifyContent: 'center', marginBottom: 32 },
+  ringCenter: { position: 'absolute', alignItems: 'center' },
+  modeLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 2, marginBottom: 6 },
+  digits: { fontSize: 52, fontWeight: '800', letterSpacing: -1, lineHeight: 58 },
+  runSub: { fontSize: 13, marginTop: 6, fontWeight: '500' },
+  controls: { flexDirection: 'row', alignItems: 'center', gap: 32, marginBottom: 36 },
+  ctrlBtn: {
+    width: 52, height: 52, borderRadius: 26,
+    borderWidth: 1.5,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  playBtn: {
+    width: 72, height: 72, borderRadius: 36,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
+  },
+  statsRow: {
+    flexDirection: 'row', alignItems: 'center',
+    width: '100%', borderRadius: 16, borderWidth: 1,
+    paddingVertical: 18, marginBottom: 16,
+  },
+  statItem: { flex: 1, alignItems: 'center' },
+  statDivider: { width: 1, height: 32 },
+  statVal: { fontSize: 22, fontWeight: '800', marginBottom: 3 },
+  statLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
+  progressTrack: { width: '100%', height: 6, borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 3 },
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// STOPWATCH TAB
+// ──────────────────────────────────────────────────────────────────────────────
+interface LapRecord { lap: number; time: number; split: number; }
+
+function StopwatchTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] }) {
+  const [running, setRunning] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [laps, setLaps] = useState<LapRecord[]>([]);
+  const startRef = useRef<number>(0);
+  const elapsedRef = useRef<number>(0);
+  const animRef = useRef<number | null>(null);
+  const { scale: btnScale, onPressIn: btnIn, onPressOut: btnOut } = useFabScale();
+  const { scale: lapScale, onPressIn: lapIn, onPressOut: lapOut } = useFabScale();
+
+  useEffect(() => {
+    if (running) {
+      startRef.current = Date.now() - elapsedRef.current;
+      const tick = () => {
+        const now = Date.now() - startRef.current;
+        elapsedRef.current = now;
+        setElapsed(now);
+        animRef.current = requestAnimationFrame(tick);
+      };
+      animRef.current = requestAnimationFrame(tick);
+    } else {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    }
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+  }, [running]);
+
+  const formatMs = (ms: number) => {
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    const cs = Math.floor((ms % 1000) / 10);
+    if (h > 0) return `${pad(h)}:${pad(m)}:${pad(s)}.${pad(cs)}`;
+    return `${pad(m)}:${pad(s)}.${pad(cs)}`;
+  };
+
+  const handleLap = () => {
+    const prev = laps.length > 0 ? laps[laps.length - 1].time : 0;
+    setLaps(l => [...l, { lap: l.length + 1, time: elapsed, split: elapsed - prev }]);
   };
 
   const handleReset = () => {
     setRunning(false);
-    setTimeLeft(MODE_DURATIONS[activeMode]);
+    elapsedRef.current = 0;
+    setElapsed(0);
+    setLaps([]);
   };
 
-  const handleSkip = () => {
-    setRunning(false);
-    if (activeMode === 'Focus') {
-      setCompletedSessions(prev => prev + 1);
-      switchMode('Short Break');
-    } else {
-      switchMode('Focus');
-    }
-  };
-
-  const timerSub = !running
-    ? 'Ready to Start'
-    : activeMode === 'Focus'
-    ? 'Focus Session Running'
-    : 'On Break';
-
-  const dailyGoal = 8;
-  const goalPct = Math.min(Math.round((completedSessions / dailyGoal) * 100), 100);
+  const bestLap = laps.length > 1 ? Math.min(...laps.map(l => l.split)) : null;
+  const worstLap = laps.length > 1 ? Math.max(...laps.map(l => l.split)) : null;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* Top Bar */}
-      <View style={styles.topBar}>
-        <Text style={styles.topBarTitle}>Focus Timer</Text>
-        <View style={styles.topBarIcons}>
-          <TouchableOpacity style={styles.iconBtn}>
-            <Ionicons name="notifications-outline" size={22} color="#333" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn}>
-            <Ionicons name="settings-outline" size={22} color="#333" />
-          </TouchableOpacity>
-        </View>
+    <View style={sw.root}>
+      {/* Big display */}
+      <View style={sw.displayWrap}>
+        <Text style={[sw.digits, { color: theme.text }]}>{formatMs(elapsed)}</Text>
+        {laps.length > 0 && (
+          <Text style={[sw.lapHint, { color: theme.textDim }]}>Lap {laps.length + 1} · {formatMs(elapsed - laps[laps.length - 1].time)}</Text>
+        )}
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Mode Segmented Control */}
-        <View style={styles.segmentedControl}>
-          {MODES.map(mode => (
-            <TouchableOpacity
-              key={mode}
-              style={[styles.segmentBtn, activeMode === mode && styles.segmentBtnActive]}
-              onPress={() => switchMode(mode)}
-            >
-              <Text style={[styles.segmentText, activeMode === mode && styles.segmentTextActive]}>
-                {mode}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Timer Area */}
-        <View style={styles.timerArea}>
-          <View style={styles.deepWorkPill}>
-            <Text style={styles.deepWorkText}>Deep Work</Text>
-          </View>
-          <Text style={styles.timerDigits}>{formatTime(timeLeft)}</Text>
-          <Text style={styles.timerSub}>{timerSub}</Text>
-        </View>
-
-        {/* Controls */}
-        <View style={styles.controls}>
-          <TouchableOpacity style={styles.controlSecondary} onPress={handleReset}>
-            <Ionicons name="refresh-outline" size={24} color="#555" />
-          </TouchableOpacity>
+      {/* Buttons */}
+      <View style={sw.btnRow}>
+        {/* Lap / Reset */}
+        <Animated.View style={{ transform: [{ scale: lapScale }] }}>
           <TouchableOpacity
-            style={styles.playBtn}
-            onPress={() => setRunning(r => !r)}
+            style={[sw.sideBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+            onPressIn={lapIn} onPressOut={lapOut}
+            onPress={running ? handleLap : handleReset}
+            activeOpacity={1}
           >
-            <Ionicons name={running ? 'pause' : 'play'} size={30} color="#fff" style={{ marginLeft: running ? 0 : 4 }} />
+            <Text style={[sw.sideBtnText, { color: theme.text }]}>{running ? 'Lap' : 'Reset'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.controlSecondary} onPress={handleSkip}>
-            <Ionicons name="play-skip-forward-outline" size={24} color="#555" />
+        </Animated.View>
+
+        {/* Start / Stop */}
+        <Animated.View style={{ transform: [{ scale: btnScale }] }}>
+          <TouchableOpacity
+            style={[sw.mainBtn, { backgroundColor: running ? '#C0392B' : '#2ECC71' }]}
+            onPressIn={btnIn} onPressOut={btnOut}
+            onPress={() => setRunning(r => !r)}
+            activeOpacity={1}
+          >
+            <Text style={sw.mainBtnText}>{running ? 'Stop' : 'Start'}</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
+      </View>
 
-        {/* Active Focus Session */}
-        <View style={styles.sessionSection}>
-          <View style={styles.sessionHeader}>
-            <Text style={styles.sessionHeaderTitle}>Active Focus Session</Text>
-            <TouchableOpacity>
-              <Text style={styles.addNewText}>+ Add New</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.sessionCard}>
-            <View style={styles.sessionCardInner}>
-              <View style={styles.sessionIconWrap}>
-                <Ionicons name="calendar-outline" size={20} color={BLUE} />
+      {/* Laps */}
+      {laps.length > 0 && (
+        <FlatList
+          data={[...laps].reverse()}
+          keyExtractor={item => item.lap.toString()}
+          style={sw.lapList}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => {
+            const isBest = bestLap !== null && item.split === bestLap;
+            const isWorst = worstLap !== null && item.split === worstLap;
+            return (
+              <View style={[sw.lapRow, { borderTopColor: theme.border }]}>
+                <Text style={[sw.lapNum, { color: theme.textDim }]}>Lap {item.lap}</Text>
+                <Text style={[
+                  sw.lapSplit, { color: theme.text },
+                  isBest && { color: '#2ECC71' },
+                  isWorst && { color: '#E05252' },
+                ]}>{formatMs(item.split)}</Text>
+                <Text style={[sw.lapTotal, { color: theme.textDim }]}>{formatMs(item.time)}</Text>
               </View>
-              <View style={styles.sessionBody}>
-                <View style={styles.sessionLabelRow}>
-                  <Text style={styles.linkedEventLabel}>LINKED EVENT</Text>
-                  <View style={styles.highPriorityBadge}>
-                    <Text style={styles.highPriorityText}>High Priority</Text>
-                  </View>
-                </View>
-                <Text style={styles.sessionTitle}>Design Review: Mobile App</Text>
-                <View style={styles.sessionTimeRow}>
-                  <Ionicons name="time-outline" size={13} color="#888" />
-                  <Text style={styles.sessionTimeText}>Ends in 45m 12s</Text>
-                </View>
-              </View>
-            </View>
-            <View style={styles.sessionFooter}>
-              <TouchableOpacity onPress={() => switchMode('Focus')}>
-                <Text style={styles.switchFocusText}>Switch Focus</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => Alert.alert('Session Options', undefined, [
-                { text: 'Mark Done', onPress: () => Alert.alert('Done', 'Session marked complete.') },
-                { text: 'Remove Session', style: 'destructive', onPress: () => {} },
-                { text: 'Cancel', style: 'cancel' },
-              ])}>
-                <Ionicons name="ellipsis-vertical" size={18} color="#ccc" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+            );
+          }}
+        />
+      )}
+    </View>
+  );
+}
 
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>COMPLETED</Text>
-            <View style={styles.statValueRow}>
-              <Text style={styles.statValueLarge}>{completedSessions}</Text>
-              <Text style={styles.statValueUnit}> sessions</Text>
-            </View>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>DAILY GOAL</Text>
-            <Text style={styles.statValuePct}>{goalPct}%</Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${goalPct}%` }]} />
-            </View>
-          </View>
-        </View>
+const sw = StyleSheet.create({
+  root: { flex: 1, alignItems: 'center' },
+  displayWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 20 },
+  digits: { fontSize: 64, fontWeight: '300', letterSpacing: -1, fontVariant: ['tabular-nums'] as any },
+  lapHint: { fontSize: 16, marginTop: 10 },
+  btnRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 48, paddingVertical: 32,
+  },
+  sideBtn: {
+    width: 78, height: 78, borderRadius: 39,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1,
+  },
+  sideBtnText: { fontSize: 17, fontWeight: '600' },
+  mainBtn: {
+    width: 78, height: 78, borderRadius: 39,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 10, elevation: 8,
+  },
+  mainBtnText: { fontSize: 17, fontWeight: '700', color: '#fff' },
+  lapList: { width: '100%', flex: 1 },
+  lapRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 24, paddingVertical: 13,
+    borderTopWidth: 1,
+  },
+  lapNum: { width: 60, fontSize: 15 },
+  lapSplit: { flex: 1, fontSize: 15, fontWeight: '600', textAlign: 'center', fontVariant: ['tabular-nums'] as any },
+  lapTotal: { width: 90, fontSize: 14, textAlign: 'right', fontVariant: ['tabular-nums'] as any },
+});
 
-        <View style={{ height: 80 }} />
-      </ScrollView>
+// ──────────────────────────────────────────────────────────────────────────────
+// MAIN SCREEN
+// ──────────────────────────────────────────────────────────────────────────────
+export default function FocusScreen({ navigation }: any) {
+  const [tab, setTab] = useState<Tab>('pomodoro');
+  const { theme } = useTheme();
 
-      {/* FAB */}
-      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('CreateEvent')}>
-        <Ionicons name="add" size={26} color="#fff" />
-      </TouchableOpacity>
+  return (
+    <SafeAreaView style={[main.safe, { backgroundColor: theme.bg }]} edges={['top']}>
+      {/* Header */}
+      <View style={[main.header, { borderBottomColor: theme.border }]}>
+        <BurgerMenu navigation={navigation} />
+        <Text style={[main.headerTitle, { color: theme.text }]}>{tab === 'pomodoro' ? 'Pomodoro' : 'Stopwatch'}</Text>
+        <TouchableOpacity onPress={() => Alert.alert('Settings', 'Timer settings coming soon.')}>
+          <Ionicons name="ellipsis-vertical" size={20} color={theme.textDim} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Tab bar */}
+      <View style={[main.tabBar, { backgroundColor: theme.segBg }]}>
+        <TouchableOpacity
+          style={[main.tabBtn, tab === 'pomodoro' && [main.tabBtnActive, { backgroundColor: theme.segActive }]]}
+          onPress={() => setTab('pomodoro')}
+        >
+          <MaterialCommunityIcons
+            name="timer-outline"
+            size={18}
+            color={tab === 'pomodoro' ? ACCENT : theme.textDim}
+          />
+          <Text style={[main.tabText, { color: tab === 'pomodoro' ? theme.text : theme.textDim }]}>Pomodoro</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[main.tabBtn, tab === 'stopwatch' && [main.tabBtnActive, { backgroundColor: theme.segActive }]]}
+          onPress={() => setTab('stopwatch')}
+        >
+          <Ionicons
+            name="stopwatch-outline"
+            size={18}
+            color={tab === 'stopwatch' ? ACCENT : theme.textDim}
+          />
+          <Text style={[main.tabText, { color: tab === 'stopwatch' ? theme.text : theme.textDim }]}>Stopwatch</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Content */}
+      <View style={{ flex: 1 }}>
+        {tab === 'pomodoro' ? <PomodoroTab theme={theme} /> : <StopwatchTab theme={theme} />}
+      </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff' },
-
-  topBar: {
+const main = StyleSheet.create({
+  safe: { flex: 1 },
+  header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#EBEBEB',
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 1,
   },
-  topBarTitle: { fontSize: 18, fontWeight: '700', color: '#111' },
-  topBarIcons: { flexDirection: 'row', alignItems: 'center' },
-  iconBtn: { marginLeft: 14 },
-
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 20, alignItems: 'center' },
-
-  segmentedControl: {
-    flexDirection: 'row', backgroundColor: '#F2F2F2', borderRadius: 12,
-    padding: 4, width: '100%', marginBottom: 32,
+  headerTitle: { fontSize: 20, fontWeight: '700' },
+  tabBar: {
+    flexDirection: 'row',
+    marginHorizontal: 20, marginVertical: 12,
+    borderRadius: 14, padding: 4,
   },
-  segmentBtn: {
-    flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: 'center',
+  tabBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 10, borderRadius: 11,
   },
-  segmentBtnActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
-  segmentText: { fontSize: 13, fontWeight: '600', color: '#888' },
-  segmentTextActive: { color: '#111', fontWeight: '700' },
-
-  timerArea: { alignItems: 'center', marginBottom: 32, width: '100%' },
-  deepWorkPill: {
-    borderWidth: 1.5, borderColor: BLUE, borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 5, marginBottom: 12,
-  },
-  deepWorkText: { color: BLUE, fontSize: 13, fontWeight: '700' },
-  timerDigits: { fontSize: 72, fontWeight: '800', color: '#111', letterSpacing: -2, lineHeight: 80 },
-  timerSub: { fontSize: 14, color: '#888', marginTop: 6, fontWeight: '500' },
-
-  controls: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 28, marginBottom: 36, width: '100%',
-  },
-  controlSecondary: {
-    width: 52, height: 52, borderRadius: 26,
-    borderWidth: 1.5, borderColor: '#E0E0E0',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  playBtn: {
-    width: 70, height: 70, borderRadius: 35,
-    backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center',
-    shadowColor: BLUE, shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
-  },
-
-  sessionSection: { width: '100%', marginBottom: 20 },
-  sessionHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10,
-  },
-  sessionHeaderTitle: { fontSize: 16, fontWeight: '700', color: '#111' },
-  addNewText: { fontSize: 13, color: BLUE, fontWeight: '600' },
-
-  sessionCard: {
-    backgroundColor: '#fff', borderRadius: 14,
-    borderWidth: 1, borderColor: '#EBEBEB',
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
-    overflow: 'hidden',
-  },
-  sessionCardInner: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
-  sessionIconWrap: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: '#EBF4FF', alignItems: 'center', justifyContent: 'center',
-  },
-  sessionBody: { flex: 1 },
-  sessionLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 },
-  linkedEventLabel: { fontSize: 10, fontWeight: '800', color: '#999', letterSpacing: 1 },
-  highPriorityBadge: {
-    backgroundColor: '#FDECEA', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
-    borderWidth: 1, borderColor: '#FBCDD0',
-  },
-  highPriorityText: { fontSize: 11, fontWeight: '700', color: '#D32F2F' },
-  sessionTitle: { fontSize: 15, fontWeight: '700', color: '#111', marginBottom: 5 },
-  sessionTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  sessionTimeText: { fontSize: 12, color: '#888' },
-
-  sessionFooter: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 10,
-    borderTopWidth: 1, borderTopColor: '#F5F5F5',
-    backgroundColor: '#FAFAFA',
-  },
-  switchFocusText: { fontSize: 13, color: BLUE, fontWeight: '600' },
-
-  statsRow: { flexDirection: 'row', gap: 12, width: '100%' },
-  statCard: {
-    flex: 1, backgroundColor: '#F8F9FA', borderRadius: 14,
-    padding: 14, borderWidth: 1, borderColor: '#EBEBEB',
-  },
-  statLabel: { fontSize: 10, fontWeight: '800', color: '#999', letterSpacing: 1, marginBottom: 8 },
-  statValueRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  statValueLarge: { fontSize: 28, fontWeight: '800', color: '#111', lineHeight: 32 },
-  statValueUnit: { fontSize: 13, color: '#888', marginBottom: 3 },
-  statValuePct: { fontSize: 28, fontWeight: '800', color: '#111', marginBottom: 8, lineHeight: 32 },
-  progressBar: {
-    height: 8, backgroundColor: '#E0E0E0', borderRadius: 4, overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%', backgroundColor: BLUE, borderRadius: 4,
-  },
-
-  fab: {
-    position: 'absolute', right: 20, bottom: 20,
-    width: 54, height: 54, borderRadius: 27,
-    backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center',
-    shadowColor: BLUE, shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
-  },
+  tabBtnActive: {},
+  tabText: { fontSize: 14, fontWeight: '600' },
+  tabTextActive: {},
 });

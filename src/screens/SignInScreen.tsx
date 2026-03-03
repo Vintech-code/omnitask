@@ -7,26 +7,38 @@ import {
   ScrollView,
   Alert,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
 
 const BLUE = '#4A90D9';
 
 export default function SignInScreen({ navigation }: any) {
+  const { signIn, hasSeenOnboarding } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     const trimEmail = email.trim();
     const trimPass = password.trim();
     if (!trimEmail) { Alert.alert('Validation', 'Please enter your email address.'); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimEmail)) { Alert.alert('Validation', 'Please enter a valid email address.'); return; }
     if (!trimPass) { Alert.alert('Validation', 'Please enter your password.'); return; }
     if (trimPass.length < 6) { Alert.alert('Validation', 'Password must be at least 6 characters.'); return; }
-    navigation.navigate('Main');
+    try {
+      setLoading(true);
+      await signIn(trimEmail, trimPass);
+      navigation.replace(hasSeenOnboarding ? 'Main' : 'Onboarding');
+    } catch (e) {
+      Alert.alert('Sign In Failed', 'Unable to sign in. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleForgotPassword = () => {
@@ -108,9 +120,14 @@ export default function SignInScreen({ navigation }: any) {
         </TouchableOpacity>
 
         {/* Sign In button */}
-        <TouchableOpacity style={s.btnPrimary} onPress={handleSignIn} activeOpacity={0.85}>
-          <Text style={s.btnText}>Sign In</Text>
-          <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />
+        <TouchableOpacity style={s.btnPrimary} onPress={handleSignIn} activeOpacity={0.85} disabled={loading}>
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <>
+                <Text style={s.btnText}>Sign In</Text>
+                <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />
+              </>
+          }
         </TouchableOpacity>
 
         {/* Divider */}
