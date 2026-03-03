@@ -6,9 +6,13 @@ export const KEYS = {
   TASK_CATEGORIES:  'omnitask_task_categories',
   ALARMS:           'omnitask_alarms',
   THEME:            'omnitask_theme',
+  SYSTEM_THEME:     'omnitask_system_theme',
   USER:             'omnitask_user',
+  PROFILE_PHOTO:    'omnitask_profile_photo',
   ONBOARDING_DONE:  'omnitask_onboarding_done',
   SESSIONS:         'omnitask_sessions',
+  FOCUS_STATS:      'omnitask_focus_stats',
+  LINKED_NOTE:      'omnitask_linked_note',
 };
 
 export const Storage = {

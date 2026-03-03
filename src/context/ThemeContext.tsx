@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
+import { Appearance } from 'react-native';
 import { Storage, KEYS } from '../services/StorageService';
 
 export interface Theme {
@@ -52,35 +53,67 @@ const DARK: Theme = {
 interface ThemeCtx {
   theme: Theme;
   isDark: boolean;
+  useSystemTheme: boolean;
   toggleTheme: () => void;
+  setUseSystemTheme: (val: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeCtx>({
   theme: LIGHT,
   isDark: false,
+  useSystemTheme: false,
   toggleTheme: () => {},
+  setUseSystemTheme: () => {},
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [isDark, setIsDark] = useState(false);
+  const [useSystemTheme, setUseSystemThemeState] = useState(false);
 
   // Load persisted theme on mount
   useEffect(() => {
-    Storage.get<boolean>(KEYS.THEME).then(saved => {
-      if (saved !== null) setIsDark(saved);
-    });
+    (async () => {
+      const systemPref = await Storage.get<boolean>(KEYS.SYSTEM_THEME);
+      if (systemPref) {
+        setUseSystemThemeState(true);
+        const colorScheme = Appearance.getColorScheme();
+        setIsDark(colorScheme === 'dark');
+      } else {
+        const saved = await Storage.get<boolean>(KEYS.THEME);
+        if (saved !== null) setIsDark(saved);
+      }
+    })();
   }, []);
+
+  // Listen for OS theme changes when systemTheme is on
+  useEffect(() => {
+    if (!useSystemTheme) return;
+    const sub = Appearance.addChangeListener(({ colorScheme }) => {
+      setIsDark(colorScheme === 'dark');
+    });
+    return () => sub.remove();
+  }, [useSystemTheme]);
 
   const theme = useMemo(() => (isDark ? DARK : LIGHT), [isDark]);
 
   const toggleTheme = () => {
+    if (useSystemTheme) return; // no manual toggle while following system
     const next = !isDark;
     setIsDark(next);
     Storage.set(KEYS.THEME, next);
   };
 
+  const setUseSystemTheme = (val: boolean) => {
+    setUseSystemThemeState(val);
+    Storage.set(KEYS.SYSTEM_THEME, val);
+    if (val) {
+      const colorScheme = Appearance.getColorScheme();
+      setIsDark(colorScheme === 'dark');
+    }
+  };
+
   return (
-    <ThemeContext.Provider value={{ theme, isDark, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, isDark, useSystemTheme, toggleTheme, setUseSystemTheme }}>
       {children}
     </ThemeContext.Provider>
   );

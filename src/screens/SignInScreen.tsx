@@ -41,11 +41,20 @@ export default function SignInScreen({ navigation }: any) {
     }
   };
 
-  const handleForgotPassword = () => {
-    Alert.alert('Reset Password', 'A password reset link will be sent to:\n' + email.trim() || 'your email.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Send Link', onPress: () => Alert.alert('Sent', 'Check your inbox for the reset link.') },
-    ]);
+  const handleForgotPassword = async () => {
+    const trimEmail = email.trim();
+    if (!trimEmail) {
+      Alert.alert('Reset Password', 'Enter your email address first.');
+      return;
+    }
+    try {
+      const { sendPasswordResetEmail } = await import('firebase/auth');
+      const { auth } = await import('../config/firebase');
+      await sendPasswordResetEmail(auth, trimEmail);
+      Alert.alert('Email Sent', `A password reset link was sent to:\n${trimEmail}`);
+    } catch {
+      Alert.alert('Error', 'Could not send reset email. Check your email address and try again.');
+    }
   };
 
   const handleSocialLogin = (provider: string) => {

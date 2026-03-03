@@ -24,10 +24,15 @@ export default function MainTabNavigator() {
         tabBarStyle: {
           borderTopWidth: 1,
           borderTopColor: theme.tabBorder,
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 6,
+          height: 80,
+          paddingBottom: 24,
+          paddingTop: 8,
           backgroundColor: theme.tabBar,
+          elevation: 12,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.08,
+          shadowRadius: 10,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}

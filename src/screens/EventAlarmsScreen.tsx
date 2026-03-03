@@ -28,6 +28,9 @@ export default function EventAlarmsScreen({ navigation }: any) {
   const { theme, isDark } = useTheme();
   const { events, isLoading, toggleAlarmActive, removeEvent } = useEvents();
   const [refreshing, setRefreshing] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [calDate, setCalDate] = useState(() => new Date());
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 700); };
 
   const activeCount = events.filter(e => e.alarmActive).length;
@@ -68,6 +71,9 @@ export default function EventAlarmsScreen({ navigation }: any) {
         <BurgerMenu navigation={navigation} />
         <Text style={[styles.topBarTitle, { color: theme.text }]}>Event Alarms</Text>
         <View style={styles.topBarRight}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => { setViewMode(v => v === 'list' ? 'calendar' : 'list'); setSelectedDay(null); }}>
+            <Ionicons name={viewMode === 'list' ? 'calendar-outline' : 'list-outline'} size={22} color={theme.text} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation?.navigate('CreateEvent')}>
             <Ionicons name="add-outline" size={24} color={theme.text} />
           </TouchableOpacity>
@@ -83,6 +89,20 @@ export default function EventAlarmsScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.textDim} />}
       >
+        {viewMode === 'calendar' ? (
+          // ── CALENDAR VIEW ──
+          <CalendarView
+            events={events}
+            theme={theme}
+            isDark={isDark}
+            calDate={calDate}
+            setCalDate={setCalDate}
+            selectedDay={selectedDay}
+            setSelectedDay={setSelectedDay}
+            navigation={navigation}
+          />
+        ) : (
+          <>
         {/* Stat Cards */}
         <View style={styles.statRow}>
           <View style={[styles.statCard, { backgroundColor: isDark ? '#1A2A3A' : '#EBF4FF' }]}>
@@ -232,6 +252,8 @@ export default function EventAlarmsScreen({ navigation }: any) {
         })}
 
         <View style={{ height: 80 }} />
+          </>
+        )}
       </ScrollView>
 
       {/* FAB */}
@@ -241,6 +263,144 @@ export default function EventAlarmsScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
+
+// ── CALENDAR VIEW COMPONENT ──────────────────────────────────────────────────
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function parseEventDate(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function CalendarView({ events, theme, isDark, calDate, setCalDate, selectedDay, setSelectedDay, navigation }: any) {
+  const year = calDate.getFullYear();
+  const month = calDate.getMonth();
+  const firstDayOfMonth = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+
+  const dayEvents: Record<number, AppEvent[]> = {};
+  events.forEach((e: AppEvent) => {
+    const d = parseEventDate(e.startDate);
+    if (d && d.getFullYear() === year && d.getMonth() === month) {
+      const day = d.getDate();
+      if (!dayEvents[day]) dayEvents[day] = [];
+      dayEvents[day].push(e);
+    }
+  });
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstDayOfMonth; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const selectedEvents: AppEvent[] = selectedDay ? (dayEvents[selectedDay] ?? []) : [];
+
+  return (
+    <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+      {/* Month navigation */}
+      <View style={calS.monthRow}>
+        <TouchableOpacity onPress={() => setCalDate(new Date(year, month - 1, 1))} style={calS.navBtn}>
+          <Ionicons name="chevron-back" size={20} color={theme.text} />
+        </TouchableOpacity>
+        <Text style={[calS.monthTitle, { color: theme.text }]}>{MONTH_NAMES[month]} {year}</Text>
+        <TouchableOpacity onPress={() => setCalDate(new Date(year, month + 1, 1))} style={calS.navBtn}>
+          <Ionicons name="chevron-forward" size={20} color={theme.text} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Day name headers */}
+      <View style={calS.dayNamesRow}>
+        {DAY_NAMES.map(d => (
+          <Text key={d} style={[calS.dayName, { color: theme.textDim }]}>{d}</Text>
+        ))}
+      </View>
+
+      {/* Grid */}
+      <View style={calS.grid}>
+        {cells.map((day, idx) => {
+          if (day === null) return <View key={`empty-${idx}`} style={calS.cell} />;
+          const isToday = year === today.getFullYear() && month === today.getMonth() && day === today.getDate();
+          const isSelected = selectedDay === day;
+          const hasDots = (dayEvents[day] ?? []).length > 0;
+          return (
+            <TouchableOpacity
+              key={day}
+              style={[calS.cell, isSelected && { backgroundColor: BLUE + '22', borderRadius: 10 }]}
+              onPress={() => setSelectedDay(isSelected ? null : day)}
+            >
+              <Text style={[
+                calS.dayNum,
+                { color: theme.text },
+                isToday && calS.todayNum,
+                isSelected && { color: BLUE, fontWeight: '800' },
+              ]}>{day}</Text>
+              {hasDots && (
+                <View style={calS.dotsRow}>
+                  {(dayEvents[day] ?? []).slice(0, 3).map((_, i) => (
+                    <View key={i} style={[calS.dot, { backgroundColor: BLUE }]} />
+                  ))}
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Selected day events */}
+      {selectedDay !== null && (
+        <View style={{ marginTop: 16 }}>
+          <Text style={[calS.dayEventsTitle, { color: theme.textDim }]}>
+            {MONTH_NAMES[month]} {selectedDay}
+          </Text>
+          {selectedEvents.length === 0 && (
+            <Text style={{ color: theme.textDim, fontSize: 14, paddingVertical: 10 }}>No events this day</Text>
+          )}
+          {selectedEvents.map(ev => (
+            <TouchableOpacity
+              key={ev.id}
+              style={[calS.eventRow, { backgroundColor: theme.card, borderColor: theme.border }]}
+              onPress={() => navigation?.navigate('EventDetail', { event: ev })}
+            >
+              <View style={calS.eventDot} />
+              <View style={{ flex: 1 }}>
+                <Text style={[calS.eventRowTitle, { color: theme.text }]} numberOfLines={1}>{ev.title}</Text>
+                <Text style={[calS.eventRowTime, { color: theme.textDim }]}>{ev.startTime}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={theme.textDim} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+      <View style={{ height: 40 }} />
+    </View>
+  );
+}
+
+const calS = StyleSheet.create({
+  monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  navBtn: { padding: 6 },
+  monthTitle: { fontSize: 17, fontWeight: '800' },
+  dayNamesRow: { flexDirection: 'row', marginBottom: 4 },
+  dayName: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', paddingVertical: 4 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  cell: { width: `${100 / 7}%` as any, alignItems: 'center', paddingVertical: 6, minHeight: 44 },
+  dayNum: { fontSize: 14, fontWeight: '500' },
+  todayNum: { color: BLUE, fontWeight: '800' },
+  dotsRow: { flexDirection: 'row', gap: 2, marginTop: 3 },
+  dot: { width: 5, height: 5, borderRadius: 3 },
+  dayEventsTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 1, marginBottom: 8 },
+  eventRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderRadius: 12, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8,
+  },
+  eventDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: BLUE },
+  eventRowTitle: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
+  eventRowTime: { fontSize: 12 },
+});
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },

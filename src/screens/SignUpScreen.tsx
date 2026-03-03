@@ -12,7 +12,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
+import { Storage, KEYS } from '../services/StorageService';
 
 const BLUE = '#4A90D9';
 
@@ -79,6 +81,24 @@ export default function SignUpScreen({ navigation }: any) {
   const [confirm, setConfirm] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+
+  const pickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow access to your photo library in Settings.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets[0]?.uri) {
+      setProfilePhoto(result.assets[0].uri);
+    }
+  };
 
   const handleCreate = async () => {
     if (!name.trim()) { Alert.alert('Validation', 'Please enter your full name.'); return; }
@@ -90,6 +110,7 @@ export default function SignUpScreen({ navigation }: any) {
     try {
       setLoading(true);
       await signUp(name.trim(), email.trim(), password);
+      if (profilePhoto) await Storage.set(KEYS.PROFILE_PHOTO, profilePhoto);
       navigation.replace('Onboarding');
     } catch (e) {
       Alert.alert('Sign Up Failed', 'Unable to create your account. Please try again.');
@@ -111,14 +132,16 @@ export default function SignUpScreen({ navigation }: any) {
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         {/* Avatar */}
-        <View style={s.avatarWrap}>
+        <TouchableOpacity style={s.avatarWrap} onPress={pickPhoto} activeOpacity={0.8}>
           <View style={s.avatarCircle}>
-            <Ionicons name="person" size={52} color="#b0a8d0" />
+            {profilePhoto
+              ? <Image source={{ uri: profilePhoto }} style={{ width: 92, height: 92, borderRadius: 46 }} />
+              : <Ionicons name="person" size={52} color="#b0a8d0" />}
           </View>
           <View style={s.cameraBtn}>
             <Ionicons name="camera" size={16} color="#fff" />
           </View>
-        </View>
+        </TouchableOpacity>
         <Text style={s.avatarLabel}>Upload Profile Photo</Text>
         <Text style={s.avatarSub}>Make your profile recognizable</Text>
 

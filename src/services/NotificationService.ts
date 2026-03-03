@@ -47,13 +47,14 @@ export async function scheduleAlarmNotification(
   } catch {}
 }
 
-/** Schedule a one-time event reminder notification. */
+/** Schedule a one-time event reminder notification, with optional recurrence. */
 export async function scheduleEventNotification(
   id: string,
   title: string,
   startTime: string,
   startDate: string,
   minutesBefore = 15,
+  recurrence: 'none' | 'daily' | 'weekly' | 'monthly' = 'none',
 ): Promise<void> {
   try {
     const dateTime = new Date(`${startDate} ${startTime}`);
@@ -61,18 +62,51 @@ export async function scheduleEventNotification(
     const triggerDate = new Date(dateTime.getTime() - minutesBefore * 60_000);
     if (triggerDate <= new Date()) return;
 
-    await Notifications.scheduleNotificationAsync({
-      identifier: `event_${id}`,
-      content: {
-        title: '📅 Upcoming: ' + title,
-        body: `Starts at ${startTime} — in ${minutesBefore} minutes`,
-        sound: true,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: triggerDate,
-      },
-    });
+    if (recurrence === 'daily') {
+      const h = dateTime.getHours() - Math.floor(minutesBefore / 60);
+      const m = dateTime.getMinutes() - (minutesBefore % 60);
+      await Notifications.scheduleNotificationAsync({
+        identifier: `event_${id}`,
+        content: {
+          title: '📅 Reminder: ' + title,
+          body: `Starts at ${startTime}`,
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: Math.max(0, h),
+          minute: Math.max(0, m),
+        },
+      });
+    } else if (recurrence === 'weekly') {
+      await Notifications.scheduleNotificationAsync({
+        identifier: `event_${id}`,
+        content: {
+          title: '📅 Weekly Reminder: ' + title,
+          body: `Starts at ${startTime}`,
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          weekday: dateTime.getDay() + 1,
+          hour: dateTime.getHours(),
+          minute: Math.max(0, dateTime.getMinutes() - minutesBefore),
+        },
+      });
+    } else {
+      await Notifications.scheduleNotificationAsync({
+        identifier: `event_${id}`,
+        content: {
+          title: '📅 Upcoming: ' + title,
+          body: `Starts at ${startTime} — in ${minutesBefore} minutes`,
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: triggerDate,
+        },
+      });
+    }
   } catch {}
 }
 

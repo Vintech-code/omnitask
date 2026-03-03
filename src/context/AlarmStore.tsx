@@ -1,4 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import {
+  collection, doc, setDoc, deleteDoc, onSnapshot, QuerySnapshot,
+} from 'firebase/firestore';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { auth, db } from '../config/firebase';
 import { Storage, KEYS } from '../services/StorageService';
 import {
   scheduleAlarmNotification,
@@ -59,17 +64,46 @@ const AlarmContext = createContext<AlarmContextType>({
   toggleAlarm: () => {},
 });
 
+// ─── Firestore helpers ──────────────────────────────────────────────────────
+const alarmDoc  = (uid: string, id: string) => doc(db, 'users', uid, 'alarms', id);
+const alarmsCol = (uid: string) => collection(db, 'users', uid, 'alarms');
+
 // ─── Provider ────────────────────────────────────────────────────────────────
 export const AlarmProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [alarms, setAlarms] = useState<Alarm[]>([]);
+  const [alarms, setAlarms]       = useState<Alarm[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const uidRef   = useRef<string | null>(null);
+  const unsubRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    (async () => {
-      const stored = await Storage.get<Alarm[]>(KEYS.ALARMS);
+    // Hydrate from local cache first
+    Storage.get<Alarm[]>(KEYS.ALARMS).then(stored => {
       setAlarms(stored ?? SEED_ALARMS);
       setIsLoading(false);
-    })();
+    });
+
+    const unsubAuth = onAuthStateChanged(auth, (fbUser: FirebaseUser | null) => {
+      if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
+      if (!fbUser) { uidRef.current = null; return; }
+      uidRef.current = fbUser.uid;
+
+      unsubRef.current = onSnapshot(
+        alarmsCol(fbUser.uid),
+        (snap: QuerySnapshot) => {
+          const fetched: Alarm[] = snap.docs.map(d => d.data() as Alarm);
+          if (fetched.length > 0) {
+            setAlarms(fetched);
+            Storage.set(KEYS.ALARMS, fetched);
+          }
+        },
+        () => {}
+      );
+    });
+
+    return () => {
+      unsubAuth();
+      if (unsubRef.current) unsubRef.current();
+    };
   }, []);
 
   const persist = (updated: Alarm[]) => {
@@ -78,17 +112,16 @@ export const AlarmProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const addAlarm = (alarm: Alarm) => {
-    const updated = [...alarms, alarm];
-    persist(updated);
+    persist([...alarms, alarm]);
+    if (uidRef.current) setDoc(alarmDoc(uidRef.current, alarm.id), alarm).catch(() => {});
     if (alarm.active) {
       scheduleAlarmNotification(alarm.id, alarm.label, alarm.hour, alarm.minute, alarm.period);
     }
   };
 
   const updateAlarm = (alarm: Alarm) => {
-    const updated = alarms.map(a => a.id === alarm.id ? alarm : a);
-    persist(updated);
-    // Reschedule notification
+    persist(alarms.map(a => a.id === alarm.id ? alarm : a));
+    if (uidRef.current) setDoc(alarmDoc(uidRef.current, alarm.id), alarm).catch(() => {});
     cancelNotification(`alarm_${alarm.id}`);
     if (alarm.active) {
       scheduleAlarmNotification(alarm.id, alarm.label, alarm.hour, alarm.minute, alarm.period);
@@ -97,6 +130,7 @@ export const AlarmProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const removeAlarm = (id: string) => {
     persist(alarms.filter(a => a.id !== id));
+    if (uidRef.current) deleteDoc(alarmDoc(uidRef.current, id)).catch(() => {});
     cancelNotification(`alarm_${id}`);
   };
 
@@ -104,6 +138,7 @@ export const AlarmProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const updated = alarms.map(a => {
       if (a.id !== id) return a;
       const toggled = { ...a, active: !a.active };
+      if (uidRef.current) setDoc(alarmDoc(uidRef.current, id), toggled).catch(() => {});
       if (toggled.active) {
         scheduleAlarmNotification(toggled.id, toggled.label, toggled.hour, toggled.minute, toggled.period);
       } else {

@@ -18,6 +18,8 @@ import CreateEventScreen from './src/screens/CreateEventScreen';
 import EventDetailScreen from './src/screens/EventDetailScreen';
 import EventAlarmsScreen from './src/screens/EventAlarmsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import SearchScreen from './src/screens/SearchScreen';
+import StatsScreen from './src/screens/StatsScreen';
 import MainTabNavigator from './src/navigation/MainTabNavigator';
 
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
@@ -73,6 +75,8 @@ function AppNavigator() {
         <Stack.Screen name="EventDetail"  component={EventDetailScreen} />
         <Stack.Screen name="EventAlarms"  component={EventAlarmsScreen} />
         <Stack.Screen name="Profile"      component={ProfileScreen} />
+        <Stack.Screen name="Search"       component={SearchScreen} />
+        <Stack.Screen name="Stats"        component={StatsScreen} />
       </Stack.Navigator>
     </>
   );

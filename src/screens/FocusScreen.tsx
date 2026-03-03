@@ -9,10 +9,13 @@ import {
   Alert,
   ScrollView,
   FlatList,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { useTaskStore } from '../context/TaskStore';
 import { BurgerMenu } from '../components/BurgerMenu';
 import { Storage, KEYS } from '../services/StorageService';
 import * as Haptics from 'expo-haptics';
@@ -132,10 +135,15 @@ function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] })
   const [sessions, setSessions] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { scale: playScale, onPressIn: playIn, onPressOut: playOut } = useFabScale();
+  const { notes } = useTaskStore();
+  const [linkedNoteId, setLinkedNoteId] = useState<string | null>(null);
+  const [notePickerVisible, setNotePickerVisible] = useState(false);
+  const linkedNote = notes.find(n => n.id === linkedNoteId) ?? null;
 
   // Load persisted count on mount
   useEffect(() => {
     Storage.get<number>(KEYS.SESSIONS).then(n => { if (n != null) setSessions(n); });
+    Storage.get<string>(KEYS.LINKED_NOTE).then(id => { if (id) setLinkedNoteId(id); });
   }, []);
 
   const persistSessions = (n: number) => {
@@ -154,12 +162,16 @@ function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] })
     if (mode === 'Focus') {
       const next = sessions + 1;
       persistSessions(next);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Session complete!', undefined, [
-        { text: 'Short Break', onPress: () => switchMode('Short Break') },
-        { text: 'Long Break', onPress: () => switchMode('Long Break') },
-        { text: 'Stay focused', onPress: () => switchMode('Focus') },
-      ]);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        'Session complete! 🎉',
+        linkedNote ? `Working on: "${linkedNote.title || 'Untitled'}"` : undefined,
+        [
+          { text: 'Short Break', onPress: () => switchMode('Short Break') },
+          { text: 'Long Break', onPress: () => switchMode('Long Break') },
+          { text: 'Stay focused', onPress: () => switchMode('Focus') },
+        ],
+      );
     } else {
       Alert.alert('Break over!', undefined, [
         { text: 'Start Focus', onPress: () => switchMode('Focus') },
@@ -277,6 +289,60 @@ function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] })
       </View>
 
       <View style={{ height: 40 }} />
+
+      {/* ── Linked note chip + link button ── */}
+      <View style={pom.linkRow}>
+        {linkedNote ? (
+          <View style={[pom.linkedChip, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <MaterialCommunityIcons name="notebook-outline" size={15} color={ACCENT} />
+            <Text style={[pom.linkedChipText, { color: theme.text }]} numberOfLines={1}>
+              {linkedNote.title || 'Untitled note'}
+            </Text>
+            <TouchableOpacity onPress={() => { setLinkedNoteId(null); Storage.set(KEYS.LINKED_NOTE, ''); }}>
+              <Ionicons name="close-circle" size={16} color={theme.textDim} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[pom.linkBtn, { backgroundColor: theme.bg2, borderColor: theme.border }]}
+            onPress={() => setNotePickerVisible(true)}
+          >
+            <Ionicons name="link-outline" size={16} color={ACCENT} />
+            <Text style={[pom.linkBtnText, { color: ACCENT }]}>Link a Note</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* ── Note picker modal ── */}
+      <Modal visible={notePickerVisible} transparent animationType="slide" onRequestClose={() => setNotePickerVisible(false)}>
+        <Pressable style={pom.pickerOverlay} onPress={() => setNotePickerVisible(false)} />
+        <View style={[pom.pickerSheet, { backgroundColor: theme.card }]}>
+          <Text style={[pom.pickerTitle, { color: theme.text }]}>Link a Note</Text>
+          {notes.length === 0 && (
+            <Text style={{ color: theme.textDim, textAlign: 'center', paddingVertical: 20 }}>No notes yet</Text>
+          )}
+          <ScrollView>
+            {notes.map(n => (
+              <TouchableOpacity
+                key={n.id}
+                style={[pom.pickerRow, { borderBottomColor: theme.border }]}
+                onPress={() => {
+                  setLinkedNoteId(n.id);
+                  Storage.set(KEYS.LINKED_NOTE, n.id);
+                  setNotePickerVisible(false);
+                }}
+              >
+                <MaterialCommunityIcons name="notebook-outline" size={18} color={ACCENT} style={{ marginRight: 10 }} />
+                <Text style={[pom.pickerRowText, { color: theme.text }]} numberOfLines={1}>
+                  {n.title || 'Untitled note'}
+                </Text>
+                {linkedNoteId === n.id && <Ionicons name="checkmark" size={18} color={ACCENT} style={{ marginLeft: 'auto' }} />}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
+
     </ScrollView>
   );
 }
@@ -316,6 +382,32 @@ const pom = StyleSheet.create({
   statLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
   progressTrack: { width: '100%', height: 6, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3 },
+  linkRow: { width: '100%', alignItems: 'center', paddingBottom: 24, paddingTop: 4 },
+  linkBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1.5, borderRadius: 24,
+    paddingHorizontal: 18, paddingVertical: 10,
+  },
+  linkBtnText: { fontSize: 14, fontWeight: '700' },
+  linkedChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1, borderRadius: 24,
+    paddingHorizontal: 14, paddingVertical: 9,
+    maxWidth: '90%',
+  },
+  linkedChipText: { fontSize: 14, fontWeight: '600', flex: 1 },
+  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
+  pickerSheet: {
+    borderTopLeftRadius: 22, borderTopRightRadius: 22,
+    paddingTop: 20, paddingHorizontal: 20, paddingBottom: 32,
+    maxHeight: '60%',
+  },
+  pickerTitle: { fontSize: 17, fontWeight: '800', marginBottom: 14, textAlign: 'center' },
+  pickerRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 14, borderBottomWidth: 1,
+  },
+  pickerRowText: { fontSize: 15, fontWeight: '500', flex: 1 },
 });
 
 // ──────────────────────────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import LottieView from 'lottie-react-native';
 
 const BLUE = '#4A90D9';
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -74,19 +75,14 @@ export default function WelcomeScreen({ navigation }: any) {
         <Text style={styles.tagline}>Your all-in-one productivity hub</Text>
       </Animated.View>
 
-      {/* Feature list */}
-      <Animated.View style={[styles.featureList, { opacity: contentOpacity, transform: [{ translateY: contentY }] }]}>
-        {FEATURES.map(f => (
-          <View key={f.label} style={styles.featureRow}>
-            <View style={[styles.featureIconWrap, { backgroundColor: f.bg }]}>
-              <Ionicons name={f.icon} size={22} color={f.color} />
-            </View>
-            <View style={styles.featureText}>
-              <Text style={styles.featureLabel}>{f.label}</Text>
-              <Text style={styles.featureDesc}>{f.desc}</Text>
-            </View>
-          </View>
-        ))}
+      {/* Balancing animation */}
+      <Animated.View style={[styles.balancingContainer, { opacity: contentOpacity, transform: [{ translateY: contentY }] }]}>
+        <LottieView
+          source={require('../../assets/animation/balancing.json')}
+          autoPlay
+          loop
+          style={styles.balancingAnim}
+        />
       </Animated.View>
 
       {/* CTA buttons */}
@@ -164,37 +160,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  /* Feature list */
-  featureList: {
+  /* Balancing animation */
+  balancingContainer: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 10,
-    gap: 12,
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  featureIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
   },
-  featureText: { flex: 1 },
-  featureLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111',
-    marginBottom: 2,
-  },
-  featureDesc: {
-    fontSize: 12,
-    color: '#777',
-    lineHeight: 17,
+  balancingAnim: {
+    width: 280,
+    height: 220,
   },
 
   /* CTA block */

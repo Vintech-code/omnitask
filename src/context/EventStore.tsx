@@ -1,4 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import {
+  collection, doc, setDoc, deleteDoc, onSnapshot, QuerySnapshot,
+} from 'firebase/firestore';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { auth, db } from '../config/firebase';
 import { Storage, KEYS } from '../services/StorageService';
 import { scheduleEventNotification, cancelNotification } from '../services/NotificationService';
 
@@ -6,14 +11,15 @@ export interface AppEvent {
   id: string;
   title: string;
   description: string;
-  startTime: string;   // e.g. "10:30 AM"
-  startDate: string;   // e.g. "Oct 24, 2026"
-  endTime: string;     // "" when not set
+  startTime: string;
+  startDate: string;
+  endTime: string;
   location: string;
   category: string;
   priority: 'Low' | 'Medium' | 'High';
   reminders: string[];
   alarmActive: boolean;
+  recurrence: 'none' | 'daily' | 'weekly' | 'monthly';
 }
 
 interface EventContextType {
@@ -34,16 +40,45 @@ const EventContext = createContext<EventContextType>({
   toggleAlarmActive: () => {},
 });
 
+// ── Firestore helpers ────────────────────────────────────────────────────
+const eventDoc  = (uid: string, id: string) => doc(db, 'users', uid, 'events', id);
+const eventsCol = (uid: string) => collection(db, 'users', uid, 'events');
+
 export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [events, setEvents] = useState<AppEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [events, setEvents]         = useState<AppEvent[]>([]);
+  const [isLoading, setIsLoading]   = useState(true);
+  const uidRef   = useRef<string | null>(null);
+  const unsubRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    (async () => {
-      const stored = await Storage.get<AppEvent[]>(KEYS.EVENTS);
+    // Hydrate from local cache immediately
+    Storage.get<AppEvent[]>(KEYS.EVENTS).then(stored => {
       if (stored) setEvents(stored);
       setIsLoading(false);
-    })();
+    });
+
+    const unsubAuth = onAuthStateChanged(auth, (fbUser: FirebaseUser | null) => {
+      if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
+      if (!fbUser) { uidRef.current = null; return; }
+      uidRef.current = fbUser.uid;
+
+      unsubRef.current = onSnapshot(
+        eventsCol(fbUser.uid),
+        (snap: QuerySnapshot) => {
+          const fetched: AppEvent[] = snap.docs.map(d => d.data() as AppEvent);
+          if (fetched.length > 0) {
+            setEvents(fetched);
+            Storage.set(KEYS.EVENTS, fetched);
+          }
+        },
+        () => {}
+      );
+    });
+
+    return () => {
+      unsubAuth();
+      if (unsubRef.current) unsubRef.current();
+    };
   }, []);
 
   const persist = (updated: AppEvent[]) => {
@@ -53,17 +88,20 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const addEvent = (e: AppEvent) => {
     persist([e, ...events]);
-    if (e.alarmActive) scheduleEventNotification(e.id, e.title, e.startTime, e.startDate);
+    if (uidRef.current) setDoc(eventDoc(uidRef.current, e.id), e).catch(() => {});
+    if (e.alarmActive) scheduleEventNotification(e.id, e.title, e.startTime, e.startDate, 15, e.recurrence ?? 'none');
   };
 
   const updateEvent = (e: AppEvent) => {
     persist(events.map(x => x.id === e.id ? e : x));
+    if (uidRef.current) setDoc(eventDoc(uidRef.current, e.id), e).catch(() => {});
     cancelNotification(`event_${e.id}`);
-    if (e.alarmActive) scheduleEventNotification(e.id, e.title, e.startTime, e.startDate);
+    if (e.alarmActive) scheduleEventNotification(e.id, e.title, e.startTime, e.startDate, 15, e.recurrence ?? 'none');
   };
 
   const removeEvent = (id: string) => {
     persist(events.filter(e => e.id !== id));
+    if (uidRef.current) deleteDoc(eventDoc(uidRef.current, id)).catch(() => {});
     cancelNotification(`event_${id}`);
   };
 
@@ -71,8 +109,9 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const updated = events.map(e => {
       if (e.id !== id) return e;
       const toggled = { ...e, alarmActive: !e.alarmActive };
+      if (uidRef.current) setDoc(eventDoc(uidRef.current, id), toggled).catch(() => {});
       if (toggled.alarmActive) {
-        scheduleEventNotification(toggled.id, toggled.title, toggled.startTime, toggled.startDate);
+        scheduleEventNotification(toggled.id, toggled.title, toggled.startTime, toggled.startDate, 15, toggled.recurrence ?? 'none');
       } else {
         cancelNotification(`event_${id}`);
       }

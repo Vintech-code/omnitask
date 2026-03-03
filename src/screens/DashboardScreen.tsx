@@ -104,6 +104,12 @@ export default function DashboardScreen({ navigation }: any) {
         </View>
         <Text style={[styles.topTitle, { color: theme.text }]}>Dashboard</Text>
         <View style={styles.topIcons}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Search')}>
+            <Ionicons name="search-outline" size={22} color={theme.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Stats')}>
+            <Ionicons name="bar-chart-outline" size={22} color={theme.text} />
+          </TouchableOpacity>
           <BurgerMenu navigation={navigation} />
         </View>
       </View>
@@ -160,7 +166,7 @@ export default function DashboardScreen({ navigation }: any) {
             </TouchableOpacity>
           ) : (
             events.slice(0, 6).map(ev => (
-              <EventCard key={ev.id} ev={ev} theme={theme} onPress={() => navigation.navigate('EventAlarms')} />
+              <EventCard key={ev.id} ev={ev} theme={theme} onPress={() => navigation.navigate('EventDetail', { event: ev })} />
             ))
           )}
         </ScrollView>
@@ -241,6 +247,7 @@ const styles = StyleSheet.create({
   },
   topTitle: { flex: 1, fontSize: 17, fontWeight: '700', textAlign: 'center', marginRight: -42 },
   topIcons: { flexDirection: 'row', alignItems: 'center' },
+  iconBtn: { padding: 6, marginLeft: 4 },
   scroll: { flex: 1 },
   greetingBlock: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12 },
   greetingTitle: { fontSize: 22, fontWeight: '800', marginBottom: 2 },

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import LottieView from 'lottie-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../context/AuthContext';
 import { requestNotificationPermission } from '../services/NotificationService';
@@ -44,10 +45,10 @@ const STEPS = [
 ];
 
 const FEATURES = [
-  { icon: 'timer-outline',         label: 'Pomodoro Timer',   color: '#4A90D9', bg: '#EBF2FF' },
-  { icon: 'alarm-outline',         label: 'Smart Alarms',     color: '#E05252', bg: '#FDECEA' },
-  { icon: 'calendar-outline',      label: 'Event Calendar',   color: '#3DAE7C', bg: '#E6F9F1' },
-  { icon: 'checkmark-done-outline', label: 'Tasks & Notes',   color: '#9C6FDE', bg: '#F3EDFF' },
+  { anim: require('../../assets/animation/timer.json'),    label: 'Pomodoro Timer',  desc: 'Timed work sessions & smart breaks',  color: '#4A90D9', bg: '#EBF2FF' },
+  { anim: require('../../assets/animation/clock.json'),    label: 'Smart Alarms',    desc: 'Event-linked alarms so you never miss', color: '#E05252', bg: '#FDECEA' },
+  { anim: require('../../assets/animation/calendar.json'), label: 'Event Calendar',  desc: 'Schedule, track & sync your events',  color: '#3DAE7C', bg: '#E6F9F1' },
+  { anim: require('../../assets/animation/notes.json'),    label: 'To-do & Notes',   desc: 'Tasks & notes with color-coded org',  color: '#9C6FDE', bg: '#F3EDFF' },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -125,15 +126,21 @@ export default function OnboardingScreen({ navigation }: any) {
           </View>
         )}
 
-        {/* ── Step 2: Feature grid ── */}
+        {/* ── Step 2: Feature grid with Lottie icons ── */}
         {step === 1 && (
           <View style={s.featureGrid}>
             {FEATURES.map(f => (
               <View key={f.label} style={[s.featureCard, { backgroundColor: '#fff' }]}>
                 <View style={[s.featureIconBox, { backgroundColor: f.bg }]}>
-                  <Ionicons name={f.icon as any} size={28} color={f.color} />
+                  <LottieView
+                    source={f.anim}
+                    autoPlay
+                    loop
+                    style={s.featureLottie}
+                  />
                 </View>
                 <Text style={[s.featureLabel, { color: '#222' }]}>{f.label}</Text>
+                <Text style={[s.featureDesc, { color: '#666' }]}>{f.desc}</Text>
               </View>
             ))}
           </View>
@@ -142,9 +149,12 @@ export default function OnboardingScreen({ navigation }: any) {
         {/* ── Step 3: Notifications ── */}
         {step === 2 && (
           <View style={s.illustrationBox}>
-            <View style={[s.logoBg, { backgroundColor: '#fff', shadowColor: current.accent }]}>
-              <Ionicons name="notifications" size={70} color={current.accent} />
-            </View>
+            <LottieView
+              source={require('../../assets/animation/todo.json')}
+              autoPlay
+              loop
+              style={s.notifAnim}
+            />
           </View>
         )}
 
@@ -208,15 +218,17 @@ const s = StyleSheet.create({
     elevation: 8,
   },
 
+  notifAnim: { width: 260, height: 260 },
+
   featureGrid: {
     flexDirection: 'row', flexWrap: 'wrap',
-    gap: 14, justifyContent: 'center',
-    marginBottom: 36,
-    width: W - 64,
+    gap: 12, justifyContent: 'center',
+    marginBottom: 28,
+    width: W - 48,
   },
   featureCard: {
-    width: (W - 64 - 14) / 2,
-    borderRadius: 18, padding: 18,
+    width: (W - 48 - 12) / 2,
+    borderRadius: 20, padding: 14,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -224,8 +236,10 @@ const s = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
   },
-  featureIconBox: { width: 54, height: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  featureLabel: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  featureIconBox: { width: 72, height: 72, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  featureLottie: { width: 56, height: 56 },
+  featureLabel: { fontSize: 13, fontWeight: '700', textAlign: 'center', marginBottom: 4 },
+  featureDesc: { fontSize: 11, textAlign: 'center', lineHeight: 15 },
 
   title: { fontSize: 26, fontWeight: '900', textAlign: 'center', marginBottom: 14, lineHeight: 34 },
   subtitle: { fontSize: 15, textAlign: 'center', lineHeight: 23 },

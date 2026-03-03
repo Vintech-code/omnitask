@@ -15,13 +15,13 @@ import {
   Animated,
   RefreshControl,
   ActivityIndicator,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEvents } from '../context/EventStore';
 import { useTheme } from '../context/ThemeContext';
 import { BurgerMenu, PulsingFAB } from '../components/BurgerMenu';
-import { useTaskStore, Note, NoteTag } from '../context/TaskStore';
+import { useTaskStore, Note, NoteTag, ChecklistItem } from '../context/TaskStore';
 import * as Haptics from 'expo-haptics';
 
 const BLUE = '#4A90D9';
@@ -55,7 +55,6 @@ function splitColumns<T>(items: T[]): [T[], T[]] {
 }
 
 export default function TasksScreen({ navigation }: any) {
-  const { events } = useEvents();
   const { theme } = useTheme();
   const { notes, categories, isLoading, addNote, updateNote, removeNote, addCategory: storeAddCat, removeCategory: storeRemoveCat } = useTaskStore();
   const [refreshing, setRefreshing] = useState(false);
@@ -76,6 +75,9 @@ export default function TasksScreen({ navigation }: any) {
   const [edCategory, setEdCategory]               = useState('Personal');
   const [edCardColor, setEdCardColor]             = useState(CARD_COLORS[0]);
   const [edTags, setEdTags]                       = useState<NoteTag[]>([]);
+  const [edTodos, setEdTodos]                     = useState<ChecklistItem[]>([]);
+  const [editorTab, setEditorTab]                 = useState<'note' | 'todos'>('note');
+  const [newTodoText, setNewTodoText]             = useState('');
   const [catPickerVisible, setCatPickerVisible]   = useState(false);
   const [colorPickerVisible, setColorPickerVisible] = useState(false);
   const [addTagMode, setAddTagMode]               = useState(false);
@@ -84,39 +86,32 @@ export default function TasksScreen({ navigation }: any) {
 
   // ── Manage categories modal ─────────────────────────────────────────────
   const [manageCatVisible, setManageCatVisible] = useState(false);
-  const [newCatName, setNewCatName]             = useState('');
+  const [newCatName, setNewCatName]               = useState('');
 
-  // ── Derived: merge events as notes ──────────────────────────────────────
-  const eventNotes = useMemo<Note[]>(() =>
-    events.map(ev => ({
-      id: `ev-${ev.id}`,
-      title: ev.title,
-      body: [ev.description, ev.location].filter(Boolean).join('\n') || `${ev.startTime} · ${ev.startDate}`,
-      date: ev.startDate || formatDate(Date.now()),
-      timestamp: Date.now(),
-      category: 'Events',
-      cardColor: '#E3F2FD',
-      tags: [{ label: ev.category.toUpperCase(), color: BLUE }, { label: 'EVENT', color: '#1A6DA8' }],
-    })),
-  [events]);
-
-  const allNotes = useMemo(() => [...notes, ...eventNotes], [notes, eventNotes]);
+  const handleAddCategory = () => {
+    const name = newCatName.trim();
+    if (!name) return;
+    storeAddCat(name);
+    setNewCatName('');
+  };
 
   const filteredNotes = useMemo(() => {
-    let list = activeCategory === 'All' ? allNotes : allNotes.filter(n => n.category === activeCategory);
+    let list = activeCategory === 'All' ? notes : notes.filter(n => n.category === activeCategory);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(n => n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q));
     }
     return list.sort((a, b) => b.timestamp - a.timestamp);
-  }, [allNotes, activeCategory, searchQuery]);
+  }, [notes, activeCategory, searchQuery]);
 
   // ── Open editor ──────────────────────────────────────────────────────────
   const openNew = () => {
     setEditNote(null);
     setEdTitle('');
     setEdBody('');
-    setEdCategory(activeCategory !== 'All' && activeCategory !== 'Events' ? activeCategory : 'Personal');
+    setEdTodos([]);
+    setEditorTab('note');
+    setEdCategory(activeCategory !== 'All' ? activeCategory : 'Personal');
     setEdCardColor(CARD_COLORS[0]);
     setEdTags([]);
     setAddTagMode(false);
@@ -124,13 +119,11 @@ export default function TasksScreen({ navigation }: any) {
   };
 
   const openEdit = (note: Note) => {
-    if (note.id.startsWith('ev-')) {
-      Alert.alert('Edit Event', 'This note is an event. Go to Events tab to edit it.');
-      return;
-    }
     setEditNote(note);
     setEdTitle(note.title);
     setEdBody(note.body);
+    setEdTodos(note.todos ? [...note.todos] : []);
+    setEditorTab('note');
     setEdCategory(note.category);
     setEdCardColor(note.cardColor);
     setEdTags([...note.tags]);
@@ -140,14 +133,14 @@ export default function TasksScreen({ navigation }: any) {
 
   // ── Save note ────────────────────────────────────────────────────────────
   const saveNote = () => {
-    if (!edTitle.trim() && !edBody.trim()) {
+    if (!edTitle.trim() && !edBody.trim() && edTodos.length === 0) {
       setEditorVisible(false);
       return;
     }
     const now = Date.now();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     if (editNote) {
-      updateNote({ ...editNote, title: edTitle, body: edBody, category: edCategory, cardColor: edCardColor, tags: edTags, date: formatDate(editNote.timestamp) });
+      updateNote({ ...editNote, title: edTitle, body: edBody, category: edCategory, cardColor: edCardColor, tags: edTags, date: formatDate(editNote.timestamp), todos: edTodos });
     } else {
       const newNote: Note = {
         id: now.toString(),
@@ -158,12 +151,35 @@ export default function TasksScreen({ navigation }: any) {
         category: edCategory,
         cardColor: edCardColor,
         tags: edTags,
+        todos: edTodos,
       };
       addNote(newNote);
       if (!categories.includes(edCategory)) storeAddCat(edCategory);
     }
     setEditorVisible(false);
   };
+
+  // ── Share note ────────────────────────────────────────────────────────────
+  const shareNote = async () => {
+    const title = edTitle.trim() || 'Note';
+    const todoText = edTodos.length > 0
+      ? '\n\nChecklist:\n' + edTodos.map(t => `${t.done ? '✓' : '☐'} ${t.text}`).join('\n')
+      : '';
+    const message = `${title}\n\n${edBody}${todoText}`.trim();
+    try {
+      await Share.share({ title, message });
+    } catch {}
+  };
+
+  // ── Todo helpers ──────────────────────────────────────────────────────────
+  const addTodo = () => {
+    const text = newTodoText.trim();
+    if (!text) return;
+    setEdTodos(prev => [...prev, { id: Date.now().toString(), text, done: false }]);
+    setNewTodoText('');
+  };
+  const toggleTodo = (id: string) => setEdTodos(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  const removeTodo = (id: string) => setEdTodos(prev => prev.filter(t => t.id !== id));
 
   // ── Delete note ──────────────────────────────────────────────────────────
   const deleteNote = (id: string) => {
@@ -188,12 +204,6 @@ export default function TasksScreen({ navigation }: any) {
   };
 
   // ── Category helpers ──────────────────────────────────────────────────────
-  const addCategory = () => {
-    const c = newCatName.trim();
-    if (!c || categories.includes(c)) return;
-    storeAddCat(c);
-    setNewCatName('');
-  };
   const deleteCategory = (cat: string) => {
     Alert.alert('Delete Category', `Delete "${cat}"?`, [
       { text: 'Cancel', style: 'cancel' },
@@ -224,14 +234,13 @@ export default function TasksScreen({ navigation }: any) {
       {note.body.length > 0 && (
         <Text style={[styles.noteCardBody, { color: theme.textSub }]} numberOfLines={5}>{note.body}</Text>
       )}
-      {note.tags.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.noteCardTagsRow}>
-          {note.tags.map((t, i) => (
-            <View key={i} style={[styles.noteCardTag, { backgroundColor: `${t.color}22`, borderColor: `${t.color}55` }]}>
-              <Text style={[styles.noteCardTagText, { color: t.color }]}>{t.label}</Text>
-            </View>
-          ))}
-        </ScrollView>
+      {note.todos && note.todos.length > 0 && (
+        <View style={styles.noteCardTodoBadge}>
+          <MaterialCommunityIcons name="checkbox-marked-outline" size={12} color={BLUE} />
+          <Text style={styles.noteCardTodoBadgeTxt}>
+            {note.todos.filter(t => t.done).length}/{note.todos.length}
+          </Text>
+        </View>
       )}
       <Text style={[styles.noteCardDate, { color: theme.textDim }]}>{note.date}</Text>
     </TouchableOpacity>
@@ -239,7 +248,7 @@ export default function TasksScreen({ navigation }: any) {
 
   // ── Render ────────────────────────────────────────────────────────────────
   const [leftCol, rightCol] = splitColumns(filteredNotes);
-  const allCatTabs = ['All', ...categories, 'Events'];
+  const allCatTabs = ['All', ...categories];
 
   if (isLoading) {
     return (
@@ -309,12 +318,6 @@ export default function TasksScreen({ navigation }: any) {
             <Text style={[styles.catChipText, { color: activeCategory === cat ? '#fff' : theme.textSub }]}>{cat}</Text>
           </TouchableOpacity>
         ))}
-        <TouchableOpacity
-          style={[styles.catChipAdd, { borderColor: theme.border }]}
-          onPress={() => setManageCatVisible(true)}
-        >
-          <MaterialCommunityIcons name="view-grid-plus-outline" size={14} color={theme.textDim} />
-        </TouchableOpacity>
       </ScrollView>
 
       {/* ── Notes grid ── */}
@@ -371,7 +374,7 @@ export default function TasksScreen({ navigation }: any) {
               <TouchableOpacity onPress={() => setColorPickerVisible(v => !v)} style={styles.editorIconBtn}>
                 <Ionicons name="color-palette-outline" size={20} color="#555" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.editorIconBtn} onPress={() => Alert.alert('Share', 'Share coming soon.')}>
+              <TouchableOpacity style={styles.editorIconBtn} onPress={shareNote}>
                 <Ionicons name="share-outline" size={20} color="#555" />
               </TouchableOpacity>
               {editNote && (
@@ -428,6 +431,26 @@ export default function TasksScreen({ navigation }: any) {
             )}
           </View>
 
+          {/* ── Note/Todos tab bar ── */}
+          <View style={[styles.editorTabBar, { backgroundColor: edCardColor, borderBottomColor: 'rgba(0,0,0,0.07)' }]}>
+            <TouchableOpacity
+              style={[styles.editorTabBtn, editorTab === 'note' && styles.editorTabBtnActive]}
+              onPress={() => setEditorTab('note')}
+            >
+              <Ionicons name="create-outline" size={15} color={editorTab === 'note' ? BLUE : '#888'} />
+              <Text style={[styles.editorTabTxt, { color: editorTab === 'note' ? BLUE : '#888' }]}>Note</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.editorTabBtn, editorTab === 'todos' && styles.editorTabBtnActive]}
+              onPress={() => setEditorTab('todos')}
+            >
+              <MaterialCommunityIcons name="checkbox-marked-outline" size={15} color={editorTab === 'todos' ? BLUE : '#888'} />
+              <Text style={[styles.editorTabTxt, { color: editorTab === 'todos' ? BLUE : '#888' }]}>
+                Checklist{edTodos.length > 0 ? ` (${edTodos.filter(t => t.done).length}/${edTodos.length})` : ''}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView
               style={{ flex: 1 }}
@@ -435,7 +458,7 @@ export default function TasksScreen({ navigation }: any) {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {/* Title */}
+              {/* ── Title (always visible) ── */}
               <TextInput
                 style={styles.editorTitle}
                 placeholder="Title"
@@ -446,40 +469,60 @@ export default function TasksScreen({ navigation }: any) {
                 maxLength={120}
               />
 
-              {/* Body */}
-              <TextInput
-                style={styles.editorText}
-                placeholder="Note here"
-                placeholderTextColor="#C0C0C0"
-                value={edBody}
-                onChangeText={setEdBody}
-                multiline
-                textAlignVertical="top"
-              />
+              {/* ── Note tab ── */}
+              {editorTab === 'note' && (
+                <TextInput
+                  style={styles.editorText}
+                  placeholder="Note here"
+                  placeholderTextColor="#C0C0C0"
+                  value={edBody}
+                  onChangeText={setEdBody}
+                  multiline
+                  textAlignVertical="top"
+                />
+              )}
+
+              {/* ── Checklist tab ── */}
+              {editorTab === 'todos' && (
+                <View style={{ paddingBottom: 12 }}>
+                  {/* Add todo input */}
+                  <View style={styles.todoAddRow}>
+                    <TextInput
+                      style={styles.todoAddInput}
+                      placeholder="Add item…"
+                      placeholderTextColor="#bbb"
+                      value={newTodoText}
+                      onChangeText={setNewTodoText}
+                      onSubmitEditing={addTodo}
+                      returnKeyType="done"
+                    />
+                    <TouchableOpacity style={styles.todoAddBtn} onPress={addTodo}>
+                      <Ionicons name="add" size={22} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Todo items */}
+                  {edTodos.length === 0 && (
+                    <Text style={styles.todoEmptyText}>No checklist items yet</Text>
+                  )}
+                  {edTodos.map(item => (
+                    <View key={item.id} style={styles.todoItem}>
+                      <TouchableOpacity onPress={() => toggleTodo(item.id)} style={styles.todoCheckbox}>
+                        {item.done
+                          ? <MaterialCommunityIcons name="checkbox-marked" size={22} color={BLUE} />
+                          : <MaterialCommunityIcons name="checkbox-blank-outline" size={22} color="#aaa" />
+                        }
+                      </TouchableOpacity>
+                      <Text style={[styles.todoItemText, item.done && styles.todoItemDone]}>{item.text}</Text>
+                      <TouchableOpacity onPress={() => removeTodo(item.id)} style={styles.todoRemoveBtn}>
+                        <Ionicons name="close" size={18} color="#bbb" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
 
             </ScrollView>
-
-            {/* ── Floating tags bar (above bottom bar) ── */}
-            <View style={[styles.floatingTagsBar, { backgroundColor: edCardColor }]}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.floatingTagsRow}>
-                {edTags.map((t, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    style={[styles.editorTag, { backgroundColor: t.color }]}
-                    onPress={() => setEdTags(prev => prev.filter((_, idx) => idx !== i))}
-                  >
-                    <Text style={styles.editorTagText}>{t.label}</Text>
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  style={styles.addTagBtn}
-                  onPress={() => setAddTagMode(v => !v)}
-                >
-                  <Ionicons name="add" size={12} color="#888" />
-                  <Text style={styles.addTagBtnText}>ADD</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
 
             {/* ── Add-tag floating overlay ── */}
             {addTagMode && (
@@ -586,12 +629,12 @@ export default function TasksScreen({ navigation }: any) {
               <MaterialCommunityIcons name="drag" size={20} color={theme.textDim} style={{ marginRight: 12 }} />
               <Text style={[styles.manageCatName, { color: theme.text }]}>
                 All
-                <Text style={[styles.manageCatCount, { color: theme.textDim }]}> ({allNotes.length})</Text>
+                <Text style={[styles.manageCatCount, { color: theme.textDim }]}> ({notes.length})</Text>
               </Text>
             </View>
 
             {categories.map(cat => {
-              const count = allNotes.filter(n => n.category === cat).length;
+              const count = notes.filter(n => n.category === cat).length;
               return (
                 <View key={cat} style={[styles.manageCatRow, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
                   <MaterialCommunityIcons name="drag" size={20} color={theme.textDim} style={{ marginRight: 12 }} />
@@ -617,37 +660,29 @@ export default function TasksScreen({ navigation }: any) {
               );
             })}
 
-            {/* Events fixed row */}
-            <View style={[styles.manageCatRow, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-              <MaterialCommunityIcons name="drag" size={20} color={theme.textDim} style={{ marginRight: 12 }} />
-              <Text style={[styles.manageCatName, { color: theme.text }]}>
-                Events
-                <Text style={[styles.manageCatCount, { color: theme.textDim }]}> ({eventNotes.length})</Text>
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginLeft: 'auto' }}>
-                <Ionicons name="lock-closed-outline" size={18} color={BLUE} />
-              </View>
-            </View>
-
             <View style={{ height: 20 }} />
           </ScrollView>
 
-          {/* Add category input + button */}
+          {/* ── Add Category bar ── */}
           <View style={[styles.addCatBar, { backgroundColor: theme.bg, borderTopColor: theme.border }]}>
             <TextInput
               style={[styles.addCatInput, { color: theme.text, backgroundColor: theme.bg2, borderColor: theme.border }]}
-              placeholder="New category name..."
+              placeholder="New category name…"
               placeholderTextColor={theme.textDim}
               value={newCatName}
               onChangeText={setNewCatName}
-              onSubmitEditing={addCategory}
+              maxLength={30}
               returnKeyType="done"
+              onSubmitEditing={handleAddCategory}
             />
+            <TouchableOpacity
+              style={styles.addCatBtn}
+              onPress={handleAddCategory}
+            >
+              <Ionicons name="add" size={18} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.addCatBtnText}>ADD CATEGORY</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.addCatBtn} onPress={addCategory}>
-            <Ionicons name="add-circle-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-            <Text style={styles.addCatBtnText}>ADD CATEGORY</Text>
-          </TouchableOpacity>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -904,4 +939,51 @@ const styles = StyleSheet.create({
     paddingVertical: 16, marginHorizontal: 14, marginBottom: 16, marginTop: 8,
   },
   addCatBtnText: { fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: 1 },
+
+  // ── Note card todo badge
+  noteCardTodoBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    marginTop: 6, alignSelf: 'flex-start',
+    backgroundColor: 'rgba(74,144,217,0.12)', borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 3,
+  },
+  noteCardTodoBadgeTxt: { fontSize: 11, fontWeight: '700', color: BLUE },
+
+  // ── Editor tab bar
+  editorTabBar: {
+    flexDirection: 'row', borderBottomWidth: 1,
+  },
+  editorTabBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 11,
+  },
+  editorTabBtnActive: {
+    borderBottomWidth: 2, borderBottomColor: BLUE,
+  },
+  editorTabTxt: { fontSize: 13, fontWeight: '700' },
+
+  // ── Todo checklist
+  todoAddRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginBottom: 14,
+  },
+  todoAddInput: {
+    flex: 1, borderRadius: 12, borderWidth: 1, borderColor: '#DDD',
+    paddingHorizontal: 14, paddingVertical: 10,
+    fontSize: 15, color: '#111', backgroundColor: '#FAFAFA',
+  },
+  todoAddBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center',
+  },
+  todoEmptyText: { fontSize: 14, color: '#bbb', textAlign: 'center', paddingVertical: 20 },
+  todoItem: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 10, paddingVertical: 8,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  todoCheckbox: { padding: 2 },
+  todoItemText: { flex: 1, fontSize: 15, color: '#333' },
+  todoItemDone: { textDecorationLine: 'line-through', color: '#aaa' },
+  todoRemoveBtn: { padding: 4 },
 });
