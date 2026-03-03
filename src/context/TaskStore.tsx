@@ -26,6 +26,7 @@ export interface Note {
   cardColor: string;
   tags: NoteTag[];
   todos?: ChecklistItem[];
+  images?: string[];
 }
 
 const DEFAULT_CATEGORIES = ['Personal', 'Work', 'School', 'Health', 'Finance'];

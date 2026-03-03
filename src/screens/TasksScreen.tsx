@@ -16,6 +16,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Share,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -91,6 +92,7 @@ export default function TasksScreen({ navigation }: any) {
   const [addTagMode, setAddTagMode]               = useState(false);
   const [newTagName, setNewTagName]               = useState('');
   const [newTagColor, setNewTagColor]             = useState(TAG_PALETTE[0]);
+  const [edImages, setEdImages]                   = useState<string[]>([]);
 
   // ── Undo / Redo history ─────────────────────────────────────────────────
   const undoStack      = useRef<string[]>([]);
@@ -139,6 +141,7 @@ export default function TasksScreen({ navigation }: any) {
     setEdCardColor(CARD_COLORS[0]);
     setEdTags([]);
     setAddTagMode(false);
+    setEdImages([]);
     undoStack.current = [];
     redoStack.current = [];
     setEmojiPickerVisible(false);
@@ -156,6 +159,7 @@ export default function TasksScreen({ navigation }: any) {
     setEdCardColor(note.cardColor);
     setEdTags([...note.tags]);
     setAddTagMode(false);
+    setEdImages(note.images ? [...note.images] : []);
     undoStack.current = [];
     redoStack.current = [];
     setEmojiPickerVisible(false);
@@ -172,7 +176,7 @@ export default function TasksScreen({ navigation }: any) {
     const now = Date.now();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     if (editNote) {
-      updateNote({ ...editNote, title: edTitle, body: edBody, category: edCategory, cardColor: edCardColor, tags: edTags, date: formatDate(editNote.timestamp), todos: edTodos });
+      updateNote({ ...editNote, title: edTitle, body: edBody, category: edCategory, cardColor: edCardColor, tags: edTags, date: formatDate(editNote.timestamp), todos: edTodos, images: edImages });
     } else {
       const newNote: Note = {
         id: now.toString(),
@@ -184,6 +188,7 @@ export default function TasksScreen({ navigation }: any) {
         cardColor: edCardColor,
         tags: edTags,
         todos: edTodos,
+        images: edImages,
       };
       addNote(newNote);
       if (!categories.includes(edCategory)) storeAddCat(edCategory);
@@ -323,11 +328,13 @@ export default function TasksScreen({ navigation }: any) {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 0.8,
+      allowsEditing: true,
+      quality: 0.85,
+      allowsMultipleSelection: false,
     });
     if (!result.canceled && result.assets[0]?.uri) {
-      insertAtCursor(`\n📷 ${result.assets[0].uri}`);
+      setEdImages(prev => [...prev, result.assets[0].uri]);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
@@ -361,6 +368,13 @@ export default function TasksScreen({ navigation }: any) {
             {note.todos.filter(t => t.done).length}/{note.todos.length}
           </Text>
         </View>
+      )}
+      {note.images && note.images.length > 0 && (
+        <Image
+          source={{ uri: note.images[0] }}
+          style={styles.noteCardImage}
+          resizeMode="cover"
+        />
       )}
       <Text style={[styles.noteCardDate, { color: theme.textDim }]}>{note.date}</Text>
     </TouchableOpacity>
@@ -571,7 +585,11 @@ export default function TasksScreen({ navigation }: any) {
             </TouchableOpacity>
           </View>
 
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+          >
             <ScrollView
               style={{ flex: 1 }}
               contentContainerStyle={styles.editorBody}
@@ -591,17 +609,42 @@ export default function TasksScreen({ navigation }: any) {
 
               {/* ── Note tab ── */}
               {editorTab === 'note' && (
-                <TextInput
-                  ref={bodyRef}
-                  style={styles.editorText}
-                  placeholder="Note here"
-                  placeholderTextColor="#C0C0C0"
-                  value={edBody}
-                  onChangeText={handleBodyChange}
-                  onSelectionChange={e => setBodySel(e.nativeEvent.selection)}
-                  multiline
-                  textAlignVertical="top"
-                />
+                <>
+                  <TextInput
+                    ref={bodyRef}
+                    style={styles.editorText}
+                    placeholder="Note here"
+                    placeholderTextColor="#C0C0C0"
+                    value={edBody}
+                    onChangeText={handleBodyChange}
+                    onSelectionChange={e => setBodySel(e.nativeEvent.selection)}
+                    multiline
+                    textAlignVertical="top"
+                    scrollEnabled={false}
+                  />
+                  {/* ── Inserted images strip ── */}
+                  {edImages.length > 0 && (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      keyboardShouldPersistTaps="handled"
+                      style={styles.imageStrip}
+                      contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+                    >
+                      {edImages.map((uri, idx) => (
+                        <View key={idx} style={styles.imageThumbWrap}>
+                          <Image source={{ uri }} style={styles.imageThumb} />
+                          <TouchableOpacity
+                            style={styles.imageDeleteBtn}
+                            onPress={() => setEdImages(prev => prev.filter((_, i) => i !== idx))}
+                          >
+                            <Ionicons name="close-circle" size={20} color="#fff" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  )}
+                </>
               )}
 
               {/* ── Checklist tab ── */}
@@ -725,7 +768,7 @@ export default function TasksScreen({ navigation }: any) {
               horizontal
               showsHorizontalScrollIndicator={false}
               style={[styles.editorBottomBar, { backgroundColor: edCardColor }]}
-              contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 4 }}
+              contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 }}
               keyboardShouldPersistTaps="handled"
             >
               {/* Aa — text format */}
@@ -1121,8 +1164,7 @@ const styles = StyleSheet.create({
 
   // ── Bottom editor bar
   editorBottomBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
-    paddingHorizontal: 8, paddingVertical: 10,
+    paddingVertical: 10,
     borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.07)',
   },
   editorBarBtn: { padding: 8 },
@@ -1176,6 +1218,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 3,
   },
   noteCardTodoBadgeTxt: { fontSize: 11, fontWeight: '700', color: BLUE },
+  noteCardImage: {
+    width: '100%', height: 100, borderRadius: 8, marginTop: 8,
+  },
+
+  // ── Editor image strip
+  imageStrip: { marginTop: 10 },
+  imageThumbWrap: { position: 'relative' },
+  imageThumb: { width: 120, height: 90, borderRadius: 10 },
+  imageDeleteBtn: {
+    position: 'absolute', top: -6, right: -6,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 12,
+  },
 
   // ── Editor tab bar
   editorTabBar: {
