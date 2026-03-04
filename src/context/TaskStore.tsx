@@ -27,6 +27,7 @@ export interface Note {
   tags: NoteTag[];
   todos?: ChecklistItem[];
   images?: string[];
+  fontFamily?: string;
 }
 
 const DEFAULT_CATEGORIES = ['Personal', 'Work', 'School', 'Health', 'Finance'];
@@ -150,13 +151,17 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Firestore rejects `undefined` field values — strip them before writing
+  const toFirestoreDoc = (note: Note): Record<string, unknown> =>
+    Object.fromEntries(Object.entries(note).filter(([, v]) => v !== undefined));
+
   const addNote = (note: Note) => {
     persist([note, ...notes]);
-    if (uidRef.current) setDoc(noteDoc(uidRef.current, note.id), note).catch(() => {});
+    if (uidRef.current) setDoc(noteDoc(uidRef.current, note.id), toFirestoreDoc(note)).catch(() => {});
   };
   const updateNote = (note: Note) => {
     persist(notes.map(n => n.id === note.id ? note : n));
-    if (uidRef.current) setDoc(noteDoc(uidRef.current, note.id), note).catch(() => {});
+    if (uidRef.current) setDoc(noteDoc(uidRef.current, note.id), toFirestoreDoc(note)).catch(() => {});
   };
   const removeNote = (id: string) => {
     persist(notes.filter(n => n.id !== id));

@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useRef } from 'react';
+﻿import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,16 +9,15 @@ import {
   Alert,
   Modal,
   Pressable,
-  KeyboardAvoidingView,
-  Platform,
   FlatList,
   Animated,
   RefreshControl,
   ActivityIndicator,
   Share,
   Image,
+  Keyboard,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { BurgerMenu, PulsingFAB } from '../components/BurgerMenu';
@@ -45,6 +44,15 @@ const EMOJI_LIST = [
   '💪','🌙','☀️','🎨','📅','🔔','🛒','💰','🔑','🌍','🐶','🐱',
 ];
 
+const FONT_FAMILIES: { label: string; value: string | undefined }[] = [
+  { label: 'Default',   value: undefined },
+  { label: 'Serif',     value: 'serif' },
+  { label: 'Mono',      value: 'monospace' },
+  { label: 'Light',     value: 'sans-serif-light' },
+  { label: 'Condensed', value: 'sans-serif-condensed' },
+  { label: 'Cursive',   value: 'cursive' },
+];
+
 function formatDate(ts: number): string {
   const now = new Date();
   const d = new Date(ts);
@@ -65,6 +73,7 @@ function splitColumns<T>(items: T[]): [T[], T[]] {
 
 export default function TasksScreen({ navigation }: any) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const { notes, categories, isLoading, addNote, updateNote, removeNote, addCategory: storeAddCat, removeCategory: storeRemoveCat } = useTaskStore();
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 700); };
@@ -109,8 +118,16 @@ export default function TasksScreen({ navigation }: any) {
   const [linkModalVisible,    setLinkModalVisible]    = useState(false);
   const [linkUrl,  setLinkUrl]  = useState('');
   const [linkText, setLinkText] = useState('');
+  const [fontPickerVisible, setFontPickerVisible] = useState(false);
+  const [edFontFamily, setEdFontFamily] = useState<string | undefined>(undefined);
 
-  // ── Manage categories modal ─────────────────────────────────────────────
+  // ── Keyboard height tracker (Android Modal workaround) ──────────────────
+  const [kbHeight, setKbHeight] = useState(0);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', e => setKbHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
   const [manageCatVisible, setManageCatVisible] = useState(false);
   const [newCatName, setNewCatName]               = useState('');
 
@@ -142,6 +159,7 @@ export default function TasksScreen({ navigation }: any) {
     setEdTags([]);
     setAddTagMode(false);
     setEdImages([]);
+    setEdFontFamily(undefined);
     undoStack.current = [];
     redoStack.current = [];
     setEmojiPickerVisible(false);
@@ -160,6 +178,7 @@ export default function TasksScreen({ navigation }: any) {
     setEdTags([...note.tags]);
     setAddTagMode(false);
     setEdImages(note.images ? [...note.images] : []);
+    setEdFontFamily(note.fontFamily);
     undoStack.current = [];
     redoStack.current = [];
     setEmojiPickerVisible(false);
@@ -176,7 +195,7 @@ export default function TasksScreen({ navigation }: any) {
     const now = Date.now();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     if (editNote) {
-      updateNote({ ...editNote, title: edTitle, body: edBody, category: edCategory, cardColor: edCardColor, tags: edTags, date: formatDate(editNote.timestamp), todos: edTodos, images: edImages });
+      updateNote({ ...editNote, title: edTitle, body: edBody, category: edCategory, cardColor: edCardColor, tags: edTags, date: formatDate(editNote.timestamp), todos: edTodos, images: edImages, fontFamily: edFontFamily });
     } else {
       const newNote: Note = {
         id: now.toString(),
@@ -189,6 +208,7 @@ export default function TasksScreen({ navigation }: any) {
         tags: edTags,
         todos: edTodos,
         images: edImages,
+        fontFamily: edFontFamily,
       };
       addNote(newNote);
       if (!categories.includes(edCategory)) storeAddCat(edCategory);
@@ -399,7 +419,7 @@ export default function TasksScreen({ navigation }: any) {
       {/* ── Header ── */}
       <View style={[styles.header, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
         <BurgerMenu navigation={navigation} />
-        <Text style={[styles.headerTitle, { color: theme.text }]}>To-do List</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Notes</Text>
         <View style={styles.headerIcons}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => { setSearchVisible(v => !v); setSearchQuery(''); }}>
             <Ionicons name="search-outline" size={22} color={theme.text} />
@@ -580,19 +600,16 @@ export default function TasksScreen({ navigation }: any) {
             >
               <MaterialCommunityIcons name="checkbox-marked-outline" size={15} color={editorTab === 'todos' ? BLUE : '#888'} />
               <Text style={[styles.editorTabTxt, { color: editorTab === 'todos' ? BLUE : '#888' }]}>
-                Checklist{edTodos.length > 0 ? ` (${edTodos.filter(t => t.done).length}/${edTodos.length})` : ''}
+                {edTodos.length > 0 ? `Checklist (${edTodos.filter(t => t.done).length}/${edTodos.length})` : 'Checklist'}
               </Text>
             </TouchableOpacity>
           </View>
 
-          <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
-          >
+          <View style={{ flex: 1 }}>
+            {/* ── Scrollable content area ── */}
             <ScrollView
               style={{ flex: 1 }}
-              contentContainerStyle={styles.editorBody}
+              contentContainerStyle={[styles.editorBody, { paddingBottom: 20 }]}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
@@ -612,7 +629,7 @@ export default function TasksScreen({ navigation }: any) {
                 <>
                   <TextInput
                     ref={bodyRef}
-                    style={styles.editorText}
+                    style={[styles.editorText, edFontFamily ? { fontFamily: edFontFamily } : null]}
                     placeholder="Note here"
                     placeholderTextColor="#C0C0C0"
                     value={edBody}
@@ -622,7 +639,6 @@ export default function TasksScreen({ navigation }: any) {
                     textAlignVertical="top"
                     scrollEnabled={false}
                   />
-                  {/* ── Inserted images strip ── */}
                   {edImages.length > 0 && (
                     <ScrollView
                       horizontal
@@ -650,7 +666,6 @@ export default function TasksScreen({ navigation }: any) {
               {/* ── Checklist tab ── */}
               {editorTab === 'todos' && (
                 <View style={{ paddingBottom: 12 }}>
-                  {/* Add todo input */}
                   <View style={styles.todoAddRow}>
                     <TextInput
                       style={styles.todoAddInput}
@@ -665,8 +680,6 @@ export default function TasksScreen({ navigation }: any) {
                       <Ionicons name="add" size={22} color="#fff" />
                     </TouchableOpacity>
                   </View>
-
-                  {/* Todo items */}
                   {edTodos.length === 0 && (
                     <Text style={styles.todoEmptyText}>No checklist items yet</Text>
                   )}
@@ -686,185 +699,157 @@ export default function TasksScreen({ navigation }: any) {
                   ))}
                 </View>
               )}
-
             </ScrollView>
 
-            {/* ── Add-tag floating overlay ── */}
-            {addTagMode && (
-              <View style={styles.addTagOverlay}>
-                <Pressable style={styles.addTagOverlayBg} onPress={() => { setAddTagMode(false); setNewTagName(''); }} />
-                <View style={styles.addTagForm}>
-                  <TextInput
-                    style={styles.addTagInput}
-                    placeholder="Category name"
-                    placeholderTextColor="#bbb"
-                    value={newTagName}
-                    onChangeText={setNewTagName}
-                    autoFocus
-                    maxLength={20}
-                  />
-                  <Text style={styles.addTagColorLabel}>Pick a color</Text>
-                  <View style={styles.addTagPalette}>
-                    {TAG_PALETTE.map(c => (
-                      <TouchableOpacity
-                        key={c}
-                        style={[styles.tagColorDot, { backgroundColor: c }, newTagColor === c && styles.tagColorDotActive]}
-                        onPress={() => setNewTagColor(c)}
-                      >
-                        {newTagColor === c && <Ionicons name="checkmark" size={11} color="#fff" />}
+            {/* ═══════════════════════════════════════════════════
+                TOOLBAR — absolutely pinned above keyboard
+            ═══════════════════════════════════════════════════ */}
+            <View style={[styles.toolbarDock, { backgroundColor: edCardColor }]}>
+
+              {/* Format + font popover */}
+              {formatPopoverVisible && (
+                <View style={[styles.formatPopover, { backgroundColor: edCardColor }]}>
+                  <View style={styles.formatRow}>
+                    <TouchableOpacity style={styles.formatBtn} onPress={() => { wrapText('**'); setFormatPopoverVisible(false); }}>
+                      <Text style={[styles.formatBtnText, { fontWeight: 'bold' }]}>B</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.formatBtn} onPress={() => { wrapText('_'); setFormatPopoverVisible(false); }}>
+                      <Text style={[styles.formatBtnText, { fontStyle: 'italic' }]}>I</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.formatBtn} onPress={() => { wrapText('~~', '~~'); setFormatPopoverVisible(false); }}>
+                      <Text style={[styles.formatBtnText, { textDecorationLine: 'line-through' }]}>S</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.formatBtn} onPress={() => { insertLinePrefix('# '); setFormatPopoverVisible(false); }}>
+                      <Text style={styles.formatBtnText}>H1</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.formatBtn} onPress={() => { insertLinePrefix('## '); setFormatPopoverVisible(false); }}>
+                      <Text style={styles.formatBtnText}>H2</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.fontRow} keyboardShouldPersistTaps="handled">
+                    {FONT_FAMILIES.map(f => (
+                      <TouchableOpacity key={f.label}
+                        style={[styles.fontChip, edFontFamily === f.value && styles.fontChipActive]}
+                        onPress={() => { setEdFontFamily(f.value); bodyRef.current?.focus(); }}>
+                        <Text style={[
+                          styles.fontChipText,
+                          f.value ? { fontFamily: f.value } : null,
+                          edFontFamily === f.value && styles.fontChipTextActive,
+                        ]}>{f.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Emoji picker */}
+              {emojiPickerVisible && (
+                <View style={[styles.emojiPicker, { backgroundColor: edCardColor }]}>
+                  <View style={styles.emojiGrid}>
+                    {EMOJI_LIST.map((em, i) => (
+                      <TouchableOpacity key={i} style={styles.emojiBtn}
+                        onPress={() => { insertAtCursor(em); setEmojiPickerVisible(false); }}>
+                        <Text style={styles.emojiText}>{em}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
-                  <View style={styles.addTagActions}>
-                    <TouchableOpacity style={styles.addTagCancel} onPress={() => { setAddTagMode(false); setNewTagName(''); }}>
-                      <Text style={styles.addTagCancelText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.addTagConfirm} onPress={addTag}>
-                      <Text style={styles.addTagConfirmText}>Add</Text>
-                    </TouchableOpacity>
-                  </View>
                 </View>
-              </View>
-            )}
+              )}
 
-            {/* ── Format popover (B / I / H1 / H2) ── */}
-            {formatPopoverVisible && (
-              <View style={styles.formatPopover}>
-                <TouchableOpacity style={styles.formatBtn}
-                  onPress={() => { wrapText('**'); setFormatPopoverVisible(false); }}>
-                  <Text style={[styles.formatBtnText, { fontWeight: 'bold' }]}>B</Text>
+              {/* Toolbar row */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.editorBottomBar}
+                contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 }}
+                keyboardShouldPersistTaps="handled"
+              >
+                <TouchableOpacity style={styles.editorBarBtn}
+                  onPress={() => { setFormatPopoverVisible(v => !v); setEmojiPickerVisible(false); }}>
+                  <MaterialCommunityIcons name="format-font" size={22} color={formatPopoverVisible ? BLUE : '#555'} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.formatBtn}
-                  onPress={() => { wrapText('_'); setFormatPopoverVisible(false); }}>
-                  <Text style={[styles.formatBtnText, { fontStyle: 'italic' }]}>I</Text>
+                <TouchableOpacity style={styles.editorBarBtn} onPress={() => insertLinePrefix('☐ ')}>
+                  <MaterialCommunityIcons name="checkbox-marked-outline" size={22} color="#555" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.formatBtn}
-                  onPress={() => { insertLinePrefix('# '); setFormatPopoverVisible(false); }}>
-                  <Text style={styles.formatBtnText}>H1</Text>
+                <TouchableOpacity style={styles.editorBarBtn} onPress={() => {
+                  bodyRef.current?.focus();
+                  Alert.alert('Voice Input', 'Tap the microphone on your keyboard to dictate.');
+                }}>
+                  <Ionicons name="mic-outline" size={22} color="#555" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.formatBtn}
-                  onPress={() => { insertLinePrefix('## '); setFormatPopoverVisible(false); }}>
-                  <Text style={styles.formatBtnText}>H2</Text>
+                <TouchableOpacity style={styles.editorBarBtn} onPress={() => wrapText('==', '==')}>
+                  <Ionicons name="brush-outline" size={22} color="#555" />
                 </TouchableOpacity>
-              </View>
-            )}
+                <TouchableOpacity style={styles.editorBarBtn} onPress={pickAndInsertImage}>
+                  <Ionicons name="image-outline" size={22} color="#555" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.editorBarBtn}
+                  onPress={() => { setEmojiPickerVisible(v => !v); setFormatPopoverVisible(false); }}>
+                  <Ionicons name="happy-outline" size={22} color={emojiPickerVisible ? BLUE : '#555'} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.editorBarBtn} onPress={() => wrapText('~~', '~~')}>
+                  <MaterialCommunityIcons name="format-strikethrough" size={22} color="#555" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.editorBarBtn} onPress={() => insertLinePrefix('• ')}>
+                  <Ionicons name="list-outline" size={22} color="#555" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.editorBarBtn} onPress={() => insertLinePrefix('1. ')}>
+                  <MaterialCommunityIcons name="format-list-numbered" size={22} color="#555" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.editorBarBtn}
+                  onPress={() => { setLinkText(''); setLinkUrl(''); setLinkModalVisible(true); }}>
+                  <Ionicons name="link-outline" size={22} color="#555" />
+                </TouchableOpacity>
+              </ScrollView>
 
-            {/* ── Emoji picker grid ── */}
-            {emojiPickerVisible && (
-              <View style={styles.emojiPicker}>
-                <View style={styles.emojiGrid}>
-                  {EMOJI_LIST.map((em, i) => (
-                    <TouchableOpacity key={i} style={styles.emojiBtn}
-                      onPress={() => { insertAtCursor(em); setEmojiPickerVisible(false); }}>
-                      <Text style={styles.emojiText}>{em}</Text>
-                    </TouchableOpacity>
-                  ))}
+            </View> {/* end toolbarDock */}
+
+          </View> {/* end flex:1 container */}
+
+          {/* ── Link insert sheet ── */}
+          <Modal
+            visible={linkModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setLinkModalVisible(false)}
+          >
+            <Pressable style={styles.linkOverlay} onPress={() => setLinkModalVisible(false)}>
+              <Pressable style={styles.linkSheet} onPress={e => e.stopPropagation()}>
+                <Text style={styles.linkSheetTitle}>Insert Link</Text>
+                <TextInput
+                  style={styles.linkInput}
+                  placeholder="Display text (optional)"
+                  placeholderTextColor="#aaa"
+                  value={linkText}
+                  onChangeText={setLinkText}
+                />
+                <TextInput
+                  style={styles.linkInput}
+                  placeholder="https://..."
+                  placeholderTextColor="#aaa"
+                  value={linkUrl}
+                  onChangeText={setLinkUrl}
+                  keyboardType="url"
+                  autoCapitalize="none"
+                />
+                <View style={styles.linkActions}>
+                  <TouchableOpacity style={styles.linkCancel} onPress={() => setLinkModalVisible(false)}>
+                    <Text style={{ color: '#888', fontWeight: '600' }}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.linkConfirm} onPress={() => {
+                    if (!linkUrl.trim()) { Alert.alert('URL required', 'Please enter a URL.'); return; }
+                    const display = linkText.trim() || linkUrl.trim();
+                    insertAtCursor(`[${display}](${linkUrl.trim()})`);
+                    setLinkModalVisible(false);
+                  }}>
+                    <Text style={{ color: '#fff', fontWeight: '700' }}>Insert</Text>
+                  </TouchableOpacity>
                 </View>
-              </View>
-            )}
-
-            {/* Bottom formatting bar */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={[styles.editorBottomBar, { backgroundColor: edCardColor }]}
-              contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 }}
-              keyboardShouldPersistTaps="handled"
-            >
-              {/* Aa — text format */}
-              <TouchableOpacity style={styles.editorBarBtn}
-                onPress={() => { setFormatPopoverVisible(v => !v); setEmojiPickerVisible(false); }}>
-                <MaterialCommunityIcons name="format-font" size={21}
-                  color={formatPopoverVisible ? '#4A90D9' : '#555'} />
-              </TouchableOpacity>
-              {/* Checkbox */}
-              <TouchableOpacity style={styles.editorBarBtn}
-                onPress={() => insertLinePrefix('☐ ')}>
-                <MaterialCommunityIcons name="checkbox-marked-outline" size={21} color="#555" />
-              </TouchableOpacity>
-              {/* Mic */}
-              <TouchableOpacity style={styles.editorBarBtn} onPress={() => {
-                bodyRef.current?.focus();
-                Alert.alert('Voice Input', 'Tap the microphone on your keyboard to dictate.');
-              }}>
-                <Ionicons name="mic-outline" size={21} color="#555" />
-              </TouchableOpacity>
-              {/* Highlight / brush */}
-              <TouchableOpacity style={styles.editorBarBtn} onPress={() => wrapText('==', '==')}>
-                <Ionicons name="brush-outline" size={21} color="#555" />
-              </TouchableOpacity>
-              {/* Image */}
-              <TouchableOpacity style={styles.editorBarBtn} onPress={pickAndInsertImage}>
-                <Ionicons name="image-outline" size={21} color="#555" />
-              </TouchableOpacity>
-              {/* Emoji */}
-              <TouchableOpacity style={styles.editorBarBtn}
-                onPress={() => { setEmojiPickerVisible(v => !v); setFormatPopoverVisible(false); }}>
-                <Ionicons name="happy-outline" size={21}
-                  color={emojiPickerVisible ? '#4A90D9' : '#555'} />
-              </TouchableOpacity>
-              {/* Strikethrough */}
-              <TouchableOpacity style={styles.editorBarBtn} onPress={() => wrapText('~~', '~~')}>
-                <MaterialCommunityIcons name="format-strikethrough" size={21} color="#555" />
-              </TouchableOpacity>
-              {/* Bullet list */}
-              <TouchableOpacity style={styles.editorBarBtn} onPress={() => insertLinePrefix('• ')}>
-                <Ionicons name="list-outline" size={21} color="#555" />
-              </TouchableOpacity>
-              {/* Numbered list */}
-              <TouchableOpacity style={styles.editorBarBtn} onPress={() => insertLinePrefix('1. ')}>
-                <MaterialCommunityIcons name="format-list-numbered" size={21} color="#555" />
-              </TouchableOpacity>
-              {/* Link */}
-              <TouchableOpacity style={styles.editorBarBtn}
-                onPress={() => { setLinkText(''); setLinkUrl(''); setLinkModalVisible(true); }}>
-                <Ionicons name="link-outline" size={21} color="#555" />
-              </TouchableOpacity>
-            </ScrollView>
-
-            {/* ── Link insert sheet ── */}
-            <Modal
-              visible={linkModalVisible}
-              transparent
-              animationType="fade"
-              onRequestClose={() => setLinkModalVisible(false)}
-            >
-              <Pressable style={styles.linkOverlay} onPress={() => setLinkModalVisible(false)}>
-                <Pressable style={styles.linkSheet} onPress={e => e.stopPropagation()}>
-                  <Text style={styles.linkSheetTitle}>Insert Link</Text>
-                  <TextInput
-                    style={styles.linkInput}
-                    placeholder="Display text (optional)"
-                    placeholderTextColor="#aaa"
-                    value={linkText}
-                    onChangeText={setLinkText}
-                  />
-                  <TextInput
-                    style={styles.linkInput}
-                    placeholder="https://..."
-                    placeholderTextColor="#aaa"
-                    value={linkUrl}
-                    onChangeText={setLinkUrl}
-                    keyboardType="url"
-                    autoCapitalize="none"
-                  />
-                  <View style={styles.linkActions}>
-                    <TouchableOpacity style={styles.linkCancel} onPress={() => setLinkModalVisible(false)}>
-                      <Text style={{ color: '#888', fontWeight: '600' }}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.linkConfirm} onPress={() => {
-                      if (!linkUrl.trim()) { Alert.alert('URL required', 'Please enter a URL.'); return; }
-                      const display = linkText.trim() || linkUrl.trim();
-                      insertAtCursor(`[${display}](${linkUrl.trim()})`);
-                      setLinkModalVisible(false);
-                    }}>
-                      <Text style={{ color: '#fff', fontWeight: '700' }}>Insert</Text>
-                    </TouchableOpacity>
-                  </View>
-                </Pressable>
               </Pressable>
-            </Modal>
-          </KeyboardAvoidingView>
+            </Pressable>
+          </Modal>
+
         </SafeAreaView>
       </Modal>
 
@@ -899,8 +884,7 @@ export default function TasksScreen({ navigation }: any) {
             <View style={[styles.manageCatRow, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
               <MaterialCommunityIcons name="drag" size={20} color={theme.textDim} style={{ marginRight: 12 }} />
               <Text style={[styles.manageCatName, { color: theme.text }]}>
-                All
-                <Text style={[styles.manageCatCount, { color: theme.textDim }]}> ({notes.length})</Text>
+                {`All (${notes.length})`}
               </Text>
             </View>
 
@@ -910,8 +894,7 @@ export default function TasksScreen({ navigation }: any) {
                 <View key={cat} style={[styles.manageCatRow, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
                   <MaterialCommunityIcons name="drag" size={20} color={theme.textDim} style={{ marginRight: 12 }} />
                   <Text style={[styles.manageCatName, { color: theme.text }]}>
-                    {cat}
-                    <Text style={[styles.manageCatCount, { color: theme.textDim }]}> ({count})</Text>
+                    {`${cat} (${count})`}
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginLeft: 'auto' }}>
                     <Ionicons name="lock-open-outline" size={18} color={theme.textDim} />
@@ -1162,6 +1145,12 @@ const styles = StyleSheet.create({
   },
   addTagConfirmText: { fontSize: 14, color: '#fff', fontWeight: '700' },
 
+  // ── Toolbar dock — sits at bottom of the flex column (pan mode shifts window up automatically)
+  toolbarDock: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.07)',
+  },
+
   // ── Bottom editor bar
   editorBottomBar: {
     paddingVertical: 10,
@@ -1271,11 +1260,8 @@ const styles = StyleSheet.create({
 
   // ── Format popover (bold / italic / headings)
   formatPopover: {
-    flexDirection: 'row',
     backgroundColor: '#fff',
     borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
     marginHorizontal: 12,
     marginBottom: 4,
     borderWidth: 1,
@@ -1284,7 +1270,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 6,
     elevation: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     gap: 6,
+  },
+  formatRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 8,
   },
   formatBtn: {
     flex: 1,
@@ -1294,6 +1287,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#F2F2F7',
   },
   formatBtnText: { fontSize: 15, color: '#222' },
+
+  // ── Font family picker row
+  fontRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 2,
+  },
+  fontChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#F2F2F7',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  fontChipActive: {
+    backgroundColor: '#E6F0FB',
+    borderColor: BLUE,
+  },
+  fontChipText: { fontSize: 13, color: '#444' },
+  fontChipTextActive: { color: BLUE, fontWeight: '700' },
 
   // ── Emoji picker
   emojiPicker: {
