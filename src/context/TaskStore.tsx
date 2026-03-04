@@ -6,29 +6,9 @@ import {
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '../config/firebase';
 import { Storage, KEYS } from '../services/StorageService';
+import type { Note, NoteTag, ChecklistItem } from '@/types/note';
 
-// ─── Types ──────────────────────────────────────────────────────────────────
-export interface NoteTag { label: string; color: string; }
-
-export interface ChecklistItem {
-  id: string;
-  text: string;
-  done: boolean;
-}
-
-export interface Note {
-  id: string;
-  title: string;
-  body: string;
-  date: string;
-  timestamp: number;
-  category: string;
-  cardColor: string;
-  tags: NoteTag[];
-  todos?: ChecklistItem[];
-  images?: string[];
-  fontFamily?: string;
-}
+export type { Note, NoteTag, ChecklistItem };
 
 const DEFAULT_CATEGORIES = ['Personal', 'Work', 'School', 'Health', 'Finance'];
 

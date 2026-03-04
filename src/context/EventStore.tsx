@@ -6,21 +6,9 @@ import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '../config/firebase';
 import { Storage, KEYS } from '../services/StorageService';
 import { scheduleEventNotification, cancelNotification } from '../services/NotificationService';
+import type { AppEvent } from '@/types/event';
 
-export interface AppEvent {
-  id: string;
-  title: string;
-  description: string;
-  startTime: string;
-  startDate: string;
-  endTime: string;
-  location: string;
-  category: string;
-  priority: 'Low' | 'Medium' | 'High';
-  reminders: string[];
-  alarmActive: boolean;
-  recurrence: 'none' | 'daily' | 'weekly' | 'monthly';
-}
+export type { AppEvent };
 
 interface EventContextType {
   events: AppEvent[];

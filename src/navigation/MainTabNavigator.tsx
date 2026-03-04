@@ -2,12 +2,12 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
-import DashboardScreen from '../screens/DashboardScreen';
-import FocusScreen from '../screens/FocusScreen';
-import AlarmScreen from '../screens/AlarmScreen';
-import EventAlarmsScreen from '../screens/EventAlarmsScreen';
-import TasksScreen from '../screens/TasksScreen';
-import { useTheme } from '../context/ThemeContext';
+import DashboardScreen from '@/screens/DashboardScreen';
+import FocusScreen from '@/screens/FocusScreen';
+import AlarmScreen from '@/screens/AlarmScreen';
+import EventAlarmsScreen from '@/screens/EventAlarmsScreen';
+import TasksScreen from '@/screens/TasksScreen';
+import { useTheme } from '@/context/ThemeContext';
 
 const BLUE = '#4A90D9';
 

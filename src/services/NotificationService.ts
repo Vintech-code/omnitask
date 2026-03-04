@@ -1,17 +1,23 @@
 import * as Notifications from 'expo-notifications';
+import { isRunningInExpoGo } from 'expo';
+
+const IS_EXPO_GO = isRunningInExpoGo();
 
 // Show alerts + play sound even when app is foregrounded
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,  
-    shouldShowList: true,   
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+if (!IS_EXPO_GO) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+}
 
 /** Request permission. Returns true if granted. */
 export async function requestNotificationPermission(): Promise<boolean> {
+  if (IS_EXPO_GO) return false;
   const { status: existing } = await Notifications.getPermissionsAsync();
   if (existing === 'granted') return true;
   const { status } = await Notifications.requestPermissionsAsync();

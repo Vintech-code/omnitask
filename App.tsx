@@ -1,102 +1,162 @@
 import 'react-native-gesture-handler';
-import React, { useEffect } from 'react';
-import { ActivityIndicator, View, LogBox } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, LogBox, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 // Suppress Expo Go SDK 53 remote push token warning — local notifications still work
-LogBox.ignoreLogs(['expo-notifications: Android Push notifications']);
+LogBox.ignoreLogs([
+  'expo-notifications: Android Push notifications',
+  '`expo-notifications` functionality is not fully supported in Expo Go',
+  '[expo-av]: Expo AV has been deprecated',
+]);
 import { enableScreens } from 'react-native-screens';
 import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import { StatusBar } from 'expo-status-bar';
-import * as Notifications from 'expo-notifications';
 
-import WelcomeScreen from './src/screens/WelcomeScreen';
-import SignInScreen from './src/screens/SignInScreen';
-import SignUpScreen from './src/screens/SignUpScreen';
-import OnboardingScreen from './src/screens/OnboardingScreen';
-import CreateEventScreen from './src/screens/CreateEventScreen';
-import EventDetailScreen from './src/screens/EventDetailScreen';
-import EventAlarmsScreen from './src/screens/EventAlarmsScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
-import SearchScreen from './src/screens/SearchScreen';
-import StatsScreen from './src/screens/StatsScreen';
-import MainTabNavigator from './src/navigation/MainTabNavigator';
-
-import { ThemeProvider, useTheme } from './src/context/ThemeContext';
-import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { ThemeProvider } from './src/context/ThemeContext';
+import { AuthProvider } from './src/context/AuthContext';
 import { EventProvider } from './src/context/EventStore';
 import { TaskProvider } from './src/context/TaskStore';
 import { AlarmProvider } from './src/context/AlarmStore';
-
-import { requestNotificationPermission } from './src/services/NotificationService';
-
-const Stack = createStackNavigator();
+import RootNavigator from './src/navigation/RootNavigator';
+import { cancelNativeAlarm, getNextTimeMillis, requestAlarmPermissions, scheduleNativeAlarm } from './src/native/AlarmModule';
 
 enableScreens();
 
-function AppNavigator() {
-  const { isDark } = useTheme();
-  const { user, isLoading } = useAuth();
+function AlarmDemoPanel() {
+  const [hourText, setHourText] = useState('07');
+  const [minuteText, setMinuteText] = useState('30');
+  const [alarmIdText, setAlarmIdText] = useState('1001');
 
-  // Request notification permission on first launch
-  useEffect(() => {
-    requestNotificationPermission();
-  }, []);
+  const parsed = useMemo(() => {
+    const hour = Math.max(0, Math.min(23, Number(hourText) || 0));
+    const minute = Math.max(0, Math.min(59, Number(minuteText) || 0));
+    const id = Math.max(1, Number(alarmIdText) || 1);
+    return { hour, minute, id };
+  }, [hourText, minuteText, alarmIdText]);
 
-  // Listen for notification taps
-  useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener(() => {
-      // navigate to relevant screen on tap — handled via deep link in future
-    });
-    return () => sub.remove();
-  }, []);
+  const onRequestPermissions = async () => {
+    try {
+      const ok = await requestAlarmPermissions();
+      Alert.alert(ok ? 'Permissions ready' : 'Permission needed', ok ? 'Alarm permissions are granted.' : 'Please grant exact alarm/notification permissions.');
+    } catch (error: any) {
+      Alert.alert('Permission error', error?.message ?? 'Could not request alarm permissions.');
+    }
+  };
 
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
-        <ActivityIndicator size="large" color="#4A90D9" />
-      </View>
-    );
-  }
+  const onSchedule = async () => {
+    try {
+      const hasPerms = await requestAlarmPermissions();
+      if (!hasPerms) return;
+      const when = getNextTimeMillis(parsed.hour, parsed.minute);
+      await scheduleNativeAlarm({
+        id: parsed.id,
+        timeMillis: when,
+        label: `OmniTask Alarm #${parsed.id}`,
+      });
+      Alert.alert('Alarm scheduled', `ID ${parsed.id} at ${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')}`);
+    } catch (error: any) {
+      Alert.alert('Schedule failed', error?.message ?? 'Unable to schedule alarm.');
+    }
+  };
+
+  const onCancel = async () => {
+    try {
+      await cancelNativeAlarm(parsed.id);
+      Alert.alert('Alarm canceled', `ID ${parsed.id} canceled.`);
+    } catch (error: any) {
+      Alert.alert('Cancel failed', error?.message ?? 'Unable to cancel alarm.');
+    }
+  };
+
+  if (Platform.OS !== 'android') return null;
 
   return (
-    <>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      <Stack.Navigator
-        initialRouteName={user ? 'Main' : 'Welcome'}
-        screenOptions={{ headerShown: false }}
-      >
-        <Stack.Screen name="Welcome"    component={WelcomeScreen} />
-        <Stack.Screen name="SignIn"     component={SignInScreen} />
-        <Stack.Screen name="SignUp"     component={SignUpScreen} />
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        <Stack.Screen name="Main"       component={MainTabNavigator} />
-        <Stack.Screen name="CreateEvent"  component={CreateEventScreen} />
-        <Stack.Screen name="EventDetail"  component={EventDetailScreen} />
-        <Stack.Screen name="EventAlarms"  component={EventAlarmsScreen} />
-        <Stack.Screen name="Profile"      component={ProfileScreen} />
-        <Stack.Screen name="Search"       component={SearchScreen} />
-        <Stack.Screen name="Stats"        component={StatsScreen} />
-      </Stack.Navigator>
-    </>
+    <View style={demo.panel}>
+      <Text style={demo.title}>Native Alarm Test</Text>
+      <View style={demo.row}>
+        <TextInput style={demo.input} value={hourText} onChangeText={setHourText} keyboardType="number-pad" placeholder="HH" placeholderTextColor="#888" maxLength={2} />
+        <Text style={demo.colon}>:</Text>
+        <TextInput style={demo.input} value={minuteText} onChangeText={setMinuteText} keyboardType="number-pad" placeholder="MM" placeholderTextColor="#888" maxLength={2} />
+      </View>
+      <TextInput style={demo.idInput} value={alarmIdText} onChangeText={setAlarmIdText} keyboardType="number-pad" placeholder="Alarm ID" placeholderTextColor="#888" />
+
+      <TouchableOpacity style={[demo.btn, demo.btnLight]} onPress={onRequestPermissions}>
+        <Text style={[demo.btnText, demo.btnTextDark]}>Request Permissions</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[demo.btn, demo.btnPrimary]} onPress={onSchedule}>
+        <Text style={demo.btnText}>Schedule Alarm</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[demo.btn, demo.btnDanger]} onPress={onCancel}>
+        <Text style={demo.btnText}>Cancel Alarm</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <TaskProvider>
-          <AlarmProvider>
-            <EventProvider>
-              <NavigationContainer>
-                <AppNavigator />
-              </NavigationContainer>
-            </EventProvider>
-          </AlarmProvider>
-        </TaskProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <View style={{ flex: 1 }}>
+      <ThemeProvider>
+        <AuthProvider>
+          <TaskProvider>
+            <AlarmProvider>
+              <EventProvider>
+                <NavigationContainer>
+                  <RootNavigator />
+                </NavigationContainer>
+              </EventProvider>
+            </AlarmProvider>
+          </TaskProvider>
+        </AuthProvider>
+      </ThemeProvider>
+      {__DEV__ && <AlarmDemoPanel />}
+    </View>
   );
 }
+
+const demo = StyleSheet.create({
+  panel: {
+    position: 'absolute',
+    right: 12,
+    bottom: 20,
+    width: 230,
+    backgroundColor: '#111',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  title: { color: '#fff', fontWeight: '700', marginBottom: 8, fontSize: 13 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  input: {
+    width: 54,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#444',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  colon: { color: '#fff', marginHorizontal: 8, fontSize: 18, fontWeight: '700' },
+  idInput: {
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#444',
+    color: '#fff',
+    paddingHorizontal: 10,
+    marginBottom: 8,
+  },
+  btn: {
+    height: 34,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  btnPrimary: { backgroundColor: '#2D7FF9' },
+  btnDanger: { backgroundColor: '#D94848' },
+  btnLight: { backgroundColor: '#E5E7EB' },
+  btnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  btnTextDark: { color: '#111' },
+});
 
