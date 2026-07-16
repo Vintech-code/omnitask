@@ -1,16 +1,20 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { Alert, AppState, Platform } from 'react-native';
 import {
-  collection, doc, setDoc, deleteDoc, onSnapshot, QuerySnapshot,
+  collection, onSnapshot, QuerySnapshot,
 } from 'firebase/firestore';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
 import { auth, db } from '../config/firebase';
 import { Storage, KEYS } from '../services/StorageService';
+import { flushCloudMutations, getPendingDeletePaths, queueCloudDelete, queueCloudSet } from '../services/OfflineSyncService';
 import {
-  scheduleAlarmNotification,
-  cancelNotification,
+  cancelAlarmNotifications,
+  openExactAlarmSettings,
+  reconcileAlarmNotifications,
+  scheduleAlarmNotifications,
 } from '../services/NotificationService';
 
-// ─── Types ──────────────────────────────────────────────────────────────────
 export type Period = 'AM' | 'PM';
 
 export interface Alarm {
@@ -25,128 +29,230 @@ export interface Alarm {
   skipHolidays: boolean;
   vibrate: boolean;
   active: boolean;
+  scheduledFor?: number;
+  updatedAt?: number;
 }
 
-const SEED_ALARMS: Alarm[] = [
-  {
-    id: '1', hour: 7, minute: 0, period: 'AM', label: 'Morning Workout',
-    sound: 'Alarm', days: [false, true, true, true, true, true, false],
-    snooze: 5, skipHolidays: false, vibrate: true, active: true,
-  },
-  {
-    id: '2', hour: 8, minute: 30, period: 'AM', label: 'Weekend Wakeup',
-    sound: 'Early Riser', days: [true, false, false, false, false, false, true],
-    snooze: 10, skipHolidays: false, vibrate: false, active: false,
-  },
-  {
-    id: '3', hour: 10, minute: 15, period: 'PM', label: 'Prep for Bed',
-    sound: 'Default alarm sound', days: [true, true, true, true, true, true, true],
-    snooze: 5, skipHolidays: false, vibrate: true, active: true,
-  },
-];
-
-// ─── Context type ────────────────────────────────────────────────────────────
 interface AlarmContextType {
   alarms: Alarm[];
   isLoading: boolean;
-  addAlarm: (alarm: Alarm) => void;
-  updateAlarm: (alarm: Alarm) => void;
-  removeAlarm: (id: string) => void;
-  toggleAlarm: (id: string) => void;
+  addAlarm: (alarm: Alarm) => Promise<void>;
+  updateAlarm: (alarm: Alarm) => Promise<void>;
+  removeAlarm: (id: string) => Promise<void>;
+  toggleAlarm: (id: string) => Promise<void>;
 }
 
 const AlarmContext = createContext<AlarmContextType>({
   alarms: [],
   isLoading: true,
-  addAlarm: () => {},
-  updateAlarm: () => {},
-  removeAlarm: () => {},
-  toggleAlarm: () => {},
+  addAlarm: async () => {},
+  updateAlarm: async () => {},
+  removeAlarm: async () => {},
+  toggleAlarm: async () => {},
 });
 
-// ─── Firestore helpers ──────────────────────────────────────────────────────
-const alarmDoc  = (uid: string, id: string) => doc(db, 'users', uid, 'alarms', id);
 const alarmsCol = (uid: string) => collection(db, 'users', uid, 'alarms');
 
-// ─── Provider ────────────────────────────────────────────────────────────────
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'Unable to schedule this alarm.';
+}
+
+function isFirestorePermissionError(error: unknown) {
+  return error instanceof FirebaseError && error.code === 'permission-denied'
+    || error instanceof Error && /missing or insufficient permissions/i.test(error.message);
+}
+
+function deactivateExpiredOneTimeAlarms(alarms: Alarm[]) {
+  const now = Date.now();
+  let changed = false;
+  const normalized = alarms.map(alarm => {
+    const oneTime = !alarm.days.some(Boolean);
+    if (alarm.active && oneTime && alarm.scheduledFor && alarm.scheduledFor <= now) {
+      changed = true;
+      return { ...alarm, active: false };
+    }
+    return alarm;
+  });
+  return { normalized, changed };
+}
+
 export const AlarmProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [alarms, setAlarms]       = useState<Alarm[]>([]);
+  const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const uidRef   = useRef<string | null>(null);
+  const alarmsRef = useRef<Alarm[]>([]);
+  const uidRef = useRef<string | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
+  const hydratedRef = useRef(false);
+  const cloudSyncBlockedRef = useRef(false);
+
+  const handleCloudError = (context: string, error: unknown) => {
+    if (isFirestorePermissionError(error)) {
+      cloudSyncBlockedRef.current = true;
+      unsubRef.current?.();
+      unsubRef.current = null;
+      return;
+    }
+    console.warn(context, errorMessage(error));
+  };
+
+  const persist = (updated: Alarm[]) => {
+    alarmsRef.current = updated;
+    setAlarms(updated);
+    if (uidRef.current) void Storage.setForUser(KEYS.ALARMS, uidRef.current, updated);
+  };
+
+  const maybeOfferExactAlarmAccess = async () => {
+    if (Platform.OS !== 'android' || Platform.Version < 31) return;
+    const prompted = await Storage.get<boolean>(KEYS.EXACT_ALARM_PROMPTED);
+    if (prompted) return;
+    await Storage.set(KEYS.EXACT_ALARM_PROMPTED, true);
+
+    Alert.alert(
+      'Allow precise alarms',
+      'Android requires Alarms & reminders access to deliver alarms at the exact minute, including while the phone is idle.',
+      [
+        { text: 'Not now', style: 'cancel' },
+        {
+          text: 'Open settings',
+          onPress: () => {
+            openExactAlarmSettings()
+              .then(() => reconcileAlarmNotifications(alarmsRef.current))
+              .catch(error => Alert.alert('Settings unavailable', errorMessage(error)));
+          },
+        },
+      ],
+    );
+  };
 
   useEffect(() => {
-    // Hydrate from local cache first
-    Storage.get<Alarm[]>(KEYS.ALARMS).then(stored => {
-      setAlarms(stored ?? SEED_ALARMS);
-      setIsLoading(false);
-    });
+    let disposed = false;
 
-    const unsubAuth = onAuthStateChanged(auth, (fbUser: FirebaseUser | null) => {
-      if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
-      if (!fbUser) { uidRef.current = null; return; }
+    const unsubAuth = onAuthStateChanged(auth, async (fbUser: FirebaseUser | null) => {
+      unsubRef.current?.();
+      unsubRef.current = null;
+      if (!fbUser) {
+        uidRef.current = null;
+        cloudSyncBlockedRef.current = false;
+        alarmsRef.current = [];
+        setAlarms([]);
+        setIsLoading(false);
+        return;
+      }
       uidRef.current = fbUser.uid;
-
+      cloudSyncBlockedRef.current = false;
+      const stored = await Storage.getForUser<Alarm[]>(KEYS.ALARMS, fbUser.uid) ?? [];
+      if (disposed || uidRef.current !== fbUser.uid) return;
+      const { normalized: hydrated } = deactivateExpiredOneTimeAlarms(stored);
+      persist(hydrated);
+      hydratedRef.current = true;
+      setIsLoading(false);
+      if (hydrated.some(alarm => alarm.active)) {
+        void reconcileAlarmNotifications(hydrated).catch(error =>
+          console.warn('Alarm reconciliation failed:', errorMessage(error))
+        );
+      }
+      void flushCloudMutations(fbUser.uid);
       unsubRef.current = onSnapshot(
         alarmsCol(fbUser.uid),
-        (snap: QuerySnapshot) => {
-          const fetched: Alarm[] = snap.docs.map(d => d.data() as Alarm);
-          if (fetched.length > 0) {
-            setAlarms(fetched);
-            Storage.set(KEYS.ALARMS, fetched);
+        async (snap: QuerySnapshot) => {
+          if (uidRef.current !== fbUser.uid) return;
+          const pendingDeletes = await getPendingDeletePaths(fbUser.uid);
+          const fetchedRaw = snap.docs
+            .map(document => document.data() as Alarm)
+            .filter(alarm => !pendingDeletes.has(`users/${fbUser.uid}/alarms/${alarm.id}`));
+          const merged = new Map(fetchedRaw.map(alarm => [alarm.id, alarm]));
+          for (const local of alarmsRef.current) {
+            const remote = merged.get(local.id);
+            if (!remote || (local.updatedAt ?? 0) > (remote.updatedAt ?? 0)) {
+              merged.set(local.id, local);
+              void queueCloudSet(fbUser.uid, ['users', fbUser.uid, 'alarms', local.id], local as unknown as Record<string, unknown>);
+            }
           }
+          const { normalized: fetched } = deactivateExpiredOneTimeAlarms([...merged.values()]);
+          persist(fetched);
+          void reconcileAlarmNotifications(fetched).catch(error =>
+            console.warn('Cloud alarm reconciliation failed:', errorMessage(error))
+          );
         },
-        () => {}
+        error => handleCloudError('Alarm sync failed:', error),
+      );
+    });
+
+    const appStateSubscription = AppState.addEventListener('change', state => {
+      if (state !== 'active' || !hydratedRef.current) return;
+      const { normalized, changed } = deactivateExpiredOneTimeAlarms(alarmsRef.current);
+      if (changed) persist(normalized);
+      if (uidRef.current) void flushCloudMutations(uidRef.current);
+      const active = normalized.filter(alarm => alarm.active);
+      if (active.length === 0) return;
+      reconcileAlarmNotifications(normalized).catch(error =>
+        console.warn('Foreground alarm reconciliation failed:', errorMessage(error))
       );
     });
 
     return () => {
+      disposed = true;
       unsubAuth();
-      if (unsubRef.current) unsubRef.current();
+      unsubRef.current?.();
+      appStateSubscription.remove();
     };
   }, []);
 
-  const persist = (updated: Alarm[]) => {
-    setAlarms(updated);
-    Storage.set(KEYS.ALARMS, updated);
-  };
-
-  const addAlarm = (alarm: Alarm) => {
-    persist([...alarms, alarm]);
-    if (uidRef.current) setDoc(alarmDoc(uidRef.current, alarm.id), alarm).catch(() => {});
-    if (alarm.active) {
-      scheduleAlarmNotification(alarm.id, alarm.label, alarm.hour, alarm.minute, alarm.period);
-    }
-  };
-
-  const updateAlarm = (alarm: Alarm) => {
-    persist(alarms.map(a => a.id === alarm.id ? alarm : a));
-    if (uidRef.current) setDoc(alarmDoc(uidRef.current, alarm.id), alarm).catch(() => {});
-    cancelNotification(`alarm_${alarm.id}`);
-    if (alarm.active) {
-      scheduleAlarmNotification(alarm.id, alarm.label, alarm.hour, alarm.minute, alarm.period);
-    }
-  };
-
-  const removeAlarm = (id: string) => {
-    persist(alarms.filter(a => a.id !== id));
-    if (uidRef.current) deleteDoc(alarmDoc(uidRef.current, id)).catch(() => {});
-    cancelNotification(`alarm_${id}`);
-  };
-
-  const toggleAlarm = (id: string) => {
-    const updated = alarms.map(a => {
-      if (a.id !== id) return a;
-      const toggled = { ...a, active: !a.active };
-      if (uidRef.current) setDoc(alarmDoc(uidRef.current, id), toggled).catch(() => {});
-      if (toggled.active) {
-        scheduleAlarmNotification(toggled.id, toggled.label, toggled.hour, toggled.minute, toggled.period);
-      } else {
-        cancelNotification(`alarm_${id}`);
-      }
-      return toggled;
-    });
+  const addAlarm = async (alarm: Alarm) => {
+    const saved = { ...alarm, updatedAt: Date.now() };
+    if (saved.active) await scheduleAlarmNotifications(saved);
+    const updated = [...alarmsRef.current, saved];
     persist(updated);
+    if (uidRef.current) {
+      void queueCloudSet(uidRef.current, ['users', uidRef.current, 'alarms', saved.id], saved as unknown as Record<string, unknown>);
+    }
+    if (saved.active) void maybeOfferExactAlarmAccess();
+  };
+
+  const updateAlarm = async (alarm: Alarm) => {
+    const saved = { ...alarm, updatedAt: Date.now() };
+    const previous = alarmsRef.current.find(item => item.id === alarm.id);
+    try {
+      if (saved.active) await scheduleAlarmNotifications(saved);
+      else await cancelAlarmNotifications(saved.id);
+    } catch (error) {
+      if (previous?.active) {
+        scheduleAlarmNotifications(previous).catch(restoreError =>
+          console.warn('Unable to restore previous alarm:', errorMessage(restoreError))
+        );
+      }
+      throw error;
+    }
+
+    const updated = alarmsRef.current.map(item => item.id === saved.id ? saved : item);
+    persist(updated);
+    if (uidRef.current) {
+      void queueCloudSet(uidRef.current, ['users', uidRef.current, 'alarms', saved.id], saved as unknown as Record<string, unknown>);
+    }
+    if (saved.active) void maybeOfferExactAlarmAccess();
+  };
+
+  const removeAlarm = async (id: string) => {
+    await cancelAlarmNotifications(id);
+    persist(alarmsRef.current.filter(alarm => alarm.id !== id));
+    if (uidRef.current) {
+      void queueCloudDelete(uidRef.current, ['users', uidRef.current, 'alarms', id]);
+    }
+  };
+
+  const toggleAlarm = async (id: string) => {
+    const current = alarmsRef.current.find(alarm => alarm.id === id);
+    if (!current) return;
+    const toggled = { ...current, active: !current.active, updatedAt: Date.now() };
+    if (toggled.active) await scheduleAlarmNotifications(toggled);
+    else await cancelAlarmNotifications(id);
+
+    const updated = alarmsRef.current.map(alarm => alarm.id === id ? toggled : alarm);
+    persist(updated);
+    if (uidRef.current) {
+      void queueCloudSet(uidRef.current, ['users', uidRef.current, 'alarms', id], toggled as unknown as Record<string, unknown>);
+    }
+    if (toggled.active) void maybeOfferExactAlarmAccess();
   };
 
   return (

@@ -17,6 +17,8 @@ import { useAuth } from '@/context/AuthContext';
 import { Storage, KEYS } from '@/services/StorageService';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { fs, s } from './styles';
+import { AppBackground } from '@/components/ui';
+import { auth } from '@/config/firebase';
 
 
 const Field = ({
@@ -97,7 +99,9 @@ export default function SignUpScreen({ navigation }: any) {
     try {
       setLoading(true);
       await signUp(name.trim(), email.trim(), password);
-      if (profilePhoto) await Storage.set(KEYS.PROFILE_PHOTO, profilePhoto);
+      if (profilePhoto && auth.currentUser) {
+        await Storage.setForUser(KEYS.PROFILE_PHOTO, auth.currentUser.uid, profilePhoto);
+      }
       navigation.replace('Onboarding');
     } catch (e) {
       Alert.alert('Sign Up Failed', 'Unable to create your account. Please try again.');
@@ -108,6 +112,7 @@ export default function SignUpScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={s.safe}>
+      <AppBackground />
       {/* Header bar */}
       <View style={s.headerBar}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>

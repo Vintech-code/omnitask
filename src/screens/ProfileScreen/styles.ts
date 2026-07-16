@@ -31,19 +31,19 @@ export const epStyles = StyleSheet.create({
 
 export const makeStyles = (t: ReturnType<typeof useTheme>['theme']) =>
   StyleSheet.create({
-    safe: { flex: 1, backgroundColor: t.bg2 },
+    safe: { flex: 1, backgroundColor: 'transparent' },
     header: {
       flexDirection: 'row', alignItems: 'center',
-      paddingHorizontal: 14, paddingVertical: 13,
-      backgroundColor: t.bg, borderBottomWidth: 1, borderBottomColor: t.border,
+      paddingHorizontal: 20, paddingVertical: 14,
+      backgroundColor: 'transparent', borderBottomWidth: 0,
     },
     backBtn: { padding: 4 },
-    headerTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: t.text, textAlign: 'center' },
+    headerTitle: { flex: 1, fontSize: 26, fontWeight: '700', color: t.text, textAlign: 'left', marginLeft: 12, letterSpacing: -0.4 },
 
     avatarCard: {
       flexDirection: 'row', alignItems: 'center',
-      margin: 16, padding: 18,
-      backgroundColor: t.card, borderRadius: 18,
+      marginHorizontal: 20, marginVertical: 12, padding: 20,
+      backgroundColor: t.glass.primary, borderRadius: 26,
       borderWidth: 1, borderColor: t.border,
     },
     avatarCircle: {
@@ -68,19 +68,19 @@ export const makeStyles = (t: ReturnType<typeof useTheme>['theme']) =>
     editBtnText: { fontSize: 13, color: BLUE, fontWeight: '700' },
 
     section: {
-      marginHorizontal: 16, marginBottom: 8,
-      backgroundColor: t.card, borderRadius: 18,
+      marginHorizontal: 20, marginBottom: 8,
+      backgroundColor: t.glass.primary, borderRadius: 24,
       borderWidth: 1, borderColor: t.border, overflow: 'hidden',
     },
     row: {
       flexDirection: 'row', alignItems: 'center',
       paddingHorizontal: 16, paddingVertical: 15,
-      borderTopWidth: 1, borderTopColor: t.border,
+      borderTopWidth: 1, borderTopColor: t.divider,
     },
     rowFirst: { borderTopWidth: 0 },
     rowLast: {},
     rowIcon: {
-      width: 36, height: 36, borderRadius: 10,
+      width: 40, height: 40, borderRadius: 20,
       backgroundColor: `${BLUE}18`,
       alignItems: 'center', justifyContent: 'center',
       marginRight: 13,

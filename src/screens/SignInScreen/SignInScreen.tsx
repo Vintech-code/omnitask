@@ -14,6 +14,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { s } from './styles';
+import { AppBackground } from '@/components/ui';
 
 
 export default function SignInScreen({ navigation }: any) {
@@ -21,7 +22,6 @@ export default function SignInScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSignIn = async () => {
@@ -64,6 +64,7 @@ export default function SignInScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={s.safe}>
+      <AppBackground />
       {/* Header bar */}
       <View style={s.headerBar}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
@@ -120,14 +121,6 @@ export default function SignInScreen({ navigation }: any) {
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Remember me */}
-        <TouchableOpacity style={s.rememberRow} onPress={() => setRemember(!remember)} activeOpacity={0.8}>
-          <View style={[s.checkbox, remember && s.checkboxChecked]}>
-            {remember && <Ionicons name="checkmark" size={13} color="#fff" />}
-          </View>
-          <Text style={s.rememberText}>Remember this device</Text>
-        </TouchableOpacity>
 
         {/* Sign In button */}
         <TouchableOpacity style={s.btnPrimary} onPress={handleSignIn} activeOpacity={0.85} disabled={loading}>

@@ -18,7 +18,14 @@ export function NoteCard({ note, onPress, onDelete }: Props) {
 
   return (
     <TouchableOpacity
-      style={[styles.noteCard, { backgroundColor: note.cardColor }]}
+      style={[
+        styles.noteCard,
+        {
+          backgroundColor: theme.glass.solid,
+          borderColor: theme.glass.border,
+          borderLeftColor: note.cardColor,
+        },
+      ]}
       onPress={() => onPress(note)}
       onLongPress={() => {
         if (!note.id.startsWith('ev-')) {

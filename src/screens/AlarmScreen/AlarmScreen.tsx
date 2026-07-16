@@ -19,35 +19,18 @@ import { useTheme } from '@/context/ThemeContext';
 import { BurgerMenu } from '@/components/BurgerMenu';
 import { useAlarmStore, Alarm, Period } from '@/context/AlarmStore';
 import * as Haptics from 'expo-haptics';
-import { Audio } from 'expo-av';
+import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as DocumentPicker from 'expo-document-picker';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { styles } from './styles';
+import { AppBackground, ScreenSkeleton } from '@/components/ui';
+import { ALARM_SOUNDS } from '@/services/AlarmSounds';
 
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-// Built-in sounds mapped to bundled asset files
-const BUILT_IN_SOUNDS: { label: string; file: any }[] = [
-  { label: 'Silent',                  file: null },
-  { label: 'Marimba Ringtone',        file: require('../../../assets/sounds/mixkit-marimba-ringtone-1359.wav') },
-  { label: 'Marimba Waiting',         file: require('../../../assets/sounds/mixkit-marimba-waiting-ringtone-1360.wav') },
-  { label: 'Waiting Ringtone',        file: require('../../../assets/sounds/mixkit-waiting-ringtone-1354.wav') },
-  { label: 'On Hold Ringtone',        file: require('../../../assets/sounds/mixkit-on-hold-ringtone-1361.wav') },
-  { label: 'Funky Triplets',          file: require('../../../assets/sounds/mixkit-funky-triplets-1141.mp3') },
-  { label: 'Gimme That Groove',       file: require('../../../assets/sounds/mixkit-gimme-that-groove-872.mp3') },
-  { label: 'Dirty Thinkin',           file: require('../../../assets/sounds/mixkit-dirty-thinkin-989.mp3') },
-  { label: 'Love',                    file: require('../../../assets/sounds/mixkit-love-787.mp3') },
-  { label: 'Sounds Good',             file: require('../../../assets/sounds/mixkit-sounds-good-1077.mp3') },
-  { label: 'Little Birds',            file: require('../../../assets/sounds/mixkit-little-birds-singing-in-the-trees-17.wav') },
-  { label: 'Rooster Crowing',         file: require('../../../assets/sounds/mixkit-rooster-crowing-in-the-morning-2462.wav') },
-  { label: 'Cow Moo',                 file: require('../../../assets/sounds/mixkit-cow-moo-in-the-barn-1751.wav') },
-  { label: 'Barking Dogs',            file: require('../../../assets/sounds/mixkit-horde-of-barking-dogs-60.wav') },
-  { label: 'Cheers & Applause',       file: require('../../../assets/sounds/mixkit-small-group-cheer-and-applause-518.wav') },
-  { label: 'Man Coughing',            file: require('../../../assets/sounds/mixkit-young-man-coughing-2227.wav') },
-];
-
-const SOUNDS = BUILT_IN_SOUNDS.map(s => s.label);
+const BUILT_IN_SOUNDS = ALARM_SOUNDS.map(sound => ({ label: sound.label, file: sound.asset }));
+const SOUNDS = ALARM_SOUNDS.map(sound => sound.label);
 const SNOOZE_OPTIONS = [5, 10, 15, 20, 25, 30];
 const HOURS_LIST   = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
 const MINUTES_LIST = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
@@ -231,14 +214,21 @@ export default function AlarmScreen({ navigation }: any) {
   const { theme } = useTheme();
 
   // -- Sound preview ref
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<AudioPlayer | null>(null);
+  const previewListenerRef = useRef<{ remove: () => void } | null>(null);
   const [previewingSound, setPreviewingSound] = useState<string | null>(null);
   // Custom sounds added by user { label, uri }
   const [customSounds, setCustomSounds] = useState<{ label: string; uri: string }[]>([]);
 
   const stopPreview = async () => {
+    previewListenerRef.current?.remove();
+    previewListenerRef.current = null;
     if (soundRef.current) {
-      try { await soundRef.current.stopAsync(); await soundRef.current.unloadAsync(); } catch {}
+      try {
+        soundRef.current.pause();
+        await soundRef.current.seekTo(0);
+        soundRef.current.remove();
+      } catch {}
       soundRef.current = null;
     }
     setPreviewingSound(null);
@@ -252,16 +242,22 @@ export default function AlarmScreen({ navigation }: any) {
     const source = custom ? { uri: custom.uri } : builtIn?.file ?? null;
     if (!source) return; // Silent
     try {
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-      const { sound } = await Audio.Sound.createAsync(source, { shouldPlay: true });
+      await setAudioModeAsync({ playsInSilentMode: true });
+      const sound = createAudioPlayer(source, {
+        keepAudioSessionActive: true,
+      });
       soundRef.current = sound;
       setPreviewingSound(soundLabel);
-      sound.setOnPlaybackStatusUpdate(status => {
-        if (status.isLoaded && status.didJustFinish) {
-          setPreviewingSound(null);
+      previewListenerRef.current = sound.addListener('playbackStatusUpdate', status => {
+        if (status.didJustFinish) {
+          previewListenerRef.current?.remove();
+          previewListenerRef.current = null;
+          sound.remove();
           soundRef.current = null;
+          setPreviewingSound(null);
         }
       });
+      sound.play();
     } catch { /* can't preview */ }
   };
 
@@ -296,7 +292,7 @@ export default function AlarmScreen({ navigation }: any) {
   const [formPeriodIdx, setFormPeriodIdx] = useState(0);
   // settings state
   const [formLabel,        setFormLabel]        = useState('');
-  const [formSound,        setFormSound]        = useState('Default alarm sound');
+  const [formSound,        setFormSound]        = useState('Marimba Ringtone');
   const [formDays,         setFormDays]         = useState<boolean[]>([true,true,true,true,true,true,true]);
   const [formSnooze,       setFormSnooze]       = useState(5);
   const [formSkipHolidays, setFormSkipHolidays] = useState(false);
@@ -309,6 +305,7 @@ export default function AlarmScreen({ navigation }: any) {
   const [soundModal,  setSoundModal]  = useState(false);
   const [labelModal,  setLabelModal]  = useState(false);
   const [tempLabel,   setTempLabel]   = useState('');
+  const [isSavingAlarm, setIsSavingAlarm] = useState(false);
 
   // -- Derived -------------------------------------------------------------
   const activeCount = alarms.filter(a => a.active).length;
@@ -321,20 +318,33 @@ export default function AlarmScreen({ navigation }: any) {
   }, [alarms]);
 
   // -- Handlers ------------------------------------------------------------
-  const toggleAlarm = (id: string) => {
+  const toggleAlarm = async (id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    storeToggleAlarm(id);
+    try {
+      await storeToggleAlarm(id);
+    } catch (error) {
+      Alert.alert('Alarm not scheduled', error instanceof Error ? error.message : 'Please check notification permissions and try again.');
+    }
   };
 
   const confirmDelete = (id: string, label: string) =>
     Alert.alert('Delete Alarm', `Delete "${label}"?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); removeAlarm(id); } },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          removeAlarm(id).catch(error =>
+            Alert.alert('Unable to delete alarm', error instanceof Error ? error.message : 'Please try again.')
+          );
+        },
+      },
     ]);
 
   const duplicateAlarm = (alarm: Alarm) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    addAlarm({ ...alarm, id: Date.now().toString(), label: `${alarm.label} (copy)`, active: false });
+    void addAlarm({ ...alarm, id: Date.now().toString(), label: `${alarm.label} (copy)`, active: false });
   };
 
   const openAlarmMenu = (alarm: Alarm) =>
@@ -352,8 +362,8 @@ export default function AlarmScreen({ navigation }: any) {
     setFormMinuteIdx(0);
     setFormPeriodIdx(0);      // AM
     setFormLabel('');
-    setFormSound('Default alarm sound');
-    setFormDays([false,true,true,true,true,true,false]);
+    setFormSound('Marimba Ringtone');
+    setFormDays([false, false, false, false, false, false, false]);
     setFormSnooze(5);
     setFormSkipHolidays(false);
     setFormVibrate(true);
@@ -376,24 +386,49 @@ export default function AlarmScreen({ navigation }: any) {
     setModalVisible(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isSavingAlarm) return;
+    setIsSavingAlarm(true);
     const hour   = formHourIdx + 1;
     const minute = formMinuteIdx;
     const period: Period = formPeriodIdx === 0 ? 'AM' : 'PM';
     const label = formLabel.trim() || 'Alarm';
+    const repeats = formDays.some(Boolean);
+    let scheduledFor: number | undefined;
+    if (!repeats) {
+      const hour24 = period === 'AM'
+        ? (hour === 12 ? 0 : hour)
+        : (hour === 12 ? 12 : hour + 12);
+      const target = new Date();
+      target.setHours(hour24, minute, 0, 0);
+      if (target.getTime() <= Date.now()) target.setDate(target.getDate() + 1);
+      scheduledFor = target.getTime();
+    }
     const alarm: Alarm = {
       id: editingId || Date.now().toString(),
       hour, minute, period, label,
       sound: formSound, days: formDays, snooze: formSnooze,
       skipHolidays: formSkipHolidays, vibrate: formVibrate, active: true,
+      ...(scheduledFor ? { scheduledFor } : {}),
     };
-    if (editingId) {
-      updateAlarm(alarm);
-    } else {
-      addAlarm(alarm);
+    try {
+      if (editingId) {
+        await updateAlarm(alarm);
+      } else {
+        await addAlarm(alarm);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setModalVisible(false);
+    } catch (error) {
+      Alert.alert(
+        'Alarm not scheduled',
+        error instanceof Error
+          ? error.message
+          : 'Allow notifications and exact alarms, then try again.',
+      );
+    } finally {
+      setIsSavingAlarm(false);
     }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setModalVisible(false);
   };
 
   // -- Repeat sub-modal helpers
@@ -406,19 +441,14 @@ export default function AlarmScreen({ navigation }: any) {
   const confirmRepeat = () => { setFormDays(repeatDraft); setRepeatModal(false); };
 
   if (isLoading) {
-    return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg2 }]} edges={['top']}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#4A90D9" />
-        </View>
-      </SafeAreaView>
-    );
+    return <ScreenSkeleton variant="list" />;
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg2 }]} edges={['top']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]} edges={['top']}>
+      <AppBackground />
       {/* Top Bar */}
-      <View style={[styles.topBar, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+      <View style={[styles.topBar, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }]}>
         <BurgerMenu navigation={navigation} />
         <Text style={[styles.topBarTitle, { color: theme.text }]}>Alarms</Text>
         <AnimIconBtn onPress={openAdd}>
@@ -427,23 +457,23 @@ export default function AlarmScreen({ navigation }: any) {
       </View>
 
       <ScrollView
-        style={[styles.scroll, { backgroundColor: theme.bg2 }]}
+        style={[styles.scroll, { backgroundColor: 'transparent' }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* -- NEXT ALARM Banner ----------------------------------- */}
-        <View style={styles.nextAlarmBanner}>
-          <View style={styles.nextAlarmLeft}>
-            <Ionicons name="alarm-outline" size={28} color="#fff" />
+        <View style={[styles.nextAlarmBanner, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}>
+          <View style={[styles.nextAlarmLeft, { backgroundColor: theme.accent.soft }]}>
+            <Ionicons name="alarm-outline" size={28} color={theme.accent.base} />
           </View>
           <View style={styles.nextAlarmBody}>
-            <Text style={styles.nextAlarmLabel}>NEXT ALARM</Text>
-            <Text style={styles.nextAlarmTime}>
+            <Text style={[styles.nextAlarmLabel, { color: theme.accent.base }]}>NEXT ALARM</Text>
+            <Text style={[styles.nextAlarmTime, { color: theme.text }]}>
               {nextAlarm
-                ? `${padTime(nextAlarm.hour, nextAlarm.minute)} ${nextAlarm.period}  �  ${nextAlarm.label}`
+                ? `${padTime(nextAlarm.hour, nextAlarm.minute)} ${nextAlarm.period} · ${nextAlarm.label}`
                 : 'No active alarms'}
             </Text>
-            <Text style={styles.nextAlarmSub}>
+            <Text style={[styles.nextAlarmSub, { color: theme.textSub }]}>
               {nextAlarm
                 ? `Alarm in ${timeUntil(nextAlarm.hour, nextAlarm.minute, nextAlarm.period)}`
                 : 'Enable an alarm to see it here'}
@@ -474,7 +504,7 @@ export default function AlarmScreen({ navigation }: any) {
         {alarms.map((alarm, idx) => (
           <View key={alarm.id}>
             <TouchableOpacity
-              style={[styles.alarmRow, { backgroundColor: theme.card }]}
+              style={[styles.alarmRow, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}
               onPress={() => openEdit(alarm)}
               onLongPress={() => confirmDelete(alarm.id, alarm.label)}
               delayLongPress={500}
@@ -501,8 +531,8 @@ export default function AlarmScreen({ navigation }: any) {
                 <Text style={[styles.alarmSub, { color: theme.textDim }, !alarm.active && styles.dimText]}>
                   {getRepeatLabel(alarm.days)}
                   {alarm.active
-                    ? `  �  Alarm in ${timeUntil(alarm.hour, alarm.minute, alarm.period)}`
-                    : '  �  Off'}
+                    ? ` · Alarm in ${timeUntil(alarm.hour, alarm.minute, alarm.period)}`
+                    : ' · Off'}
                 </Text>
               </View>
 
@@ -511,7 +541,7 @@ export default function AlarmScreen({ navigation }: any) {
                 <Switch
                   value={alarm.active}
                   onValueChange={() => toggleAlarm(alarm.id)}
-                  trackColor={{ false: '#E0E0E0', true: '#B8D4F5' }}
+                  trackColor={{ false: theme.divider, true: theme.accent.soft }}
                   thumbColor={alarm.active ? BLUE : '#f0f0f0'}
                 />
                 <TouchableOpacity
@@ -530,7 +560,7 @@ export default function AlarmScreen({ navigation }: any) {
         ))}
 
         {/* -- Sleep Tip ------------------------------------------- */}
-        <View style={[styles.sleepTipCard, { backgroundColor: theme.dark ? '#1A2A3A' : '#EBF4FF' }]}>
+        <View style={[styles.sleepTipCard, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}>
           <View style={styles.sleepTipIcon}>
             <Ionicons name="moon-outline" size={22} color={BLUE} />
           </View>
@@ -563,8 +593,10 @@ export default function AlarmScreen({ navigation }: any) {
             <Text style={[styles.editHeaderTitle, { color: theme.text }]}>
               {editingId ? 'Edit Alarm' : 'New Alarm'}
             </Text>
-            <TouchableOpacity onPress={handleSave} style={styles.editHeaderBtn}>
-              <Ionicons name="checkmark" size={26} color={BLUE} />
+            <TouchableOpacity disabled={isSavingAlarm} onPress={handleSave} style={styles.editHeaderBtn}>
+              {isSavingAlarm
+                ? <ActivityIndicator size="small" color={theme.accent.base} />
+                : <Ionicons name="checkmark" size={26} color={theme.accent.base} />}
             </TouchableOpacity>
           </View>
 
@@ -731,42 +763,68 @@ export default function AlarmScreen({ navigation }: any) {
         visible={soundModal}
         animationType="slide"
         transparent={false}
-        onRequestClose={() => setSoundModal(false)}
+        onRequestClose={() => { stopPreview(); setSoundModal(false); }}
       >
         <SafeAreaView style={[styles.editSafe, { backgroundColor: theme.bg2 }]} edges={['top', 'bottom']}>
-          <View style={[styles.editHeader, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
-            <TouchableOpacity onPress={() => setSoundModal(false)} style={styles.editHeaderBtn}>
+          <AppBackground />
+          <View style={[styles.editHeader, { backgroundColor: 'transparent', borderBottomColor: theme.divider }]}>
+            <TouchableOpacity onPress={() => { stopPreview(); setSoundModal(false); }} style={styles.editHeaderBtn}>
               <Ionicons name="arrow-back" size={22} color={theme.textSub} />
             </TouchableOpacity>
             <Text style={[styles.editHeaderTitle, { color: theme.text }]}>Alarm Sound</Text>
-            <View style={styles.editHeaderBtn} />
+            <TouchableOpacity onPress={() => { stopPreview(); setSoundModal(false); }} style={styles.editHeaderDoneBtn}>
+              <Text style={[styles.editHeaderDoneText, { color: theme.accent.base }]}>Done</Text>
+            </TouchableOpacity>
           </View>
 
-          <ScrollView>
+          <ScrollView contentContainerStyle={styles.soundScroll} showsVerticalScrollIndicator={false}>
+            <View style={[styles.soundHelpCard, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}>
+              <View style={[styles.soundHelpIcon, { backgroundColor: theme.accent.soft }]}>
+                <Ionicons name="volume-high-outline" size={20} color={theme.accent.base} />
+              </View>
+              <View style={styles.soundHelpCopy}>
+                <Text style={[styles.soundHelpTitle, { color: theme.text }]}>Choose your alarm sound</Text>
+                <Text style={[styles.soundHelpText, { color: theme.textSub }]}>Tap Preview to listen, then tap a row to select it.</Text>
+              </View>
+            </View>
+
             {/* -- Your (custom) sounds -- */}
             <Text style={[styles.soundSection, { color: theme.textDim }]}>Your sounds</Text>
-            <View style={[styles.settingsPanel, { backgroundColor: theme.card }]}>
-              <TouchableOpacity style={styles.checkRow} onPress={pickCustomSound}>
-                <Text style={[styles.checkLabel, { color: theme.text }]}>Add from device�</Text>
-                <Ionicons name="add" size={22} color={BLUE} />
+            <View style={[styles.soundPanel, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}>
+              <TouchableOpacity style={styles.soundAddRow} onPress={pickCustomSound}>
+                <View style={[styles.soundAddIcon, { backgroundColor: theme.accent.soft }]}>
+                  <Ionicons name="add" size={20} color={theme.accent.base} />
+                </View>
+                <View style={styles.soundLabelWrap}>
+                  <Text style={[styles.soundRowTitle, { color: theme.text }]}>Add from device</Text>
+                  <Text style={[styles.soundRowMeta, { color: theme.textDim }]}>Choose an audio file stored on this device</Text>
+                </View>
               </TouchableOpacity>
               {customSounds.map((cs, i) => (
                 <View key={cs.uri}>
-                  <View style={[styles.settingDivider, { backgroundColor: theme.border }]} />
+                  <View style={[styles.soundDivider, { backgroundColor: theme.divider }]} />
                   <TouchableOpacity
-                    style={styles.checkRow}
-                    onPress={() => previewSound(cs.label)}
+                    style={styles.soundRow}
+                    onPress={() => setFormSound(cs.label)}
                     onLongPress={() => Alert.alert(cs.label, undefined, [
-                      { text: 'Use this sound', onPress: () => { setFormSound(cs.label); setSoundModal(false); stopPreview(); } },
                       { text: 'Remove', style: 'destructive', onPress: () => setCustomSounds(prev => prev.filter((_, j) => j !== i)) },
                       { text: 'Cancel', style: 'cancel' },
                     ])}
                   >
-                    <Text style={[styles.checkLabel, { color: theme.text }]} numberOfLines={1}>{cs.label}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      {previewingSound === cs.label
-                        ? <Ionicons name="stop-circle" size={22} color={BLUE} onPress={stopPreview} />
-                        : <Ionicons name="play-circle-outline" size={22} color={theme.textDim} />}
+                    <View style={styles.soundLabelWrap}>
+                      <Text style={[styles.soundRowTitle, { color: theme.text }]} numberOfLines={1}>{cs.label}</Text>
+                      <Text style={[styles.soundRowMeta, { color: theme.textDim }]}>Custom sound</Text>
+                    </View>
+                    <View style={styles.soundActions}>
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel={`${previewingSound === cs.label ? 'Stop' : 'Preview'} ${cs.label}`}
+                        style={[styles.previewBtn, { backgroundColor: theme.accent.soft }]}
+                        onPress={() => previewingSound === cs.label ? stopPreview() : previewSound(cs.label)}
+                      >
+                        <Ionicons name={previewingSound === cs.label ? 'stop' : 'play'} size={14} color={theme.accent.base} />
+                        <Text style={[styles.previewBtnText, { color: theme.accent.base }]}>{previewingSound === cs.label ? 'Stop' : 'Preview'}</Text>
+                      </TouchableOpacity>
                       <View style={[styles.radioOuter, formSound === cs.label && styles.radioOuterSelected]}>
                         {formSound === cs.label && <View style={styles.radioInner} />}
                       </View>
@@ -775,42 +833,44 @@ export default function AlarmScreen({ navigation }: any) {
                 </View>
               ))}
               {customSounds.length === 0 && (
-                <Text style={[{ fontSize: 12, color: theme.textDim, marginHorizontal: 16, marginBottom: 12 }]}>No custom sounds yet. Tap "Add from device�" to pick an audio file.</Text>
+                <Text style={[styles.soundEmptyText, { color: theme.textDim }]}>No custom sounds added yet.</Text>
               )}
             </View>
 
             {/* -- Built-in sounds -- */}
             <Text style={[styles.soundSection, { color: theme.textDim }]}>Ringtones</Text>
-            <View style={[styles.settingsPanel, { backgroundColor: theme.card }]}>
+            <View style={[styles.soundPanel, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}>
               {BUILT_IN_SOUNDS.map((s, i) => (
                 <View key={s.label}>
                   <TouchableOpacity
-                    style={styles.checkRow}
-                    onPress={() => {
-                      setFormSound(s.label);
-                      setSoundModal(false);
-                      stopPreview();
-                    }}
-                    onLongPress={() => previewSound(s.label)}
+                    style={styles.soundRow}
+                    onPress={() => setFormSound(s.label)}
                   >
-                    <Text style={[styles.checkLabel, { color: theme.text }]}>{s.label}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={styles.soundLabelWrap}>
+                      <Text style={[styles.soundRowTitle, { color: theme.text }]} numberOfLines={1}>{s.label}</Text>
+                      <Text style={[styles.soundRowMeta, { color: theme.textDim }]}>{s.file === null ? 'No alarm audio' : 'Built-in ringtone'}</Text>
+                    </View>
+                    <View style={styles.soundActions}>
                       {s.file !== null && (
-                        previewingSound === s.label
-                          ? <Ionicons name="stop-circle" size={22} color={BLUE} onPress={stopPreview} />
-                          : <Ionicons name="play-circle-outline" size={22} color={theme.textDim} />
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          accessibilityLabel={`${previewingSound === s.label ? 'Stop' : 'Preview'} ${s.label}`}
+                          style={[styles.previewBtn, { backgroundColor: theme.accent.soft }]}
+                          onPress={() => previewingSound === s.label ? stopPreview() : previewSound(s.label)}
+                        >
+                          <Ionicons name={previewingSound === s.label ? 'stop' : 'play'} size={14} color={theme.accent.base} />
+                          <Text style={[styles.previewBtnText, { color: theme.accent.base }]}>{previewingSound === s.label ? 'Stop' : 'Preview'}</Text>
+                        </TouchableOpacity>
                       )}
                       <View style={[styles.radioOuter, formSound === s.label && styles.radioOuterSelected]}>
                         {formSound === s.label && <View style={styles.radioInner} />}
                       </View>
                     </View>
                   </TouchableOpacity>
-                  {i < BUILT_IN_SOUNDS.length - 1 && <View style={[styles.settingDivider, { backgroundColor: theme.border }]} />}
+                  {i < BUILT_IN_SOUNDS.length - 1 && <View style={[styles.soundDivider, { backgroundColor: theme.divider }]} />}
                 </View>
               ))}
             </View>
-            <Text style={[{ fontSize: 11, color: theme.textDim, marginHorizontal: 24, marginBottom: 8 }]}>Hold any ringtone to preview it. Tap to select.</Text>
-            <View style={{ height: 32 }} />
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -853,5 +913,3 @@ export default function AlarmScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
-
-// --- Styles ------------------------------------------------------------------

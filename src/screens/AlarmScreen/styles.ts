@@ -6,20 +6,19 @@ export const styles = StyleSheet.create({
 
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 18, paddingVertical: 13,
-    borderBottomWidth: 1,
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 0,
   },
-  topBarTitle: { fontSize: 20, fontWeight: '700', flex: 1, textAlign: 'center' },
+  topBarTitle: { fontSize: 26, fontWeight: '700', flex: 1, textAlign: 'left', marginLeft: 14, letterSpacing: -0.4 },
   iconBtn: { padding: 4 },
 
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 124 },
 
   // Next Alarm banner
   nextAlarmBanner: {
-    backgroundColor: BLUE, borderRadius: 16, padding: 18,
+    borderRadius: 24, padding: 18, borderWidth: 1,
     flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 22,
-    shadowColor: BLUE, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
   },
   nextAlarmLeft: {
     width: 52, height: 52, borderRadius: 26,
@@ -28,11 +27,11 @@ export const styles = StyleSheet.create({
   },
   nextAlarmBody: { flex: 1 },
   nextAlarmLabel: {
-    color: 'rgba(255,255,255,0.75)', fontSize: 10,
+    fontSize: 10,
     fontWeight: '800', letterSpacing: 1.2, marginBottom: 4,
   },
-  nextAlarmTime: { color: '#fff', fontSize: 17, fontWeight: '800', marginBottom: 2 },
-  nextAlarmSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
+  nextAlarmTime: { fontSize: 17, fontWeight: '800', marginBottom: 2 },
+  nextAlarmSub: { fontSize: 12 },
 
   // Section header
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
@@ -55,6 +54,7 @@ export const styles = StyleSheet.create({
   alarmRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: 16, paddingHorizontal: 16,
+    borderRadius: 22, borderWidth: 1, marginTop: 10,
   },
   alarmLeft: { flex: 1 },
   alarmTimeRow: { flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', gap: 6 },
@@ -65,11 +65,11 @@ export const styles = StyleSheet.create({
   alarmRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   menuBtn: { padding: 6 },
   dimText: { color: '#CCC' },
-  divider: { height: 1, marginHorizontal: 16 },
+  divider: { height: 0, marginHorizontal: 16 },
 
   // Sleep tip
   sleepTipCard: {
-    borderRadius: 16, padding: 16,
+    borderRadius: 22, padding: 16, borderWidth: 1,
     flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginTop: 18,
   },
   sleepTipIcon: {
@@ -88,6 +88,8 @@ export const styles = StyleSheet.create({
   },
   editHeaderBtn: { width: 40, alignItems: 'center' },
   editHeaderTitle: { fontSize: 17, fontWeight: '700' },
+  editHeaderDoneBtn: { minWidth: 48, minHeight: 44, alignItems: 'flex-end', justifyContent: 'center' },
+  editHeaderDoneText: { fontSize: 15, fontWeight: '700' },
 
   // Wheel picker
   pickerContainer: {
@@ -99,7 +101,6 @@ export const styles = StyleSheet.create({
   settingsPanel: {
     marginHorizontal: 16, marginTop: 16,
     borderRadius: 14, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
   },
   settingRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -142,9 +143,48 @@ export const styles = StyleSheet.create({
 
   // Sound modal
   soundSection: {
-    fontSize: 12, fontWeight: '700', color: '#999',
-    letterSpacing: 0.8, marginHorizontal: 24, marginTop: 20, marginBottom: 6,
+    fontSize: 13, fontWeight: '700', color: '#999',
+    letterSpacing: 0.5, marginHorizontal: 20, marginTop: 24, marginBottom: 10,
   },
+  soundScroll: { paddingBottom: 32 },
+  soundHelpCard: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 20, marginTop: 16, padding: 14,
+    borderRadius: 18, borderWidth: 1,
+  },
+  soundHelpIcon: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center', marginRight: 12,
+  },
+  soundHelpCopy: { flex: 1 },
+  soundHelpTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700', marginBottom: 2 },
+  soundHelpText: { fontSize: 14, lineHeight: 19 },
+  soundPanel: {
+    marginHorizontal: 20, borderRadius: 20, borderWidth: 1, overflow: 'hidden',
+  },
+  soundAddRow: {
+    minHeight: 72, paddingHorizontal: 16, paddingVertical: 12,
+    flexDirection: 'row', alignItems: 'center',
+  },
+  soundAddIcon: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center', marginRight: 12,
+  },
+  soundRow: {
+    minHeight: 72, paddingHorizontal: 16, paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'center',
+  },
+  soundLabelWrap: { flex: 1, minWidth: 0, paddingRight: 10 },
+  soundRowTitle: { fontSize: 16, lineHeight: 21, fontWeight: '600' },
+  soundRowMeta: { fontSize: 13, lineHeight: 18, marginTop: 2 },
+  soundActions: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 0 },
+  previewBtn: {
+    minWidth: 82, height: 40, borderRadius: 20,
+    paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+  },
+  previewBtnText: { fontSize: 13, fontWeight: '700' },
+  soundDivider: { height: 1, marginLeft: 16 },
+  soundEmptyText: { fontSize: 14, lineHeight: 20, paddingHorizontal: 16, paddingBottom: 16 },
 
   // Label modal
   labelSheet: {

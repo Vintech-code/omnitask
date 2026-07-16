@@ -13,4 +13,5 @@ export interface AppEvent {
   reminders: string[];
   alarmActive: boolean;
   recurrence: 'none' | 'daily' | 'weekly' | 'monthly';
+  updatedAt?: number;
 }

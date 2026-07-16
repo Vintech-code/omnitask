@@ -23,4 +23,5 @@ export interface Note {
   todos?: ChecklistItem[];
   images?: string[];
   fontFamily?: string;
+  updatedAt?: number;
 }

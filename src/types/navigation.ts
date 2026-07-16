@@ -1,4 +1,5 @@
 import { AppEvent } from './event';
+import type { AlarmRingPayload } from '@/services/NotificationService';
 
 /** Root stack param list — keeps navigation.navigate calls type-safe. */
 export type RootStackParamList = {
@@ -13,4 +14,5 @@ export type RootStackParamList = {
   Profile:     undefined;
   Search:      undefined;
   Stats:       undefined;
+  RingingAlarm: AlarmRingPayload;
 };

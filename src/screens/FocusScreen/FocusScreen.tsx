@@ -12,15 +12,20 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/ThemeContext';
 import { useTaskStore } from '@/context/TaskStore';
+import { useAuth } from '@/context/AuthContext';
 import { BurgerMenu } from '@/components/BurgerMenu';
 import { Storage, KEYS } from '@/services/StorageService';
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
 import { BRAND_BLUE as ACCENT } from '@/theme/colors';
 import { pom, sw, main } from './styles';
+import { AppBackground, ScreenSkeleton } from '@/components/ui';
+import { requestNotificationPermission, cancelNotification } from '@/services/NotificationService';
+import { hydrateFocusSessions, saveFocusSessions } from '@/services/FocusStatsService';
 
 
 type Tab = 'pomodoro' | 'stopwatch';
@@ -130,6 +135,7 @@ function ProgressRing({ pct, color, size, strokeWidth, trackColor }: { pct: numb
 // POMODORO TAB
 // ------------------------------------------------------------------------------
 function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] }) {
+  const { user } = useAuth();
   const [mode, setMode] = useState<PomMode>('Focus');
   const [running, setRunning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(MODE_DURATIONS['Focus']);
@@ -140,26 +146,71 @@ function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] })
   const [linkedNoteId, setLinkedNoteId] = useState<string | null>(null);
   const [notePickerVisible, setNotePickerVisible] = useState(false);
   const linkedNote = notes.find(n => n.id === linkedNoteId) ?? null;
+  const POMODORO_NOTIF_ID = 'pomodoro_end';
+
+  const clearPomodoroAlert = useCallback(async () => {
+    await cancelNotification(POMODORO_NOTIF_ID);
+  }, []);
+
+  const schedulePomodoroAlert = useCallback(async (seconds: number, nextMode: PomMode) => {
+    if (seconds <= 0) return;
+
+    const notifOk = await requestNotificationPermission();
+    if (!notifOk) return;
+    await Notifications.setNotificationChannelAsync('focus-timers', {
+      name: 'Focus timers',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: 'default',
+      enableVibrate: true,
+      vibrationPattern: [0, 250, 150, 250],
+    });
+    await Notifications.scheduleNotificationAsync({
+      identifier: POMODORO_NOTIF_ID,
+      content: {
+        title: 'Pomodoro complete',
+        body: nextMode === 'Focus' ? 'Time for a break.' : 'Ready to focus again?',
+        sound: true,
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds, channelId: 'focus-timers' },
+    });
+  }, []);
+
+  const firePomodoroAlertNow = useCallback(async (nextMode: PomMode) => {
+    const notifOk = await requestNotificationPermission();
+    if (!notifOk) return;
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Pomodoro complete',
+        body: nextMode === 'Focus' ? 'Time for a break.' : 'Ready to focus again?',
+        sound: true,
+      },
+      trigger: null,
+    });
+  }, []);
 
   // Load persisted count on mount
   useEffect(() => {
-    Storage.get<number>(KEYS.SESSIONS).then(n => { if (n != null) setSessions(n); });
-    Storage.get<string>(KEYS.LINKED_NOTE).then(id => { if (id) setLinkedNoteId(id); });
-  }, []);
+    if (!user) return;
+    void hydrateFocusSessions(user.id, setSessions);
+    Storage.getForUser<string>(KEYS.LINKED_NOTE, user.id).then(id => { if (id) setLinkedNoteId(id); });
+  }, [user?.id]);
 
   const persistSessions = (n: number) => {
     setSessions(n);
-    Storage.set(KEYS.SESSIONS, n);
+    if (user) void saveFocusSessions(user.id, n);
   };
 
   const switchMode = useCallback((m: PomMode) => {
     setRunning(false);
+    clearPomodoroAlert().catch(() => {});
     setMode(m);
     setTimeLeft(MODE_DURATIONS[m]);
-  }, []);
+  }, [clearPomodoroAlert]);
 
   const handleEnd = useCallback(() => {
     setRunning(false);
+    clearPomodoroAlert().catch(() => {});
+    firePomodoroAlertNow(mode).catch(() => {});
     if (mode === 'Focus') {
       const next = sessions + 1;
       persistSessions(next);
@@ -179,7 +230,7 @@ function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] })
         { text: 'Not yet', style: 'cancel', onPress: () => switchMode(mode) },
       ]);
     }
-  }, [mode, switchMode]);
+  }, [mode, switchMode, clearPomodoroAlert, firePomodoroAlertNow]);
 
   useEffect(() => {
     if (running) {
@@ -229,7 +280,7 @@ function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] })
           <Text style={[pom.digits, { color }]}>
             {pad(mins)}:{pad(secs)}
           </Text>
-          <Text style={[pom.runSub, { color: theme.textDim }]}>{running ? 'Running�' : 'Paused'}</Text>
+          <Text style={[pom.runSub, { color: theme.textDim }]}>{running ? 'Running…' : 'Paused'}</Text>
         </View>
       </View>
 
@@ -237,7 +288,7 @@ function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] })
       <View style={pom.controls}>
         <TouchableOpacity
           style={[pom.ctrlBtn, { borderColor: theme.border }]}
-          onPress={() => { setRunning(false); setTimeLeft(MODE_DURATIONS[mode]); }}
+          onPress={() => { setRunning(false); setTimeLeft(MODE_DURATIONS[mode]); clearPomodoroAlert().catch(() => {}); }}
         >
           <Ionicons name="refresh" size={22} color={theme.textDim} />
         </TouchableOpacity>
@@ -247,7 +298,17 @@ function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] })
             style={[pom.playBtn, { backgroundColor: color }]}
             onPressIn={playIn}
             onPressOut={playOut}
-            onPress={() => setRunning(r => !r)}
+            onPress={() => {
+              setRunning(prev => {
+                const next = !prev;
+                if (next) {
+                  schedulePomodoroAlert(timeLeft, mode).catch(() => {});
+                } else {
+                  clearPomodoroAlert().catch(() => {});
+                }
+                return next;
+              });
+            }}
             activeOpacity={1}
           >
             <Ionicons name={running ? 'pause' : 'play'} size={30} color="#fff" style={{ marginLeft: running ? 0 : 3 }} />
@@ -299,7 +360,7 @@ function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] })
             <Text style={[pom.linkedChipText, { color: theme.text }]} numberOfLines={1}>
               {linkedNote.title || 'Untitled note'}
             </Text>
-            <TouchableOpacity onPress={() => { setLinkedNoteId(null); Storage.set(KEYS.LINKED_NOTE, ''); }}>
+            <TouchableOpacity onPress={() => { setLinkedNoteId(null); if (user) Storage.setForUser(KEYS.LINKED_NOTE, user.id, ''); }}>
               <Ionicons name="close-circle" size={16} color={theme.textDim} />
             </TouchableOpacity>
           </View>
@@ -329,7 +390,7 @@ function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] })
                 style={[pom.pickerRow, { borderBottomColor: theme.border }]}
                 onPress={() => {
                   setLinkedNoteId(n.id);
-                  Storage.set(KEYS.LINKED_NOTE, n.id);
+                  if (user) Storage.setForUser(KEYS.LINKED_NOTE, user.id, n.id);
                   setNotePickerVisible(false);
                 }}
               >
@@ -353,7 +414,7 @@ function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] })
 // ------------------------------------------------------------------------------
 interface LapRecord { lap: number; time: number; split: number; }
 
-function StopwatchTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] }) {
+function StopwatchTab({ theme, bottomClearance }: { theme: ReturnType<typeof useTheme>['theme']; bottomClearance: number }) {
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [laps, setLaps] = useState<LapRecord[]>([]);
@@ -404,12 +465,12 @@ function StopwatchTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] }
   const worstLap = laps.length > 1 ? Math.max(...laps.map(l => l.split)) : null;
 
   return (
-    <View style={sw.root}>
+    <View style={[sw.root, { paddingBottom: bottomClearance }]}>
       {/* Big display */}
       <View style={sw.displayWrap}>
         <Text style={[sw.digits, { color: theme.text }]}>{formatMs(elapsed)}</Text>
         {laps.length > 0 && (
-          <Text style={[sw.lapHint, { color: theme.textDim }]}>Lap {laps.length + 1} � {formatMs(elapsed - laps[laps.length - 1].time)}</Text>
+          <Text style={[sw.lapHint, { color: theme.textDim }]}>Lap {laps.length + 1} · {formatMs(elapsed - laps[laps.length - 1].time)}</Text>
         )}
       </View>
 
@@ -474,11 +535,17 @@ function StopwatchTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] }
 export default function FocusScreen({ navigation }: any) {
   const [tab, setTab] = useState<Tab>('pomodoro');
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { isLoading } = useTaskStore();
+  const bottomNavigationClearance = Math.max(insets.bottom, 8) + 92;
+
+  if (isLoading) return <ScreenSkeleton variant="dashboard" />;
 
   return (
-    <SafeAreaView style={[main.safe, { backgroundColor: theme.bg }]} edges={['top']}>
+    <SafeAreaView style={[main.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
+      <AppBackground />
       {/* Header */}
-      <View style={[main.header, { borderBottomColor: theme.border }]}>
+      <View style={[main.header, { borderBottomColor: 'transparent' }]}>
         <BurgerMenu navigation={navigation} />
         <Text style={[main.headerTitle, { color: theme.text }]}>{tab === 'pomodoro' ? 'Pomodoro' : 'Stopwatch'}</Text>
         <TouchableOpacity onPress={() => Alert.alert('Settings', 'Timer settings coming soon.')}>
@@ -487,7 +554,7 @@ export default function FocusScreen({ navigation }: any) {
       </View>
 
       {/* Tab bar */}
-      <View style={[main.tabBar, { backgroundColor: theme.segBg }]}>
+      <View style={[main.tabBar, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}>
         <TouchableOpacity
           style={[main.tabBtn, tab === 'pomodoro' && [main.tabBtnActive, { backgroundColor: theme.segActive }]]}
           onPress={() => setTab('pomodoro')}
@@ -514,7 +581,7 @@ export default function FocusScreen({ navigation }: any) {
 
       {/* Content */}
       <View style={{ flex: 1 }}>
-        {tab === 'pomodoro' ? <PomodoroTab theme={theme} /> : <StopwatchTab theme={theme} />}
+        {tab === 'pomodoro' ? <PomodoroTab theme={theme} /> : <StopwatchTab theme={theme} bottomClearance={bottomNavigationClearance} />}
       </View>
     </SafeAreaView>
   );

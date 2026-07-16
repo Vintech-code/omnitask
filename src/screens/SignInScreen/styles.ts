@@ -2,19 +2,18 @@
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 
 export const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomWidth: 0,
   },
   back: { width: 40, alignItems: 'flex-start' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A' },
-  scroll: { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 50 },
+  scroll: { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 50, maxWidth: 480, width: '100%', alignSelf: 'center' },
 
   title: { fontSize: 26, fontWeight: '800', color: '#111', marginBottom: 8 },
   sub: { fontSize: 14, color: '#888', lineHeight: 21, marginBottom: 28 },
@@ -28,10 +27,10 @@ export const s = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 10,
+    borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 13,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.78)',
   },
   inputIcon: { marginRight: 8 },
   input: { flex: 1, fontSize: 15, color: '#222' },
@@ -52,7 +51,7 @@ export const s = StyleSheet.create({
 
   btnPrimary: {
     backgroundColor: BLUE,
-    borderRadius: 12,
+    borderRadius: 999,
     paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -70,7 +69,8 @@ export const s = StyleSheet.create({
     flex: 1,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.65)',
     paddingVertical: 13,
     flexDirection: 'row',
     alignItems: 'center',

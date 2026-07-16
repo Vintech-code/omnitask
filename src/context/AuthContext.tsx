@@ -1,15 +1,18 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { FirebaseError } from 'firebase/app';
 import {
-  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut as firebaseSignOut,
   onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
   updateProfile,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+
 import { auth, db } from '../config/firebase';
-import { Storage, KEYS } from '../services/StorageService';
+import { flushCloudMutations, queueCloudSet } from '../services/OfflineSyncService';
+import { KEYS, Storage } from '../services/StorageService';
 
 export interface User {
   id: string;
@@ -39,23 +42,20 @@ const AuthContext = createContext<AuthContextType>({
   markOnboardingSeen: async () => {},
 });
 
-// ── Firestore helpers ──────────────────────────────────────────────────────
 const userDocRef = (uid: string) => doc(db, 'users', uid);
 
-const firestoreErrorMessage = (e: unknown): string => {
-  if (e instanceof FirebaseError) {
-    switch (e.code) {
-      case 'auth/user-not-found':     return 'No account found with that email.';
-      case 'auth/wrong-password':     return 'Incorrect password. Please try again.';
-      case 'auth/email-already-in-use': return 'An account with this email already exists.';
-      case 'auth/invalid-email':      return 'Please enter a valid email address.';
-      case 'auth/weak-password':      return 'Password must be at least 6 characters.';
-      case 'auth/too-many-requests':  return 'Too many attempts. Please try again later.';
-      case 'auth/network-request-failed': return 'Network error. Check your connection.';
-      default: return e.message;
-    }
+const firestoreErrorMessage = (error: unknown): string => {
+  if (!(error instanceof FirebaseError)) return 'Something went wrong. Please try again.';
+  switch (error.code) {
+    case 'auth/user-not-found': return 'No account found with that email.';
+    case 'auth/wrong-password': return 'Incorrect password. Please try again.';
+    case 'auth/email-already-in-use': return 'An account with this email already exists.';
+    case 'auth/invalid-email': return 'Please enter a valid email address.';
+    case 'auth/weak-password': return 'Password must be at least 6 characters.';
+    case 'auth/too-many-requests': return 'Too many attempts. Please try again later.';
+    case 'auth/network-request-failed': return 'You must be online to sign in or create an account.';
+    default: return error.message;
   }
-  return 'Something went wrong. Please try again.';
 };
 
 export { firestoreErrorMessage };
@@ -66,97 +66,138 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
 
   useEffect(() => {
-    // Resolve onboarding status from local storage (doesn't need Firebase)
-    Storage.get<boolean>(KEYS.ONBOARDING_DONE).then(done => {
+    void Storage.get<boolean>(KEYS.ONBOARDING_DONE).then(done => {
       if (done) setHasSeenOnboarding(true);
     });
 
-    // Listen to Firebase auth state — persists across restarts
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Fetch profile from Firestore
-        try {
-          const snap = await getDoc(userDocRef(firebaseUser.uid));
-          const profile = snap.data() as User | undefined;
-          const u: User = {
-            id:    firebaseUser.uid,
-            name:  profile?.name  ?? firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'User',
-            email: firebaseUser.email ?? '',
-          };
-          setUser(u);
-          await Storage.set(KEYS.USER, u);   // cache locally
-        } catch {
-          // Firestore unavailable — use cached local user
-          const cached = await Storage.get<User>(KEYS.USER);
-          setUser(cached);
-        }
-      } else {
+    return onAuthStateChanged(auth, async firebaseUser => {
+      if (!firebaseUser) {
         setUser(null);
+        setIsLoading(false);
+        return;
       }
-      setIsLoading(false);
-    });
 
-    return unsubscribe;
+      const fallback: User = {
+        id: firebaseUser.uid,
+        name: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'User',
+        email: firebaseUser.email ?? '',
+      };
+      let cached = await Storage.getForUser<User>(KEYS.USER, firebaseUser.uid);
+      if (!cached) {
+        const legacy = await Storage.get<User>(KEYS.USER);
+        if (legacy?.id === firebaseUser.uid) {
+          cached = legacy;
+          await Storage.setForUser(KEYS.USER, firebaseUser.uid, legacy);
+          const userDataKeys = [
+            KEYS.EVENTS,
+            KEYS.TASKS,
+            KEYS.TASK_CATEGORIES,
+            KEYS.ALARMS,
+            KEYS.SESSIONS,
+            KEYS.FOCUS_STATS,
+            KEYS.PROFILE_PHOTO,
+            KEYS.LINKED_NOTE,
+          ];
+          await Promise.all(userDataKeys.map(async key => {
+            const existing = await Storage.getForUser<unknown>(key, firebaseUser.uid);
+            const value = await Storage.get<unknown>(key);
+            if (existing === null && value !== null) {
+              await Storage.setForUser(key, firebaseUser.uid, value);
+            }
+          }));
+          await Storage.remove(KEYS.USER);
+        }
+      }
+
+      setUser(cached ?? fallback);
+      setIsLoading(false);
+
+      // Restore immediately from disk, then refresh and drain offline writes in
+      // the background. Network latency must never expose the auth screens.
+      void flushCloudMutations(firebaseUser.uid);
+      void getDoc(userDocRef(firebaseUser.uid)).then(async snapshot => {
+        const profile = snapshot.data() as User | undefined;
+        if (!profile || auth.currentUser?.uid !== firebaseUser.uid) return;
+        const resolved = { ...fallback, ...profile, id: firebaseUser.uid };
+        setUser(resolved);
+        await Storage.setForUser(KEYS.USER, firebaseUser.uid, resolved);
+      }).catch(() => undefined);
+    });
   }, []);
 
-  // ── Sign In ───────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      const uid = auth.currentUser?.uid;
+      if (state === 'active' && uid) void flushCloudMutations(uid);
+    });
+    return () => subscription.remove();
+  }, []);
+
   const signIn = async (email: string, password: string) => {
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
-      // onAuthStateChanged above handles updating user state
-    } catch (e) {
-      throw new Error(firestoreErrorMessage(e));
+    } catch (error) {
+      throw new Error(firestoreErrorMessage(error));
     }
   };
 
-  // ── Sign Up ───────────────────────────────────────────────────────────────
   const signUp = async (name: string, email: string, password: string) => {
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      // Store display name in Firebase Auth
-      await updateProfile(cred.user, { displayName: name.trim() });
-      // Store full profile in Firestore
-      const u: User = { id: cred.user.uid, name: name.trim(), email: email.trim() };
-      await setDoc(userDocRef(cred.user.uid), u);
-      await Storage.set(KEYS.USER, u);
-      setUser(u);
-    } catch (e) {
-      throw new Error(firestoreErrorMessage(e));
+      const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      await updateProfile(credential.user, { displayName: name.trim() });
+      const created: User = {
+        id: credential.user.uid,
+        name: name.trim(),
+        email: email.trim(),
+      };
+      await Storage.setForUser(KEYS.USER, credential.user.uid, created);
+      await queueCloudSet(
+        credential.user.uid,
+        ['users', credential.user.uid],
+        created as unknown as Record<string, unknown>,
+      );
+      setUser(created);
+    } catch (error) {
+      throw new Error(firestoreErrorMessage(error));
     }
   };
 
-  // ── Sign Out ──────────────────────────────────────────────────────────────
   const signOut = async () => {
     await firebaseSignOut(auth);
-    await Storage.remove(KEYS.USER);
     setUser(null);
   };
 
-  // ── Update Profile ────────────────────────────────────────────────────────
   const updateUser = async (updates: Partial<User>) => {
     if (!user) return;
     const updated = { ...user, ...updates };
-    // Update Firestore
-    try {
-      await updateDoc(userDocRef(user.id), updates);
-    } catch { /* offline — still update locally */ }
+    await Storage.setForUser(KEYS.USER, user.id, updated);
+    await queueCloudSet(
+      user.id,
+      ['users', user.id],
+      updated as unknown as Record<string, unknown>,
+    );
     if (updates.name && auth.currentUser) {
-      await updateProfile(auth.currentUser, { displayName: updates.name });
+      await updateProfile(auth.currentUser, { displayName: updates.name }).catch(() => undefined);
     }
-    await Storage.set(KEYS.USER, updated);
     setUser(updated);
   };
 
-  // ── Onboarding ────────────────────────────────────────────────────────────
   const markOnboardingSeen = async () => {
     await Storage.set(KEYS.ONBOARDING_DONE, true);
     setHasSeenOnboarding(true);
   };
 
   return (
-    <AuthContext.Provider
-      value={{ user, isLoading, hasSeenOnboarding, signIn, signUp, signOut, updateUser, markOnboardingSeen }}
-    >
+    <AuthContext.Provider value={{
+      user,
+      isLoading,
+      hasSeenOnboarding,
+      signIn,
+      signUp,
+      signOut,
+      updateUser,
+      markOnboardingSeen,
+    }}>
       {children}
     </AuthContext.Provider>
   );

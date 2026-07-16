@@ -53,11 +53,6 @@ const styles = StyleSheet.create({
     padding: 15,
     width: '100%',
     marginVertical: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   text: {
     fontSize: 18,

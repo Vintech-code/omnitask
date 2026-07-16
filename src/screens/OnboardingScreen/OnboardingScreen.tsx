@@ -17,6 +17,7 @@ import { useAuth } from '@/context/AuthContext';
 import { requestNotificationPermission } from '@/services/NotificationService';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { s } from './styles';
+import { AppBackground } from '@/components/ui';
 
 const { width: W } = Dimensions.get('window');
 
@@ -103,7 +104,8 @@ export default function OnboardingScreen({ navigation }: any) {
   const current = STEPS[step];
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: current.bg }]}>
+    <SafeAreaView style={[s.safe, { backgroundColor: 'transparent' }]}>
+      <AppBackground />
       {/* Skip button */}
       {step < 2 && (
         <TouchableOpacity style={s.skip} onPress={handleSkip}>
@@ -117,7 +119,7 @@ export default function OnboardingScreen({ navigation }: any) {
         {/* ── Step 1: Logo ── */}
         {step === 0 && (
           <View style={s.illustrationBox}>
-            <View style={[s.logoBg, { backgroundColor: '#fff', shadowColor: current.accent }]}>
+            <View style={[s.logoBg, { backgroundColor: 'rgba(255,255,255,0.76)' }]}>
               <Image
                 source={require('../../../assets/omnitasklogo.png')}
                 style={{ width: 90, height: 90 }}
@@ -131,7 +133,7 @@ export default function OnboardingScreen({ navigation }: any) {
         {step === 1 && (
           <View style={s.featureGrid}>
             {FEATURES.map(f => (
-              <View key={f.label} style={[s.featureCard, { backgroundColor: '#fff' }]}>
+              <View key={f.label} style={[s.featureCard, { backgroundColor: 'rgba(255,255,255,0.72)' }]}>
                 <View style={[s.featureIconBox, { backgroundColor: f.bg }]}>
                   <LottieView
                     source={f.anim}

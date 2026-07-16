@@ -5,7 +5,7 @@ const { height: SCREEN_H } = (require('react-native').Dimensions).get('window');
 export const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#FAFBFF',
+    backgroundColor: 'transparent',
   },
 
   /* Hero */
@@ -51,16 +51,12 @@ export const styles = StyleSheet.create({
   },
   btnPrimary: {
     backgroundColor: BLUE,
-    borderRadius: 14,
+    borderRadius: 999,
     paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
-    shadowColor: BLUE,
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 4,
   },
   btnPrimaryText: {
     color: '#fff',
@@ -71,7 +67,7 @@ export const styles = StyleSheet.create({
   btnSecondary: {
     borderWidth: 1.5,
     borderColor: '#DDE2EE',
-    borderRadius: 14,
+    borderRadius: 999,
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 18,
@@ -102,14 +98,14 @@ export const styles = StyleSheet.create({
   socialBtn: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#DDE2EE',
-    borderRadius: 12,
+    borderColor: 'rgba(255,255,255,0.75)',
+    borderRadius: 999,
     paddingVertical: 13,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.70)',
   },
   socialText: { fontSize: 15, color: '#222', fontWeight: '700' },
 

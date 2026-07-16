@@ -4,9 +4,10 @@
  */
 
 // ── Brand ────────────────────────────────────────────────────────────────────
-export const BRAND_BLUE     = '#4A90D9';
+/** Legacy token name retained during migration; the redesigned primary accent is warm orange. */
+export const BRAND_BLUE     = '#FF7A00';
 export const BRAND_GREEN    = '#3DAE7C';
-export const BRAND_ORANGE   = '#E09C52';
+export const BRAND_ORANGE   = '#FF7A00';
 export const BRAND_RED      = '#E05252';
 export const BRAND_PURPLE   = '#9B6DD4';
 

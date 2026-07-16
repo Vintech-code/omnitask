@@ -4,19 +4,19 @@ export const sr = StyleSheet.create({
   safe: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth, gap: 10,
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 0, gap: 10,
   },
   backBtn: { padding: 6 },
   searchBox: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
-    borderRadius: 14, paddingHorizontal: 12, paddingVertical: 11,
+    borderRadius: 18, paddingHorizontal: 14, minHeight: 52,
     borderWidth: StyleSheet.hairlineWidth,
   },
   searchInput: { flex: 1, fontSize: 15, fontWeight: '500' },
   filtersRow: {
-    paddingHorizontal: 14, paddingVertical: 10, gap: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 20, paddingVertical: 10, gap: 8,
+    borderBottomWidth: 0,
   },
   filterChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
@@ -52,9 +52,8 @@ export const sr = StyleSheet.create({
   // Result card
   resultCard: {
     flexDirection: 'row', alignItems: 'center',
-    borderRadius: 16, padding: 14, marginBottom: 8,
+    borderRadius: 22, padding: 14, marginBottom: 10,
     borderWidth: StyleSheet.hairlineWidth,
-    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 4, elevation: 1,
   },
   resultIconWrap: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   resultTitle: { fontSize: 15, fontWeight: '700', marginBottom: 3 },

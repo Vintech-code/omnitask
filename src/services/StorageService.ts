@@ -5,6 +5,7 @@ export const KEYS = {
   TASKS:            'omnitask_tasks',
   TASK_CATEGORIES:  'omnitask_task_categories',
   ALARMS:           'omnitask_alarms',
+  EXACT_ALARM_PROMPTED: 'omnitask_exact_alarm_prompted',
   THEME:            'omnitask_theme',
   SYSTEM_THEME:     'omnitask_system_theme',
   USER:             'omnitask_user',
@@ -35,5 +36,19 @@ export const Storage = {
     try {
       await AsyncStorage.removeItem(key);
     } catch {}
+  },
+
+  userKey: (key: string, uid: string): string => `${key}:${uid}`,
+
+  getForUser: async <T>(key: string, uid: string): Promise<T | null> => {
+    return Storage.get<T>(Storage.userKey(key, uid));
+  },
+
+  setForUser: async <T>(key: string, uid: string, value: T): Promise<void> => {
+    await Storage.set(Storage.userKey(key, uid), value);
+  },
+
+  removeForUser: async (key: string, uid: string): Promise<void> => {
+    await Storage.remove(Storage.userKey(key, uid));
   },
 };

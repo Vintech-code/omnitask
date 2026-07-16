@@ -3,12 +3,10 @@ import { BRAND_BLUE } from '@/theme/colors';
 
 export const styles = StyleSheet.create({
   noteCard: {
-    borderRadius: 14,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius: 20,
+    padding: 14,
+    borderWidth: 1,
+    borderLeftWidth: 4,
   },
   noteCardTitle: {
     fontSize: 15,
@@ -37,7 +35,7 @@ export const styles = StyleSheet.create({
     gap: 4,
     marginTop: 6,
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(74,144,217,0.12)',
+    backgroundColor: 'rgba(255,122,0,0.13)',
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 3,

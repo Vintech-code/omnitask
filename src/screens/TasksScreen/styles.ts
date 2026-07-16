@@ -7,19 +7,23 @@ export const styles = StyleSheet.create({
   // -- Header
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1,
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 0,
   },
-  headerTitle: { fontSize: 19, fontWeight: '800', flex: 1, textAlign: 'center' },
-  headerIcons: { flexDirection: 'row', alignItems: 'center' },
-  iconBtn: { marginLeft: 16 },
+  headerTitle: { fontSize: 26, fontWeight: '700', flex: 1, textAlign: 'left', marginLeft: 14, letterSpacing: -0.4 },
+  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtn: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  headerAddBtn: {
+    width: 42, height: 42, borderRadius: 21,
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   // -- Search
   searchBar: {
     flexDirection: 'row', alignItems: 'center',
-    borderRadius: 12,
-    marginHorizontal: 14, marginTop: 10, marginBottom: 2,
-    paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)',
+    marginHorizontal: 20, marginTop: 6, marginBottom: 2,
+    paddingHorizontal: 14, minHeight: 50,
   },
   searchInput: { flex: 1, fontSize: 15 },
 
@@ -31,7 +35,7 @@ export const styles = StyleSheet.create({
   },
   catChip: {
     paddingHorizontal: 16, paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 20, borderWidth: 1,
   },
   catChipActive: {},
   catChipText: { fontSize: 13, fontWeight: '600' },
@@ -44,14 +48,14 @@ export const styles = StyleSheet.create({
 
   // -- Grid
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 8, paddingTop: 10 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 124 },
   columns: { flexDirection: 'row', gap: 8 },
   column: { flex: 1, gap: 8 },
+  listColumn: { gap: 10 },
 
   // -- Note card
   noteCard: {
     borderRadius: 14, padding: 12,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
   noteCardTitle: { fontSize: 15, fontWeight: '700', marginBottom: 5, lineHeight: 20 },
   noteCardBody: { fontSize: 13, lineHeight: 19, marginBottom: 8 },
@@ -67,16 +71,6 @@ export const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingVertical: 60, gap: 10 },
   emptyTitle: { fontSize: 16, fontWeight: '700' },
   emptySub: { fontSize: 13 },
-
-  // -- FAB
-  fab: {
-    position: 'absolute', right: 20, bottom: 24,
-  },
-  fabInner: {
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center',
-    shadowColor: BLUE, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6,
-  },
 
   // -- Editor
   editorSafe: { flex: 1 },
@@ -125,7 +119,6 @@ export const styles = StyleSheet.create({
     backgroundColor: '#fff', borderRadius: 14,
     borderWidth: 1, borderColor: '#E8E8E8',
     overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 10, elevation: 20,
     zIndex: 999,
   },
   catDropdownItem: {
@@ -203,7 +196,7 @@ export const styles = StyleSheet.create({
   },
   addTagConfirmText: { fontSize: 14, color: '#fff', fontWeight: '700' },
 
-  // -- Toolbar dock � sits at bottom of the flex column (pan mode shifts window up automatically)
+  // Toolbar dock sits at the bottom of the flex column.
   toolbarDock: {
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.07)',
@@ -324,10 +317,6 @@ export const styles = StyleSheet.create({
     marginBottom: 4,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.08)',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
     paddingHorizontal: 8,
     paddingVertical: 8,
     gap: 6,
@@ -376,10 +365,6 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.08)',
     padding: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
   },
   emojiGrid: {
     flexDirection: 'row',

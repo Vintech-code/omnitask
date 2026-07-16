@@ -8,9 +8,11 @@ import { useTheme } from '@/context/ThemeContext';
 import { useTaskStore } from '@/context/TaskStore';
 import { useEvents } from '@/context/EventStore';
 import { useAlarmStore } from '@/context/AlarmStore';
-import { Storage, KEYS } from '@/services/StorageService';
+import { useAuth } from '@/context/AuthContext';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { mb, st } from './styles';
+import { AppBackground, ScreenSkeleton } from '@/components/ui';
+import { hydrateFocusSessions } from '@/services/FocusStatsService';
 
 const GREEN  = '#52B788';
 const ORANGE = '#E09C52';
@@ -73,14 +75,15 @@ interface FocusStat {
 
 export default function StatsScreen({ navigation }: any) {
   const { theme } = useTheme();
-  const { notes } = useTaskStore();
-  const { events } = useEvents();
-  const { alarms } = useAlarmStore();
+  const { notes, isLoading: notesLoading } = useTaskStore();
+  const { events, isLoading: eventsLoading } = useEvents();
+  const { alarms, isLoading: alarmsLoading } = useAlarmStore();
+  const { user } = useAuth();
   const [sessions, setSessions] = useState(0);
 
   useEffect(() => {
-    Storage.get<number>(KEYS.SESSIONS).then(n => { if (n != null) setSessions(n); });
-  }, []);
+    if (user) void hydrateFocusSessions(user.id, setSessions);
+  }, [user?.id]);
 
   // ── Computed stats ────────────────────────────────────────────────────────
   const totalNotes      = notes.length;
@@ -112,9 +115,12 @@ export default function StatsScreen({ navigation }: any) {
   events.forEach(e => { prioMap[e.priority] = (prioMap[e.priority] || 0) + 1; });
   const PRIO_COLORS: Record<string, string> = { High: '#E05252', Medium: ORANGE, Low: GREEN };
 
+  if (notesLoading || eventsLoading || alarmsLoading) return <ScreenSkeleton variant="dashboard" />;
+
   return (
-    <SafeAreaView style={[st.safe, { backgroundColor: theme.bg2 }]} edges={['top']}>
-      <View style={[st.header, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+    <SafeAreaView style={[st.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
+      <AppBackground />
+      <View style={[st.header, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={st.backBtn}>
           <Ionicons name="arrow-back" size={22} color={theme.iconColor} />
         </TouchableOpacity>

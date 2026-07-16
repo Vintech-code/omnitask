@@ -24,6 +24,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Storage, KEYS } from '@/services/StorageService';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { epStyles, makeStyles } from './styles';
+import { AppBackground, ScreenSkeleton } from '@/components/ui';
 
 
 interface MenuRow {
@@ -31,7 +32,7 @@ interface MenuRow {
   lib: 'ion' | 'mc';
   label: string;
   action: () => void;
-  right?: React.ReactNode;
+  right?: React.ReactElement;
   danger?: boolean;
 }
 
@@ -44,14 +45,18 @@ export default function ProfileScreen({ navigation }: any) {
   const [editName, setEditName] = useState(user?.name ?? '');
   const [saving, setSaving] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [langModal, setLangModal] = useState(false);
   const [selectedLang, setSelectedLang] = useState('English');
   const [privacyModal, setPrivacyModal] = useState(false);
   const [helpModal, setHelpModal] = useState(false);
 
   useEffect(() => {
-    Storage.get<string>(KEYS.PROFILE_PHOTO).then(p => { if (p) setProfilePhoto(p); });
-  }, []);
+    if (!user) return;
+    Storage.getForUser<string>(KEYS.PROFILE_PHOTO, user.id)
+      .then(p => { if (p) setProfilePhoto(p); })
+      .finally(() => setProfileLoading(false));
+  }, [user?.id]);
 
   const pickPhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -68,7 +73,7 @@ export default function ProfileScreen({ navigation }: any) {
     if (!result.canceled && result.assets[0]?.uri) {
       const uri = result.assets[0].uri;
       setProfilePhoto(uri);
-      await Storage.set(KEYS.PROFILE_PHOTO, uri);
+      if (user) await Storage.setForUser(KEYS.PROFILE_PHOTO, user.id, uri);
     }
   };
 
@@ -177,18 +182,21 @@ export default function ProfileScreen({ navigation }: any) {
     },
   ];
 
+  if (profileLoading) return <ScreenSkeleton variant="profile" />;
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <AppBackground />
       {/* ── Header ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Ionicons name="arrow-back" size={22} color={theme.iconColor} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Profile & Settings</Text>
+        <Text style={s.headerTitle}>Profile</Text>
         <View style={{ width: 38 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
         {/* ── Avatar Card ── */}
         <View style={s.avatarCard}>
           <TouchableOpacity onPress={pickPhoto} style={s.avatarCircle}>

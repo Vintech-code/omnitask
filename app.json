@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/omnitasklogo.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -16,6 +16,15 @@
     },
     "android": {
       "softwareKeyboardLayoutMode": "pan",
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.VIBRATE"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -31,6 +40,17 @@
       "eas": {
         "projectId": "0e87cf1e-75c1-41a2-b287-37fa22daed11"
       }
-    }
+    },
+    "plugins": [
+      "expo-audio",
+      "expo-asset",
+      [
+        "expo-notifications",
+        {
+          "color": "#FF7A00"
+        }
+      ],
+      "./plugins/withAlarmNotificationSounds"
+    ]
   }
 }

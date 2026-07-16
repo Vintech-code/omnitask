@@ -12,7 +12,6 @@ import {
   FlatList,
   Animated,
   RefreshControl,
-  ActivityIndicator,
   Share,
   Image,
   Keyboard,
@@ -20,17 +19,17 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/ThemeContext';
-import { BurgerMenu, PulsingFAB } from '@/components/BurgerMenu';
+import { BurgerMenu } from '@/components/BurgerMenu';
 import { NoteCard } from '@/components/NoteCard';
 import { useTaskStore } from '@/context/TaskStore';
 import { Note, NoteTag, ChecklistItem } from '@/types/note';
 import { BRAND_BLUE as BLUE, CARD_COLORS, TAG_PALETTE } from '@/theme/colors';
 import { FONT_FAMILIES } from '@/theme/typography';
 import { formatDate } from '@/utils/date';
-import { splitColumns } from '@/utils/array';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { styles } from './styles';
+import { AppBackground, ScreenSkeleton } from '@/components/ui';
 
 const EMOJI_LIST = [
   '😀','😂','😍','🥰','😎','🤩','🥳','😜','🤔','😇','🙃','😴',
@@ -50,7 +49,6 @@ export default function TasksScreen({ navigation }: any) {
   const [activeCategory, setActiveCategory] = useState<string>('All');
 
   // -- Search --------------------------------------------------------------
-  const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery]     = useState('');
 
   // -- Editor modal state ---------------------------------------------------
@@ -328,44 +326,36 @@ export default function TasksScreen({ navigation }: any) {
 
   // -- Note Card -------------------------------------------------------------
   // -- Render ----------------------------------------------------------------
-  const [leftCol, rightCol] = splitColumns(filteredNotes);
   const allCatTabs = ['All', ...categories];
 
   if (isLoading) {
-    return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]} edges={['top']}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#4A90D9" />
-        </View>
-      </SafeAreaView>
-    );
+    return <ScreenSkeleton variant="list" />;
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
+      <AppBackground />
       {/* -- Header -- */}
-      <View style={[styles.header, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+      <View style={[styles.header, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }]}>
         <BurgerMenu navigation={navigation} />
         <Text style={[styles.headerTitle, { color: theme.text }]}>Notes</Text>
         <View style={styles.headerIcons}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => { setSearchVisible(v => !v); setSearchQuery(''); }}>
-            <Ionicons name="search-outline" size={22} color={theme.text} />
-          </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={() => setManageCatVisible(true)}>
             <MaterialCommunityIcons name="view-grid-plus-outline" size={22} color={theme.text} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => Alert.alert('Options', undefined, [
-            { text: 'Manage Categories', onPress: () => setManageCatVisible(true) },
-            { text: 'Cancel', style: 'cancel' },
-          ])}>
-            <Ionicons name="ellipsis-vertical" size={20} color={theme.text} />
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Create note"
+            style={[styles.headerAddBtn, { backgroundColor: theme.accent.base }]}
+            onPress={openNew}
+          >
+            <Ionicons name="add" size={22} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* -- Search bar -- */}
-      {searchVisible && (
-        <View style={[styles.searchBar, { backgroundColor: theme.bg2 }]}>
+      <View style={[styles.searchBar, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
           <Ionicons name="search-outline" size={16} color={theme.textDim} style={{ marginRight: 8 }} />
           <TextInput
             style={[styles.searchInput, { color: theme.text }]}
@@ -373,36 +363,34 @@ export default function TasksScreen({ navigation }: any) {
             placeholderTextColor={theme.textDim}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            autoFocus
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
               <Ionicons name="close-circle" size={18} color={theme.textDim} />
             </TouchableOpacity>
           )}
-        </View>
-      )}
+      </View>
 
       {/* -- Category chips -- */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.catChipsRow}
-        style={[styles.catChipsScroll, { backgroundColor: theme.bg }]}
+        style={[styles.catChipsScroll, { backgroundColor: 'transparent' }]}
       >
         {allCatTabs.map(cat => (
           <TouchableOpacity
             key={cat}
-            style={[styles.catChip, { backgroundColor: activeCategory === cat ? BLUE : theme.bg2 }]}
+            style={[styles.catChip, { backgroundColor: activeCategory === cat ? theme.accent.soft : theme.glass.secondary, borderColor: theme.glass.border }]}
             onPress={() => setActiveCategory(cat)}
           >
-            <Text style={[styles.catChipText, { color: activeCategory === cat ? '#fff' : theme.textSub }]}>{cat}</Text>
+            <Text style={[styles.catChipText, { color: activeCategory === cat ? theme.accent.base : theme.textSub }]}>{cat}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
       {/* -- Notes grid -- */}
-      <ScrollView style={[styles.scroll, { backgroundColor: theme.bg2 }]} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}
+      <ScrollView style={[styles.scroll, { backgroundColor: 'transparent' }]} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.textDim} />}>
         {filteredNotes.length === 0 ? (
           <View style={styles.emptyState}>
@@ -411,22 +399,11 @@ export default function TasksScreen({ navigation }: any) {
             <Text style={[styles.emptySub, { color: theme.textDim }]}>Tap + to create your first note</Text>
           </View>
         ) : (
-          <View style={styles.columns}>
-            <View style={styles.column}>
-              {leftCol.map(note => <NoteCard key={note.id} note={note} onPress={openEdit} onDelete={deleteNote} />)}
-            </View>
-            <View style={styles.column}>
-              {rightCol.map(note => <NoteCard key={note.id} note={note} onPress={openEdit} onDelete={deleteNote} />)}
-            </View>
+          <View style={styles.listColumn}>
+            {filteredNotes.map(note => <NoteCard key={note.id} note={note} onPress={openEdit} onDelete={deleteNote} />)}
           </View>
         )}
-        <View style={{ height: 90 }} />
       </ScrollView>
-
-      {/* -- FAB (pulsing) -- */}
-      <View style={styles.fab}>
-        <PulsingFAB onPress={openNew} />
-      </View>
 
       {/* ----------------------------------------------------------
           NOTE EDITOR MODAL
@@ -490,7 +467,7 @@ export default function TasksScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
-            {/* Category dropdown � absolute overlay */}
+            {/* Category dropdown overlay */}
             {catPickerVisible && (
               <View style={styles.catDropdown}>
                 <TouchableOpacity style={styles.catDropdownItem} onPress={() => { setManageCatVisible(true); setCatPickerVisible(false); }}>
@@ -596,7 +573,7 @@ export default function TasksScreen({ navigation }: any) {
                   <View style={styles.todoAddRow}>
                     <TextInput
                       style={styles.todoAddInput}
-                      placeholder="Add item�"
+                      placeholder="Add item…"
                       placeholderTextColor="#bbb"
                       value={newTodoText}
                       onChangeText={setNewTodoText}
@@ -629,7 +606,7 @@ export default function TasksScreen({ navigation }: any) {
             </ScrollView>
 
             {/* ---------------------------------------------------
-                TOOLBAR � absolutely pinned above keyboard
+                TOOLBAR — pinned above keyboard
             --------------------------------------------------- */}
             <View style={[styles.toolbarDock, { backgroundColor: edCardColor }]}>
 
@@ -718,7 +695,7 @@ export default function TasksScreen({ navigation }: any) {
                 <TouchableOpacity style={styles.editorBarBtn} onPress={() => wrapText('~~', '~~')}>
                   <MaterialCommunityIcons name="format-strikethrough" size={22} color="#555" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.editorBarBtn} onPress={() => insertLinePrefix('� ')}>
+                <TouchableOpacity style={styles.editorBarBtn} onPress={() => insertLinePrefix('• ')}>
                   <Ionicons name="list-outline" size={22} color="#555" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.editorBarBtn} onPress={() => insertLinePrefix('1. ')}>
@@ -848,7 +825,7 @@ export default function TasksScreen({ navigation }: any) {
           <View style={[styles.addCatBar, { backgroundColor: theme.bg, borderTopColor: theme.border }]}>
             <TextInput
               style={[styles.addCatInput, { color: theme.text, backgroundColor: theme.bg2, borderColor: theme.border }]}
-              placeholder="New category name�"
+              placeholder="New category name…"
               placeholderTextColor={theme.textDim}
               value={newCatName}
               onChangeText={setNewCatName}

@@ -8,28 +8,27 @@ export const fs = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 10,
+    borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 13,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.78)',
   },
   input: { flex: 1, fontSize: 15, color: '#222' },
 });
 
 export const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 1, backgroundColor: 'transparent' },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomWidth: 0,
   },
   back: { width: 40, alignItems: 'flex-start' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A' },
-  scroll: { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 40, alignItems: 'center' },
+  scroll: { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 40, alignItems: 'center', maxWidth: 480, width: '100%', alignSelf: 'center' },
 
   /* Avatar */
   avatarWrap: { position: 'relative', marginBottom: 10 },
@@ -81,7 +80,7 @@ export const s = StyleSheet.create({
   btnPrimary: {
     width: '100%',
     backgroundColor: BLUE,
-    borderRadius: 12,
+    borderRadius: 999,
     paddingVertical: 16,
     alignItems: 'center',
     marginBottom: 18,
@@ -97,8 +96,8 @@ export const s = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
-    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.62)',
+    borderRadius: 20,
     padding: 14,
     width: '100%',
   },

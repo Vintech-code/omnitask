@@ -19,19 +19,19 @@ export const s = StyleSheet.create({
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 0,
   },
   headerBtn: { minWidth: 60 },
-  headerTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  headerTitle: { fontSize: 19, fontWeight: '700', textAlign: 'center' },
   cancelTxt: { fontSize: 15, fontWeight: '500' },
   saveTxt: { fontSize: 15, fontWeight: '700', textAlign: 'right' },
 
   scroll: { flex: 1 },
-  content: { paddingHorizontal: 16, paddingTop: 14, gap: 12 },
+  content: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 28, gap: 12 },
 
   // Title card
   titleCard: {
-    borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden',
+    borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden',
   },
   titleInput: {
     fontSize: 20, fontWeight: '700',
@@ -45,7 +45,7 @@ export const s = StyleSheet.create({
 
   // Card
   card: {
-    borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden',
+    borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden',
   },
   timeRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -89,7 +89,7 @@ export const s = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   saveBtn: {
-    backgroundColor: BLUE, borderRadius: 13,
+    backgroundColor: BLUE, borderRadius: 999,
     paddingVertical: 14, alignItems: 'center',
   },
   saveBtnTxt: { fontSize: 15, fontWeight: '700', color: '#fff' },

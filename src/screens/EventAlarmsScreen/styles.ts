@@ -30,30 +30,30 @@ export const styles = StyleSheet.create({
 
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 12,
-    borderBottomWidth: 1,
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 0,
   },
-  topBarTitle: { flex: 1, fontSize: 17, fontWeight: '700', textAlign: 'center' },
-  topBarRight: { flexDirection: 'row', alignItems: 'center' },
-  iconBtn: { marginLeft: 14 },
+  topBarTitle: { flex: 1, fontSize: 25, fontWeight: '700', textAlign: 'left', marginLeft: 14, letterSpacing: -0.4 },
+  topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  iconBtn: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21 },
 
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 20 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 124 },
 
-  statRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  statCard: { flex: 1, borderRadius: 12, padding: 10 },
+  statRow: { flexDirection: 'row', gap: 12, marginBottom: 22 },
+  statCard: { flex: 1, borderRadius: 20, padding: 16, borderWidth: 1 },
   statCardBlue: {},
-  statCardWhite: { shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  statCardWhite: {},
   statLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8, marginBottom: 3 },
   statValueBlue: { fontSize: 22, fontWeight: '800' },
   statValueDark: { fontSize: 13, fontWeight: '700', marginTop: 2 },
 
   sectionHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, marginTop: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12,
   },
   blueDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: BLUE },
   sectionTitle: { flex: 1, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  manageAllBtn: {},
+  manageAllBtn: { minHeight: 44, justifyContent: 'center', paddingLeft: 12 },
   manageAllText: { fontSize: 12, color: BLUE, fontWeight: '600' },
 
   emptyState: { alignItems: 'center', paddingVertical: 48, gap: 8 },
@@ -66,12 +66,11 @@ export const styles = StyleSheet.create({
   emptyAddText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   alarmCard: {
-    flexDirection: 'row', borderRadius: 12,
-    marginBottom: 8, overflow: 'hidden',
-    shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 3, elevation: 1,
+    flexDirection: 'row', borderRadius: 22, borderWidth: 1,
+    marginBottom: 10, overflow: 'hidden',
   },
-  alarmLeftBorder: { width: 4, backgroundColor: BLUE },
-  alarmCardBody: { flex: 1, paddingHorizontal: 12, paddingVertical: 10 },
+  alarmLeftBorder: { width: 3, backgroundColor: BLUE },
+  alarmCardBody: { flex: 1, paddingHorizontal: 16, paddingVertical: 14 },
 
   alarmTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
   alarmTimeBlock: { flexDirection: 'row', alignItems: 'flex-end' },
@@ -80,7 +79,7 @@ export const styles = StyleSheet.create({
   alarmTimeInactive: { color: '#CCC' },
   alarmTopActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
-  alarmTitle: { fontSize: 14, fontWeight: '700', marginBottom: 3 },
+  alarmTitle: { fontSize: 16, fontWeight: '700', marginBottom: 5 },
   alarmTitleInactive: { color: '#BBB' },
 
   alarmEventRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 },
@@ -99,7 +98,7 @@ export const styles = StyleSheet.create({
   },
   repeatBadgeText: { fontSize: 10, fontWeight: '700' },
 
-  alarmBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  alarmBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   chipsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', flex: 1 },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -113,7 +112,4 @@ export const styles = StyleSheet.create({
   priorityBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   priorityBadgeText: { fontSize: 11, fontWeight: '700' },
 
-  fab: {
-    position: 'absolute', right: 20, bottom: 20,
-  },
 });

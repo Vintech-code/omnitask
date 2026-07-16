@@ -1,295 +1,248 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  RefreshControl,
-  Image,
-} from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+
 import { useEvents } from '@/context/EventStore';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useAlarmStore } from '@/context/AlarmStore';
-import { Storage, KEYS } from '@/services/StorageService';
-import { BurgerMenu } from '@/components/BurgerMenu';
 import { useTaskStore } from '@/context/TaskStore';
-import { BRAND_BLUE as BLUE } from '@/theme/colors';
+import { AppBackground, GlassCard, GlassIconButton, PillButton, ScreenSkeleton } from '@/components/ui';
+import { hydrateFocusSessions } from '@/services/FocusStatsService';
 import { styles } from './styles';
 
-
-const PRIORITY_BAR: Record<string, string> = {
-  High: '#E05252', Medium: '#4A90D9', Low: '#3DAE7C',
-};
-
-function EventCard({ ev, onPress, theme }: any) {
-  return (
-    <TouchableOpacity
-      style={[styles.eventCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-      onPress={onPress}
-      activeOpacity={0.85}
-    >
-      <View style={[styles.eventBar, { backgroundColor: PRIORITY_BAR[ev.priority] ?? BLUE }]} />
-      <View style={styles.eventBody}>
-        <View style={styles.eventTimeRow}>
-          <Ionicons name="time-outline" size={13} color={theme.textDim} />
-          <Text style={[styles.eventTime, { color: theme.textDim }]}> {ev.startTime || ev.startDate}</Text>
-        </View>
-        <Text style={[styles.eventTitle, { color: theme.text }]} numberOfLines={1}>{ev.title}</Text>
-        {ev.location ? (
-          <View style={styles.eventLocRow}>
-            <Ionicons name="location-outline" size={12} color={theme.textDim} />
-            <Text style={[styles.eventLoc, { color: theme.textDim }]} numberOfLines={1}> {ev.location}</Text>
-          </View>
-        ) : (
-          <View style={styles.eventLocRow}>
-            <Ionicons name="pricetag-outline" size={12} color={theme.textDim} />
-            <Text style={[styles.eventLoc, { color: theme.textDim }]}> {ev.category}</Text>
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-}
+const priorityColor = (priority: string, theme: ReturnType<typeof useTheme>['theme']) => ({
+  High: theme.semantic.danger,
+  Medium: theme.semantic.warning,
+  Low: theme.semantic.success,
+}[priority] ?? theme.accent.base);
 
 export default function DashboardScreen({ navigation }: any) {
-  const { events } = useEvents();
+  const { events, isLoading: eventsLoading } = useEvents();
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { alarms } = useAlarmStore();
-  const { notes } = useTaskStore();
+  const { alarms, isLoading: alarmsLoading } = useAlarmStore();
+  const { notes, isLoading: notesLoading } = useTaskStore();
   const firstName = user?.name?.split(' ')[0] ?? 'there';
+  const initial = firstName.charAt(0).toUpperCase();
 
   const [sessions, setSessions] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [now, setNow] = useState(new Date());
+
   useEffect(() => {
-    Storage.get<number>(KEYS.SESSIONS).then(n => { if (n != null) setSessions(n); });
+    if (user) void hydrateFocusSessions(user.id, setSessions);
+  }, [user?.id]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
   }, []);
 
-  // next active alarm sorted by time
   const nextAlarm = useMemo(() => {
     const active = alarms.filter(a => a.active);
-    if (!active.length) return null;
-    const toMins = (a: typeof active[0]) => {
-      let h = a.hour;
-      if (a.period === 'PM' && h !== 12) h += 12;
-      if (a.period === 'AM' && h === 12) h = 0;
-      return h * 60 + a.minute;
+    const toMinutes = (alarm: typeof active[0]) => {
+      let hour = alarm.hour;
+      if (alarm.period === 'PM' && hour !== 12) hour += 12;
+      if (alarm.period === 'AM' && hour === 12) hour = 0;
+      return hour * 60 + alarm.minute;
     };
-    return [...active].sort((a, b) => toMins(a) - toMins(b))[0];
+    return [...active].sort((a, b) => toMinutes(a) - toMinutes(b))[0] ?? null;
   }, [alarms]);
 
+  const week = useMemo(() => Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(now);
+    date.setDate(now.getDate() + index - 3);
+    return date;
+  }), [now.toDateString()]);
+
+  const recentNotes = useMemo(
+    () => [...notes].sort((a, b) => b.timestamp - a.timestamp).slice(0, 4),
+    [notes],
+  );
+
+  const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 18 ? 'Good afternoon' : 'Good evening';
+  const dateLabel = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const nextAlarmLabel = nextAlarm
-    ? `${String(nextAlarm.hour).padStart(2, '0')}:${String(nextAlarm.minute).padStart(2, '0')}`
+    ? `${String(nextAlarm.hour).padStart(2, '0')}:${String(nextAlarm.minute).padStart(2, '0')} ${nextAlarm.period}`
     : '--:--';
 
-  const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 800); };
+  const onRefresh = () => {
+    setRefreshing(true);
+    if (user) void hydrateFocusSessions(user.id, setSessions);
+    setTimeout(() => setRefreshing(false), 650);
+  };
 
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 30000);
-    return () => clearInterval(t);
-  }, []);
-
-  const todayStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const h = now.getHours();
-  const greeting = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  if (eventsLoading || alarmsLoading || notesLoading) {
+    return <ScreenSkeleton variant="dashboard" />;
+  }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.bg }]}>
-      {/* Top Bar */}
-      <View style={[styles.topBar, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
-        <View style={[styles.logoBox, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }]}>
-          <Image source={require('../../../assets/omnitasklogo.png')} style={{ width: 26, height: 26 }} resizeMode="contain" />
-        </View>
-        <Text style={[styles.topTitle, { color: theme.text }]}>Dashboard</Text>
-        <View style={styles.topIcons}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Search')}>
-            <Ionicons name="search-outline" size={22} color={theme.text} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Stats')}>
-            <Ionicons name="bar-chart-outline" size={22} color={theme.text} />
-          </TouchableOpacity>
-          <BurgerMenu navigation={navigation} />
-        </View>
-      </View>
-
-      <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.textDim} />}>
-
-        {/* Greeting */}
-        <View style={styles.greetingBlock}>
-          <Text style={[styles.greetingTitle, { color: theme.text }]}>{greeting}, {firstName}! 👋</Text>
-          <Text style={[styles.greetingSub, { color: theme.textDim }]}>{todayStr}</Text>
-          <Text style={[styles.greetingMeta, { color: BLUE }]}>
-            {events.length > 0
-              ? `${events.length} upcoming event${events.length !== 1 ? 's' : ''} scheduled`
-              : 'No upcoming events'}
-          </Text>
-        </View>
-
-        {/* Quick Stats Bar */}
-        <View style={[styles.quickStats, { backgroundColor: theme.bg2, borderColor: theme.border }]}>
-          <TouchableOpacity style={styles.quickStat} onPress={() => navigation.navigate('EventAlarms')}>
-            <Text style={[styles.quickStatNum, { color: theme.text }]}>{events.length}</Text>
-            <Text style={[styles.quickStatLabel, { color: theme.textDim }]}>Events</Text>
-          </TouchableOpacity>
-          <View style={[styles.quickStatDiv, { backgroundColor: theme.border }]} />
-          <TouchableOpacity style={styles.quickStat} onPress={() => navigation.navigate('Focus')}>
-            <Text style={[styles.quickStatNum, { color: theme.text }]}>{sessions}</Text>
-            <Text style={[styles.quickStatLabel, { color: theme.textDim }]}>Sessions</Text>
-          </TouchableOpacity>
-          <View style={[styles.quickStatDiv, { backgroundColor: theme.border }]} />
-          <TouchableOpacity style={styles.quickStat} onPress={() => navigation.navigate('Alarm')}>
-            <Text style={[styles.quickStatNum, { color: BLUE }]}>{nextAlarmLabel}</Text>
-            <Text style={[styles.quickStatLabel, { color: theme.textDim }]}>Next Alarm</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Upcoming Events */}
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Upcoming Events</Text>
-          <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('EventAlarms')}>
-            <Text style={[styles.viewAllText, { color: BLUE }]}>See all</Text>
-            <Ionicons name="chevron-forward" size={13} color={BLUE} />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 16, paddingRight: 8 }}>
-          {events.length === 0 ? (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <AppBackground />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent.base} />}
+      >
+        <View style={styles.header}>
+          <View style={styles.headerCopy}>
+            <Text style={[styles.eyebrow, { color: theme.content.secondary }]}>{greeting}</Text>
+            <Text style={[styles.title, { color: theme.content.primary }]}>{firstName}'s day</Text>
+          </View>
+          <View style={styles.headerActions}>
+            <GlassIconButton name="search-outline" onPress={() => navigation.navigate('Search')} accessibilityLabel="Search" />
             <TouchableOpacity
-              style={[styles.emptyEventCard, { backgroundColor: theme.bg2, borderColor: theme.border }]}
-              onPress={() => navigation.navigate('CreateEvent')}
+              accessibilityRole="button"
+              accessibilityLabel="Open profile"
+              onPress={() => navigation.navigate('Profile')}
+              style={[styles.avatar, { backgroundColor: theme.accent.base, borderColor: theme.glass.border }]}
             >
-              <Ionicons name="add-circle-outline" size={24} color={theme.textDim} />
-              <Text style={[styles.emptyEventText, { color: theme.textDim }]}>Add an event</Text>
+              <Text style={styles.avatarText}>{initial}</Text>
             </TouchableOpacity>
-          ) : (
-            events.slice(0, 6).map(ev => (
-              <EventCard key={ev.id} ev={ev} theme={theme} onPress={() => navigation.navigate('EventDetail', { event: ev })} />
-            ))
+          </View>
+        </View>
+
+        <View style={styles.dateHeading}>
+          <View>
+            <Text style={[styles.sectionTitle, { color: theme.content.primary }]}>Plan your day</Text>
+            <Text style={[styles.dateLabel, { color: theme.content.muted }]}>{dateLabel}</Text>
+          </View>
+          <GlassIconButton name="stats-chart-outline" onPress={() => navigation.navigate('Stats')} accessibilityLabel="View statistics" />
+        </View>
+
+        <GlassCard variant="subtle" padding={8} style={styles.weekCard} contentStyle={styles.weekRow}>
+          {week.map(date => {
+            const selected = date.toDateString() === now.toDateString();
+            return (
+              <View key={date.toISOString()} style={[styles.day, selected && { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
+                <Text style={[styles.dayName, { color: selected ? theme.accent.base : theme.content.muted }]}>
+                  {date.toLocaleDateString('en-US', { weekday: 'narrow' })}
+                </Text>
+                <Text style={[styles.dayNumber, { color: theme.content.primary }]}>{date.getDate()}</Text>
+                <View style={[styles.dayDot, { backgroundColor: selected ? theme.accent.base : 'transparent' }]} />
+              </View>
+            );
+          })}
+        </GlassCard>
+
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.content.primary }]}>Upcoming events</Text>
+          <TouchableOpacity style={styles.inlineAction} onPress={() => navigation.navigate('EventAlarms')}>
+            <Text style={[styles.inlineActionText, { color: theme.accent.base }]}>See all</Text>
+            <Ionicons name="arrow-forward" size={15} color={theme.accent.base} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+          {events.length ? events.slice(0, 6).map(event => (
+            <TouchableOpacity key={event.id} activeOpacity={0.82} onPress={() => navigation.navigate('EventDetail', { event })}>
+              <GlassCard style={styles.eventCard} padding={16}>
+                <View style={styles.eventTopRow}>
+                  <View style={[styles.eventIcon, { backgroundColor: theme.accent.soft }]}>
+                    <Ionicons name="calendar-outline" size={18} color={theme.accent.base} />
+                  </View>
+                  <View style={[styles.priorityDot, { backgroundColor: priorityColor(event.priority, theme) }]} />
+                </View>
+                <Text style={[styles.eventTitle, { color: theme.content.primary }]} numberOfLines={2}>{event.title}</Text>
+                <View style={styles.metaRow}>
+                  <Ionicons name="time-outline" size={14} color={theme.content.muted} />
+                  <Text style={[styles.metaText, { color: theme.content.muted }]} numberOfLines={1}>
+                    {event.startTime || event.startDate}
+                  </Text>
+                </View>
+                <View style={styles.metaRow}>
+                  <Ionicons name={event.location ? 'location-outline' : 'pricetag-outline'} size={14} color={theme.content.muted} />
+                  <Text style={[styles.metaText, { color: theme.content.muted }]} numberOfLines={1}>
+                    {event.location || event.category}
+                  </Text>
+                </View>
+              </GlassCard>
+            </TouchableOpacity>
+          )) : (
+            <GlassCard style={styles.emptyEvent} variant="subtle" padding={18}>
+              <View style={[styles.eventIcon, { backgroundColor: theme.accent.soft }]}>
+                <Ionicons name="calendar-outline" size={20} color={theme.accent.base} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: theme.content.primary }]}>A clear day</Text>
+              <Text style={[styles.emptyCopy, { color: theme.content.muted }]}>Create an event when you're ready.</Text>
+              <PillButton label="Add event" icon="add" variant="tonal" onPress={() => navigation.navigate('CreateEvent')} />
+            </GlassCard>
           )}
         </ScrollView>
 
-        {/* Focus + Alarm widgets */}
-        <View style={styles.widgetRow}>
-          <TouchableOpacity
-            style={[styles.widgetCard, { backgroundColor: theme.dark ? '#1A2A3A' : '#EBF4FF' }]}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('Focus')}
-          >
-            <View style={styles.widgetTitleRow}>
-              <Ionicons name="timer-outline" size={14} color={BLUE} />
-              <Text style={[styles.widgetTitle, { color: BLUE }]}> Focus</Text>
-            </View>
-            <View style={[styles.widgetPlayRing, { borderColor: BLUE }]}>
-              <Ionicons name="play" size={24} color={BLUE} />
-            </View>
-            <Text style={[styles.timerTime, { color: theme.text }]}>25:00</Text>
-            <Text style={[styles.timerGoal, { color: theme.textDim }]}>Pomodoro ready</Text>
+        <View style={styles.metricsRow}>
+          <TouchableOpacity style={styles.metricTouch} activeOpacity={0.82} onPress={() => navigation.navigate('Focus')}>
+            <GlassCard style={styles.metricCard} padding={16}>
+              <View style={styles.metricTop}>
+                <View style={[styles.metricIcon, { backgroundColor: theme.accent.soft }]}>
+                  <Ionicons name="timer-outline" size={20} color={theme.accent.base} />
+                </View>
+                <Text style={[styles.metricKicker, { color: theme.content.secondary }]}>Focus</Text>
+              </View>
+              <Text style={[styles.metricValue, { color: theme.content.primary }]}>25:00</Text>
+              <Text style={[styles.metricMeta, { color: theme.content.muted }]}>{sessions} sessions completed</Text>
+              <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
+                <View style={[styles.progressFill, { width: `${Math.min(sessions / 8, 1) * 100}%`, backgroundColor: theme.accent.base }]} />
+              </View>
+            </GlassCard>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.widgetCard, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border }]}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('Alarm')}
-          >
-            <View style={styles.widgetTitleRow}>
-              <Ionicons name="alarm-outline" size={14} color="#E09C52" />
-              <Text style={[styles.widgetTitle, { color: '#E09C52' }]}> Alarm</Text>
-            </View>
-            <Text style={[styles.alarmTime, { color: theme.text }]}>{nextAlarmLabel}</Text>
-            <View style={styles.alarmTagRow}>
-              <View style={[styles.alarmTag, { backgroundColor: theme.dark ? '#2A2000' : '#FFF3E0' }]}>
-                <Text style={styles.alarmTagText}>{nextAlarm ? nextAlarm.label : 'No alarms'}</Text>
+          <TouchableOpacity style={styles.metricTouch} activeOpacity={0.82} onPress={() => navigation.navigate('Alarm')}>
+            <GlassCard style={styles.metricCard} padding={16}>
+              <View style={styles.metricTop}>
+                <View style={[styles.metricIcon, { backgroundColor: theme.accent.soft }]}>
+                  <Ionicons name="alarm-outline" size={20} color={theme.accent.base} />
+                </View>
+                <Text style={[styles.metricKicker, { color: theme.content.secondary }]}>Next alarm</Text>
               </View>
-            </View>
-            <View style={[styles.alarmBar, { backgroundColor: '#F5C842' }]} />
+              <Text style={[styles.alarmValue, { color: theme.content.primary }]} numberOfLines={1}>{nextAlarmLabel}</Text>
+              <Text style={[styles.metricMeta, { color: theme.content.muted }]} numberOfLines={1}>{nextAlarm?.label || 'No active alarms'}</Text>
+              <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
+                <View style={[styles.progressFill, { width: nextAlarm ? '68%' : '0%', backgroundColor: theme.accent.base }]} />
+              </View>
+            </GlassCard>
           </TouchableOpacity>
         </View>
 
-        {/* Quick action shortcuts */}
-        <TouchableOpacity
-          style={[styles.actionRow, { backgroundColor: theme.card, borderColor: theme.border }]}
-          onPress={() => navigation.navigate('CreateEvent')}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="calendar-outline" size={18} color={BLUE} />
-          <Text style={[styles.actionText, { color: theme.text }]}>Create New Event</Text>
-          <Ionicons name="chevron-forward" size={16} color={theme.textDim} />
-        </TouchableOpacity>
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={[styles.sectionTitle, { color: theme.content.primary }]}>Agenda</Text>
+            <Text style={[styles.sectionSub, { color: theme.content.muted }]}>{notes.length} notes and task lists</Text>
+          </View>
+          <PillButton label="Add" icon="add-circle-outline" variant="secondary" onPress={() => navigation.navigate('Tasks')} style={styles.addButton} />
+        </View>
 
-        <TouchableOpacity
-          style={[styles.actionRow, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 8 }]}
-          onPress={() => navigation.navigate('Tasks')}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="checkmark-circle-outline" size={18} color="#3DAE7C" />
-          <Text style={[styles.actionText, { color: theme.text }]}>View To-do List</Text>
-          <Ionicons name="chevron-forward" size={16} color={theme.textDim} />
-        </TouchableOpacity>
-
-        {/* Recent Notes */}
-        {notes.length > 0 && (
-          <>
-            <View style={[styles.sectionHeader, { marginTop: 20 }]}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent Notes</Text>
-              <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('Tasks')}>
-                <Text style={[styles.viewAllText, { color: BLUE }]}>See all</Text>
-                <Ionicons name="chevron-forward" size={13} color={BLUE} />
+        <GlassCard padding={0} style={styles.agendaCard}>
+          {recentNotes.length ? recentNotes.map((note, index) => {
+            const done = note.todos?.length ? note.todos.filter(todo => todo.done).length : 0;
+            return (
+              <TouchableOpacity
+                key={note.id}
+                style={[styles.agendaRow, index < recentNotes.length - 1 && { borderBottomColor: theme.divider, borderBottomWidth: 1 }]}
+                activeOpacity={0.72}
+                onPress={() => navigation.navigate('Tasks')}
+              >
+                <View style={[styles.agendaIcon, { backgroundColor: theme.accent.soft }]}>
+                  <Ionicons name={note.todos?.length ? 'checkbox-outline' : 'document-text-outline'} size={20} color={theme.accent.base} />
+                </View>
+                <View style={styles.agendaCopy}>
+                  <Text style={[styles.agendaTitle, { color: theme.content.primary }]} numberOfLines={1}>{note.title || 'Untitled note'}</Text>
+                  <Text style={[styles.agendaMeta, { color: theme.content.muted }]} numberOfLines={1}>
+                    {note.category}{note.todos?.length ? ` · ${done}/${note.todos.length} complete` : ` · ${note.date}`}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={17} color={theme.content.muted} />
               </TouchableOpacity>
+            );
+          }) : (
+            <View style={styles.agendaEmpty}>
+              <Text style={[styles.emptyTitle, { color: theme.content.primary }]}>Nothing on your list</Text>
+              <Text style={[styles.emptyCopy, { color: theme.content.muted }]}>Add a note or checklist to get started.</Text>
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingLeft: 16, paddingRight: 8 }}
-            >
-              {[...notes].sort((a, b) => b.timestamp - a.timestamp).slice(0, 6).map(note => (
-                <TouchableOpacity
-                  key={note.id}
-                  style={{
-                    width: 160, borderRadius: 12, padding: 12,
-                    marginRight: 10, marginBottom: 16,
-                    backgroundColor: note.cardColor,
-                    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
-                  }}
-                  activeOpacity={0.85}
-                  onPress={() => navigation.navigate('Tasks')}
-                >
-                  {note.title.length > 0 && (
-                    <Text
-                      style={{ fontSize: 13, fontWeight: '700', color: '#222', marginBottom: 5, lineHeight: 18 }}
-                      numberOfLines={2}
-                    >
-                      {note.title}
-                    </Text>
-                  )}
-                  {note.body.length > 0 && (
-                    <Text
-                      style={{ fontSize: 12, color: '#555', lineHeight: 17, marginBottom: 6 }}
-                      numberOfLines={3}
-                    >
-                      {note.body}
-                    </Text>
-                  )}
-                  {note.todos && note.todos.length > 0 && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                      <Ionicons name="checkbox-outline" size={11} color={BLUE} />
-                      <Text style={{ fontSize: 10, color: BLUE, fontWeight: '700' }}>
-                        {note.todos.filter(t => t.done).length}/{note.todos.length}
-                      </Text>
-                    </View>
-                  )}
-                  <Text style={{ fontSize: 10, color: '#888', marginTop: 2 }}>{note.date}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </>
-        )}
-
+          )}
+        </GlassCard>
       </ScrollView>
     </SafeAreaView>
   );

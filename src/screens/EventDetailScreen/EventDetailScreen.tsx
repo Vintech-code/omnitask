@@ -16,6 +16,7 @@ import { useEvents, AppEvent } from '@/context/EventStore';
 import * as Haptics from 'expo-haptics';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { s } from './styles';
+import { AppBackground } from '@/components/ui';
 
 const GREEN = '#3DAE7C';
 const RED   = '#E53935';
@@ -54,6 +55,7 @@ export default function EventDetailScreen({ route, navigation }: any) {
   if (!event) {
     return (
       <SafeAreaView style={[s.safe, { backgroundColor: theme.bg }]} edges={['top']}>
+        <AppBackground />
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 16 }}>
           <Ionicons name="arrow-back" size={22} color={theme.text} />
         </TouchableOpacity>
@@ -66,9 +68,10 @@ export default function EventDetailScreen({ route, navigation }: any) {
   }
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: theme.bg2 }]} edges={['top']}>
+    <SafeAreaView style={[s.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
+      <AppBackground />
       {/* Top Bar */}
-      <View style={[s.topBar, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+      <View style={[s.topBar, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.iconBtn}>
           <Ionicons name="arrow-back" size={22} color={theme.text} />
         </TouchableOpacity>
@@ -105,7 +108,7 @@ export default function EventDetailScreen({ route, navigation }: any) {
                 <Ionicons name="pricetag-outline" size={11} color={BLUE} />
                 <Text style={[s.badgeText, { color: BLUE }]}>{event.category}</Text>
               </View>
-              {event.recurrence && event.recurrence !== 'none' && (
+              {Boolean(event.recurrence) && event.recurrence !== 'none' && (
                 <View style={[s.badge, { backgroundColor: isDark ? '#1A2A1A' : '#E6F9F1' }]}>
                   <Ionicons name="repeat-outline" size={11} color={GREEN} />
                   <Text style={[s.badgeText, { color: GREEN }]}>{event.recurrence}</Text>
@@ -124,7 +127,7 @@ export default function EventDetailScreen({ route, navigation }: any) {
                 <View style={[s.datetimeChip, { backgroundColor: isDark ? '#1A2A3A' : '#EBF4FF' }]}>
                   <Ionicons name="time-outline" size={14} color={BLUE} />
                   <Text style={[s.datetimeText, { color: BLUE }]}>
-                    {event.startTime}{event.endTime ? ` � ${event.endTime}` : ''}
+                    {event.startTime}{event.endTime ? ` · ${event.endTime}` : ''}
                   </Text>
                 </View>
               ) : null}

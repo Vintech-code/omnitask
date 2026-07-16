@@ -7,15 +7,15 @@ import {
   Switch,
   Alert,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEvents, AppEvent } from '@/context/EventStore';
 import { useTheme } from '@/context/ThemeContext';
-import { BurgerMenu, PulsingFAB } from '@/components/BurgerMenu';
+import { BurgerMenu } from '@/components/BurgerMenu';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { calS, styles } from './styles';
+import { AppBackground, ScreenSkeleton } from '@/components/ui';
 
 
 function parseTime(timeStr: string): { time: string; period: 'AM' | 'PM' } {
@@ -55,21 +55,16 @@ export default function EventAlarmsScreen({ navigation }: any) {
     ]);
 
   if (isLoading) {
-    return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg2 }]} edges={['top']}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#4A90D9" />
-        </View>
-      </SafeAreaView>
-    );
+    return <ScreenSkeleton variant="list" />;
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg2 }]} edges={['top']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]} edges={['top']}>
+      <AppBackground />
       {/* Top Bar */}
-      <View style={[styles.topBar, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+      <View style={[styles.topBar, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }]}>
         <BurgerMenu navigation={navigation} />
-        <Text style={[styles.topBarTitle, { color: theme.text }]}>Event Alarms</Text>
+        <Text style={[styles.topBarTitle, { color: theme.text }]}>Event alarms</Text>
         <View style={styles.topBarRight}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => { setViewMode(v => v === 'list' ? 'calendar' : 'list'); setSelectedDay(null); }}>
             <Ionicons name={viewMode === 'list' ? 'calendar-outline' : 'list-outline'} size={22} color={theme.text} />
@@ -105,11 +100,11 @@ export default function EventAlarmsScreen({ navigation }: any) {
           <>
         {/* Stat Cards */}
         <View style={styles.statRow}>
-          <View style={[styles.statCard, { backgroundColor: isDark ? '#1A2A3A' : '#EBF4FF' }]}>
+          <View style={[styles.statCard, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
             <Text style={[styles.statLabel, { color: theme.textDim }]}>ACTIVE ALARMS</Text>
             <Text style={[styles.statValueBlue, { color: theme.text }]}>{activeCount}</Text>
           </View>
-          <View style={[styles.statCard, { backgroundColor: theme.card }]}>
+          <View style={[styles.statCard, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
             <Text style={[styles.statLabel, { color: theme.textDim }]}>NEXT EVENT</Text>
             <Text style={[styles.statValueDark, { color: theme.text }]} numberOfLines={1}>
               {nextEvent ? nextEvent.title : 'None'}
@@ -152,11 +147,11 @@ export default function EventAlarmsScreen({ navigation }: any) {
           return (
             <TouchableOpacity
               key={event.id}
-              style={[styles.alarmCard, { backgroundColor: theme.card }]}
+              style={[styles.alarmCard, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}
               onPress={() => navigation?.navigate('EventDetail', { event })}
               onLongPress={() => openEventMenu(event)}
               delayLongPress={400}
-              activeOpacity={0.97}
+              activeOpacity={0.82}
             >
               <View style={styles.alarmLeftBorder} />
               <View style={styles.alarmCardBody}>
@@ -174,7 +169,7 @@ export default function EventAlarmsScreen({ navigation }: any) {
                     <Switch
                       value={event.alarmActive}
                       onValueChange={() => toggleAlarmActive(event.id)}
-                      trackColor={{ false: '#E0E0E0', true: '#B8D4F5' }}
+                      trackColor={{ false: theme.divider, true: theme.accent.soft }}
                       thumbColor={event.alarmActive ? BLUE : '#f0f0f0'}
                       style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
                     />
@@ -195,7 +190,7 @@ export default function EventAlarmsScreen({ navigation }: any) {
                 <View style={styles.alarmEventRow}>
                   <Ionicons name="calendar-outline" size={12} color={theme.textDim} />
                   <Text style={[styles.alarmEventText, { color: theme.textDim }]}>
-                    {event.startDate}{event.startDate && event.startTime ? ' � ' : ''}{event.startTime}
+                    {event.startDate}{event.startDate && event.startTime ? ' · ' : ''}{event.startTime}
                   </Text>
                   <View style={[styles.statusBadge, styles.statusGoing]}>
                     <Text style={[styles.statusText, styles.statusTextGoing]}>confirmed</Text>
@@ -208,12 +203,12 @@ export default function EventAlarmsScreen({ navigation }: any) {
                     <>
                       <Ionicons name="location-outline" size={12} color={BLUE} />
                       <Text style={styles.alarmMetaBlue} numberOfLines={1}>{event.location}</Text>
-                      <Text style={[styles.alarmMetaDot, { color: theme.textDim }]}>�</Text>
+                      <Text style={[styles.alarmMetaDot, { color: theme.textDim }]}>·</Text>
                     </>
                   ) : null}
                   <MaterialCommunityIcons name="music-note" size={12} color={theme.textDim} />
                   <Text style={[styles.alarmMetaText, { color: theme.textDim }]}>Chimes</Text>
-                  <Text style={[styles.alarmMetaDot, { color: theme.textDim }]}>�</Text>
+                  <Text style={[styles.alarmMetaDot, { color: theme.textDim }]}>·</Text>
                   <View style={[styles.repeatBadge, { backgroundColor: isDark ? '#2A2A2A' : '#F0F0F0' }]}>
                     <Text style={[styles.repeatBadgeText, { color: theme.textSub }]}>{repeat}</Text>
                   </View>
@@ -251,15 +246,11 @@ export default function EventAlarmsScreen({ navigation }: any) {
           );
         })}
 
-        <View style={{ height: 80 }} />
+        <View style={{ height: 24 }} />
           </>
         )}
       </ScrollView>
 
-      {/* FAB */}
-      <View style={styles.fab}>
-        <PulsingFAB onPress={() => navigation?.navigate('CreateEvent')} />
-      </View>
     </SafeAreaView>
   );
 }
@@ -378,4 +369,3 @@ function CalendarView({ events, theme, isDark, calDate, setCalDate, selectedDay,
     </View>
   );
 }
-

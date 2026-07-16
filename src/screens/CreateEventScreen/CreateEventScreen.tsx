@@ -17,6 +17,7 @@ import { useEvents, AppEvent } from '@/context/EventStore';
 import { useTheme } from '@/context/ThemeContext';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { fr, s } from './styles';
+import { AppBackground } from '@/components/ui';
 
 
 const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -271,9 +272,10 @@ export default function CreateEventScreen({ navigation, route }: any) {
   const cardBg = isDark ? theme.card : '#fff';
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: theme.bg2 }]} edges={['top']}>
+    <SafeAreaView style={[s.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
+      <AppBackground />
       {/* -- Header -- */}
-      <View style={[s.header, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+      <View style={[s.header, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.headerBtn}>
           <Text style={[s.cancelTxt, { color: theme.textSub }]}>Cancel</Text>
         </TouchableOpacity>
@@ -303,7 +305,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
           />
           <TextInput
             style={[s.descInput, { color: theme.text, borderTopColor: theme.border }]}
-            placeholder="Notes, agenda, links�"
+            placeholder="Notes, agenda, links…"
             placeholderTextColor={theme.textDim}
             multiline
             value={description}
@@ -473,7 +475,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
       </ScrollView>
 
       {/* -- Save button -- */}
-      <View style={[s.footer, { backgroundColor: theme.bg, borderTopColor: theme.border }]}>
+      <View style={[s.footer, { backgroundColor: theme.glass.solid, borderTopColor: theme.glass.border }]}>
         <TouchableOpacity style={s.saveBtn} onPress={handleSave} activeOpacity={0.85}>
           <Text style={s.saveBtnTxt}>{editEvent ? 'Update Event' : 'Create Event'}</Text>
         </TouchableOpacity>

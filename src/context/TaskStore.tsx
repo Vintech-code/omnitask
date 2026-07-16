@@ -1,42 +1,16 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import {
-  collection, doc, setDoc, deleteDoc,
-  onSnapshot, QuerySnapshot,
-} from 'firebase/firestore';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, db } from '../config/firebase';
-import { Storage, KEYS } from '../services/StorageService';
-import type { Note, NoteTag, ChecklistItem } from '@/types/note';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { collection, doc, getDoc, onSnapshot, QuerySnapshot } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
-export type { Note, NoteTag, ChecklistItem };
+import { auth, db } from '../config/firebase';
+import { getPendingDeletePaths, queueCloudDelete, queueCloudSet } from '../services/OfflineSyncService';
+import { KEYS, Storage } from '../services/StorageService';
+import type { ChecklistItem, Note, NoteTag } from '@/types/note';
+
+export type { ChecklistItem, Note, NoteTag };
 
 const DEFAULT_CATEGORIES = ['Personal', 'Work', 'School', 'Health', 'Finance'];
 
-const SEED_NOTES: Note[] = [
-  {
-    id: 'n1', title: 'Pick up groceries',
-    body: 'Eggs, milk, bread, fruits, vegetables',
-    date: 'Today', timestamp: Date.now() - 100,
-    category: 'Personal', cardColor: '#FFF9C4',
-    tags: [{ label: 'PERSONAL', color: '#4CAF50' }],
-  },
-  {
-    id: 'n2', title: 'Send weekly report',
-    body: 'Compile data from monday to friday and send before 5pm.',
-    date: 'Yesterday', timestamp: Date.now() - 86400000,
-    category: 'Work', cardColor: '#E3F2FD',
-    tags: [{ label: 'WORK', color: '#2196F3' }],
-  },
-  {
-    id: 'n3', title: 'Study for exam',
-    body: 'Review chapters 4–7. Focus on formulas and diagrams.',
-    date: 'Mar 1, 2026', timestamp: Date.now() - 172800000,
-    category: 'School', cardColor: '#FFF3E0',
-    tags: [{ label: 'STUDY', color: '#4CAF50' }, { label: 'EXAM', color: '#F44336' }],
-  },
-];
-
-// ─── Context type ────────────────────────────────────────────────────────────
 interface TaskContextType {
   notes: Note[];
   categories: string[];
@@ -44,119 +18,122 @@ interface TaskContextType {
   addNote: (note: Note) => void;
   updateNote: (note: Note) => void;
   removeNote: (id: string) => void;
-  addCategory: (cat: string) => void;
-  removeCategory: (cat: string) => void;
+  addCategory: (category: string) => void;
+  removeCategory: (category: string) => void;
 }
 
 const TaskContext = createContext<TaskContextType>({
-  notes: [],
-  categories: DEFAULT_CATEGORIES,
-  isLoading: true,
-  addNote: () => {},
-  updateNote: () => {},
-  removeNote: () => {},
-  addCategory: () => {},
-  removeCategory: () => {},
+  notes: [], categories: DEFAULT_CATEGORIES, isLoading: true,
+  addNote: () => {}, updateNote: () => {}, removeNote: () => {}, addCategory: () => {}, removeCategory: () => {},
 });
 
-// ─── Firestore helpers ──────────────────────────────────────────────────────
 const notesCol = (uid: string) => collection(db, 'users', uid, 'notes');
-const noteDoc  = (uid: string, id: string) => doc(db, 'users', uid, 'notes', id);
-const metaDoc  = (uid: string) => doc(db, 'users', uid, 'meta', 'taskMeta');
+const notePath = (uid: string, id: string) => ['users', uid, 'notes', id];
+const metaPath = (uid: string) => ['users', uid, 'meta', 'taskMeta'];
+const modified = (note: Note) => note.updatedAt ?? note.timestamp ?? 0;
+const clean = (value: Record<string, unknown>) => Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
 
-// ─── Provider ────────────────────────────────────────────────────────────────
 export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [notes, setNotes]           = useState<Note[]>([]);
-  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
-  const [isLoading, setIsLoading]   = useState(true);
-  const uidRef     = useRef<string | null>(null);
-  const unsubNotes = useRef<(() => void) | null>(null);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [isLoading, setIsLoading] = useState(true);
+  const notesRef = useRef<Note[]>([]);
+  const categoriesRef = useRef(DEFAULT_CATEGORIES);
+  const uidRef = useRef<string | null>(null);
+  const unsubNotesRef = useRef<(() => void) | null>(null);
+
+  const persistNotes = (updated: Note[]) => {
+    notesRef.current = updated;
+    setNotes(updated);
+    if (uidRef.current) void Storage.setForUser(KEYS.TASKS, uidRef.current, updated);
+  };
+
+  const persistCategories = (updated: string[], upload = true) => {
+    categoriesRef.current = updated;
+    setCategories(updated);
+    const uid = uidRef.current;
+    if (!uid) return;
+    void Storage.setForUser(KEYS.TASK_CATEGORIES, uid, updated);
+    if (upload) void queueCloudSet(uid, metaPath(uid), { categories: updated, updatedAt: Date.now() });
+  };
 
   useEffect(() => {
-    // 1. Hydrate from local cache instantly
-    (async () => {
-      const storedNotes = await Storage.get<Note[]>(KEYS.TASKS);
-      const storedCats  = await Storage.get<string[]>(KEYS.TASK_CATEGORIES);
-      setNotes(storedNotes ?? SEED_NOTES);
-      setCategories(storedCats ?? DEFAULT_CATEGORIES);
+    const unsubAuth = onAuthStateChanged(auth, async firebaseUser => {
+      unsubNotesRef.current?.();
+      unsubNotesRef.current = null;
+      if (!firebaseUser) {
+        uidRef.current = null;
+        persistNotes([]);
+        categoriesRef.current = DEFAULT_CATEGORIES;
+        setCategories(DEFAULT_CATEGORIES);
+        setIsLoading(false);
+        return;
+      }
+
+      const uid = firebaseUser.uid;
+      uidRef.current = uid;
+      const [localNotes, localCategories] = await Promise.all([
+        Storage.getForUser<Note[]>(KEYS.TASKS, uid),
+        Storage.getForUser<string[]>(KEYS.TASK_CATEGORIES, uid),
+      ]);
+      persistNotes(localNotes ?? []);
+      persistCategories(localCategories ?? DEFAULT_CATEGORIES, false);
       setIsLoading(false);
-    })();
 
-    // 2. Attach Firestore realtime listener when authenticated
-    const unsubAuth = onAuthStateChanged(auth, async (fbUser: FirebaseUser | null) => {
-      if (unsubNotes.current) { unsubNotes.current(); unsubNotes.current = null; }
-      if (!fbUser) { uidRef.current = null; return; }
-      uidRef.current = fbUser.uid;
-
-      unsubNotes.current = onSnapshot(
-        notesCol(fbUser.uid),
-        (snap: QuerySnapshot) => {
-          const fetched: Note[] = snap.docs.map(d => d.data() as Note);
-          if (fetched.length > 0) {
-            setNotes(fetched);
-            Storage.set(KEYS.TASKS, fetched);
-          }
-        },
-        () => {}
-      );
-
-      // Fetch categories metadata
-      try {
-        const firestoreImport = await import('firebase/firestore');
-        const snap = await firestoreImport.getDoc(metaDoc(fbUser.uid));
-        const data = snap.data();
-        if (data?.categories) {
-          setCategories(data.categories);
-          Storage.set(KEYS.TASK_CATEGORIES, data.categories);
+      void getDoc(doc(db, metaPath(uid).join('/'))).then(snapshot => {
+        const cloudCategories = snapshot.data()?.categories;
+        if (uidRef.current === uid && Array.isArray(cloudCategories)) {
+          persistCategories([...new Set([...categoriesRef.current, ...cloudCategories])], false);
         }
-      } catch { /* offline */ }
-    });
+      }).catch(() => undefined);
 
+      unsubNotesRef.current = onSnapshot(notesCol(uid), async (snapshot: QuerySnapshot) => {
+        if (uidRef.current !== uid) return;
+        const pendingDeletes = await getPendingDeletePaths(uid);
+        const cloud = snapshot.docs
+          .map(item => item.data() as Note)
+          .filter(item => !pendingDeletes.has(notePath(uid, item.id).join('/')));
+        const merged = new Map(cloud.map(item => [item.id, item]));
+        for (const local of notesRef.current) {
+          const remote = merged.get(local.id);
+          if (!remote || modified(local) > modified(remote)) {
+            merged.set(local.id, local);
+            void queueCloudSet(uid, notePath(uid, local.id), clean(local as unknown as Record<string, unknown>));
+          }
+        }
+        persistNotes([...merged.values()].sort((a, b) => b.timestamp - a.timestamp));
+      }, () => undefined);
+    });
     return () => {
       unsubAuth();
-      if (unsubNotes.current) unsubNotes.current();
+      unsubNotesRef.current?.();
     };
   }, []);
 
-  const persist = (updated: Note[]) => {
-    setNotes(updated);
-    Storage.set(KEYS.TASKS, updated);
+  const saveNote = (note: Note, isNew: boolean) => {
+    const uid = uidRef.current;
+    if (!uid) return;
+    const updatedNote = { ...note, updatedAt: Date.now() };
+    persistNotes(isNew
+      ? [updatedNote, ...notesRef.current]
+      : notesRef.current.map(item => item.id === note.id ? updatedNote : item));
+    void queueCloudSet(uid, notePath(uid, note.id), clean(updatedNote as unknown as Record<string, unknown>));
   };
 
-  const persistCats = (updated: string[]) => {
-    setCategories(updated);
-    Storage.set(KEYS.TASK_CATEGORIES, updated);
-    if (uidRef.current) {
-      setDoc(metaDoc(uidRef.current), { categories: updated }, { merge: true }).catch(() => {});
-    }
-  };
-
-  // Firestore rejects `undefined` field values — strip them before writing
-  const toFirestoreDoc = (note: Note): Record<string, unknown> =>
-    Object.fromEntries(Object.entries(note).filter(([, v]) => v !== undefined));
-
-  const addNote = (note: Note) => {
-    persist([note, ...notes]);
-    if (uidRef.current) setDoc(noteDoc(uidRef.current, note.id), toFirestoreDoc(note)).catch(() => {});
-  };
-  const updateNote = (note: Note) => {
-    persist(notes.map(n => n.id === note.id ? note : n));
-    if (uidRef.current) setDoc(noteDoc(uidRef.current, note.id), toFirestoreDoc(note)).catch(() => {});
-  };
+  const addNote = (note: Note) => saveNote(note, true);
+  const updateNote = (note: Note) => saveNote(note, false);
   const removeNote = (id: string) => {
-    persist(notes.filter(n => n.id !== id));
-    if (uidRef.current) deleteDoc(noteDoc(uidRef.current, id)).catch(() => {});
+    const uid = uidRef.current;
+    if (!uid) return;
+    persistNotes(notesRef.current.filter(note => note.id !== id));
+    void queueCloudDelete(uid, notePath(uid, id));
   };
-  const addCategory = (cat: string) => {
-    if (!categories.includes(cat)) persistCats([...categories, cat]);
+  const addCategory = (category: string) => {
+    if (!categoriesRef.current.includes(category)) persistCategories([...categoriesRef.current, category]);
   };
-  const removeCategory = (cat: string) => persistCats(categories.filter(c => c !== cat));
+  const removeCategory = (category: string) => persistCategories(categoriesRef.current.filter(item => item !== category));
 
-  return (
-    <TaskContext.Provider value={{ notes, categories, isLoading, addNote, updateNote, removeNote, addCategory, removeCategory }}>
-      {children}
-    </TaskContext.Provider>
-  );
+  return <TaskContext.Provider value={{ notes, categories, isLoading, addNote, updateNote, removeNote, addCategory, removeCategory }}>{children}</TaskContext.Provider>;
 };
 
 export const useTaskStore = () => useContext(TaskContext);

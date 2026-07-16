@@ -1,7 +1,7 @@
 ﻿import { StyleSheet } from 'react-native';
 
 export const pom = StyleSheet.create({
-  scroll: { alignItems: 'center', paddingTop: 28, paddingHorizontal: 24 },
+  scroll: { alignItems: 'center', paddingTop: 24, paddingHorizontal: 24, paddingBottom: 124 },
   modePills: { flexDirection: 'row', gap: 8, marginBottom: 32 },
   modePill: {
     paddingHorizontal: 16, paddingVertical: 9,
@@ -22,11 +22,10 @@ export const pom = StyleSheet.create({
   playBtn: {
     width: 72, height: 72, borderRadius: 36,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
   },
   statsRow: {
     flexDirection: 'row', alignItems: 'center',
-    width: '100%', borderRadius: 16, borderWidth: 1,
+    width: '100%', borderRadius: 22, borderWidth: 1,
     paddingVertical: 18, marginBottom: 16,
   },
   statItem: { flex: 1, alignItems: 'center' },
@@ -65,13 +64,13 @@ export const pom = StyleSheet.create({
 
 
 export const sw = StyleSheet.create({
-  root: { flex: 1, alignItems: 'center' },
-  displayWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 20 },
-  digits: { fontSize: 64, fontWeight: '300', letterSpacing: -1, fontVariant: ['tabular-nums'] as any },
+  root: { flex: 1, alignItems: 'center', paddingHorizontal: 20 },
+  displayWrap: { flex: 1, minHeight: 180, alignItems: 'center', justifyContent: 'center', paddingTop: 12 },
+  digits: { fontSize: 58, lineHeight: 68, fontWeight: '300', letterSpacing: -1, fontVariant: ['tabular-nums'] as any },
   lapHint: { fontSize: 16, marginTop: 10 },
   btnRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 48, paddingVertical: 32,
+    gap: 28, paddingTop: 16, paddingBottom: 20,
   },
   sideBtn: {
     width: 78, height: 78, borderRadius: 39,
@@ -82,10 +81,9 @@ export const sw = StyleSheet.create({
   mainBtn: {
     width: 78, height: 78, borderRadius: 39,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 10, elevation: 8,
   },
   mainBtnText: { fontSize: 17, fontWeight: '700', color: '#fff' },
-  lapList: { width: '100%', flex: 1 },
+  lapList: { width: '100%', maxHeight: 220 },
   lapRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 24, paddingVertical: 13,
@@ -102,13 +100,13 @@ export const main = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingVertical: 14,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0,
   },
   headerTitle: { fontSize: 20, fontWeight: '700' },
   tabBar: {
     flexDirection: 'row',
     marginHorizontal: 20, marginVertical: 12,
-    borderRadius: 14, padding: 4,
+    borderRadius: 999, padding: 4, borderWidth: 1,
   },
   tabBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',

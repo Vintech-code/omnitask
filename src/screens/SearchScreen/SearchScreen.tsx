@@ -11,6 +11,7 @@ import { useEvents } from '@/context/EventStore';
 import { useAlarmStore } from '@/context/AlarmStore';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { sr } from './styles';
+import { AppBackground, ScreenSkeleton } from '@/components/ui';
 
 
 type ResultType = 'note' | 'event' | 'alarm';
@@ -26,9 +27,9 @@ interface SearchResult {
 
 export default function SearchScreen({ navigation }: any) {
   const { theme } = useTheme();
-  const { notes } = useTaskStore();
-  const { events } = useEvents();
-  const { alarms } = useAlarmStore();
+  const { notes, isLoading: notesLoading } = useTaskStore();
+  const { events, isLoading: eventsLoading } = useEvents();
+  const { alarms, isLoading: alarmsLoading } = useAlarmStore();
 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ResultType | 'all'>('all');
@@ -144,14 +145,17 @@ export default function SearchScreen({ navigation }: any) {
     { icon: 'alarm-outline',         color: '#E09C52', text: 'Look up alarms by label or time' },
   ];
 
+  if (notesLoading || eventsLoading || alarmsLoading) return <ScreenSkeleton variant="list" />;
+
   return (
-    <SafeAreaView style={[sr.safe, { backgroundColor: theme.bg }]} edges={['top']}>
+    <SafeAreaView style={[sr.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
+      <AppBackground />
       {/* Header */}
-      <View style={[sr.header, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+      <View style={[sr.header, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={sr.backBtn}>
           <Ionicons name="arrow-back" size={22} color={theme.text} />
         </TouchableOpacity>
-        <View style={[sr.searchBox, { backgroundColor: theme.bg2, borderColor: theme.border }]}>
+        <View style={[sr.searchBox, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
           <Ionicons name="search-outline" size={17} color={theme.textDim} style={{ marginRight: 8 }} />
           <TextInput
             style={[sr.searchInput, { color: theme.text }]}

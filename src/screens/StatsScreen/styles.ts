@@ -9,16 +9,16 @@ export const st = StyleSheet.create({
   safe: { flex: 1 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 13,
-    backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 20, paddingVertical: 14,
+    backgroundColor: 'transparent', borderBottomWidth: 0,
   },
   backBtn: { padding: 4, width: 38 },
-  headerTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
-  content: { paddingHorizontal: 14, paddingTop: 14, gap: 12 },
+  headerTitle: { fontSize: 25, fontWeight: '700', textAlign: 'left', flex: 1, marginLeft: 12, letterSpacing: -0.4 },
+  content: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40, gap: 12 },
 
   kpiRow: { flexDirection: 'row', gap: 10 },
   kpiCard: {
-    flex: 1, borderRadius: 14, padding: 12, alignItems: 'center', gap: 4,
+    flex: 1, borderRadius: 20, padding: 12, alignItems: 'center', gap: 4,
     borderWidth: StyleSheet.hairlineWidth,
   },
   kpiIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
@@ -26,7 +26,7 @@ export const st = StyleSheet.create({
   kpiLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
 
   section: {
-    borderRadius: 16, padding: 16, borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 22, padding: 16, borderWidth: StyleSheet.hairlineWidth,
   },
   sectionHead: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14,

@@ -10,12 +10,8 @@ export const s = StyleSheet.create({
 
   illustrationBox: { marginBottom: 40, alignItems: 'center' },
   logoBg: {
-    width: 160, height: 160, borderRadius: 40,
+    width: 160, height: 160, borderRadius: 48,
     alignItems: 'center', justifyContent: 'center',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
   },
 
   notifAnim: { width: 260, height: 260 },
@@ -30,11 +26,6 @@ export const s = StyleSheet.create({
     width: (W - 48 - 12) / 2,
     borderRadius: 20, padding: 14,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
   },
   featureIconBox: { width: 72, height: 72, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   featureLottie: { width: 56, height: 56 },
@@ -51,9 +42,7 @@ export const s = StyleSheet.create({
   footer: { width: '100%', paddingHorizontal: 28, gap: 12 },
   btn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    borderRadius: 16, paddingVertical: 18,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15, shadowRadius: 10, elevation: 4,
+    borderRadius: 999, paddingVertical: 18,
   },
   btnText: { fontSize: 17, fontWeight: '700', color: '#fff' },
 

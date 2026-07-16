@@ -14,6 +14,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import LottieView from 'lottie-react-native';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { styles } from './styles';
+import { AppBackground } from '@/components/ui';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -65,6 +66,7 @@ export default function WelcomeScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <AppBackground />
       {/* Top hero */}
       <Animated.View style={[styles.hero, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
         <Image
@@ -93,7 +95,7 @@ export default function WelcomeScreen({ navigation }: any) {
           onPress={() => navigation.navigate('SignUp')}
           activeOpacity={0.85}
         >
-          <Text style={styles.btnPrimaryText}>Get Started! It's Free</Text>
+          <Text style={styles.btnPrimaryText}>Get Started!</Text>
           <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />
         </TouchableOpacity>
 

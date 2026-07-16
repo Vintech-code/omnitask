@@ -5,7 +5,6 @@
  * Extracted from App.tsx to keep App.tsx a pure provider wrapper.
  */
 import React, { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
@@ -13,7 +12,16 @@ import { isRunningInExpoGo } from 'expo';
 
 import { useTheme }  from '@/context/ThemeContext';
 import { useAuth }   from '@/context/AuthContext';
-import { requestNotificationPermission } from '@/services/NotificationService';
+import {
+  ALARM_SNOOZE_ACTION,
+  ALARM_STOP_ACTION,
+  configureAlarmNotifications,
+  dismissAlarmNotification,
+  getAlarmPayload,
+  requestNotificationPermission,
+  snoozeAlarmNotification,
+} from '@/services/NotificationService';
+import { openRingingAlarm } from '@/navigation/navigationRef';
 
 import WelcomeScreen      from '@/screens/WelcomeScreen';
 import SignInScreen       from '@/screens/SignInScreen';
@@ -25,7 +33,9 @@ import EventAlarmsScreen  from '@/screens/EventAlarmsScreen';
 import ProfileScreen      from '@/screens/ProfileScreen';
 import SearchScreen       from '@/screens/SearchScreen';
 import StatsScreen        from '@/screens/StatsScreen';
+import RingingAlarmScreen from '@/screens/RingingAlarmScreen';
 import MainTabNavigator   from '@/navigation/MainTabNavigator';
+import { ScreenSkeleton } from '@/components/ui';
 
 import type { RootStackParamList } from '@/types/navigation';
 
@@ -38,24 +48,50 @@ export default function RootNavigator() {
 
   // Request push-notification permission on first launch
   useEffect(() => {
-    requestNotificationPermission();
+    void configureAlarmNotifications()
+      .then(requestNotificationPermission)
+      .catch(() => undefined);
   }, []);
 
-  // Handle notification taps (deep-link navigation can be wired here)
   useEffect(() => {
     if (isExpoGo) return;
-    const sub = Notifications.addNotificationResponseReceivedListener(() => {
-      // TODO: navigate to relevant screen on tap
+    const received = Notifications.addNotificationReceivedListener(notification => {
+      const payload = getAlarmPayload(notification);
+      if (payload) openRingingAlarm(payload);
     });
-    return () => sub.remove();
+
+    const handleResponse = async (response: Notifications.NotificationResponse) => {
+      const payload = getAlarmPayload(response.notification);
+      if (!payload) return;
+      if (response.actionIdentifier === ALARM_STOP_ACTION) {
+        await dismissAlarmNotification(payload.notificationIdentifier);
+        return;
+      }
+      if (response.actionIdentifier === ALARM_SNOOZE_ACTION) {
+        await snoozeAlarmNotification(payload);
+        return;
+      }
+      openRingingAlarm(payload);
+    };
+
+    const response = Notifications.addNotificationResponseReceivedListener(value => {
+      void handleResponse(value);
+    });
+    const lastResponse = Notifications.getLastNotificationResponse();
+    if (lastResponse) {
+      void handleResponse(lastResponse).finally(() => {
+        Notifications.clearLastNotificationResponse();
+      });
+    }
+
+    return () => {
+      received.remove();
+      response.remove();
+    };
   }, [isExpoGo]);
 
   if (isLoading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
-        <ActivityIndicator size="large" color="#4A90D9" />
-      </View>
-    );
+    return <ScreenSkeleton variant="profile" />;
   }
 
   return (
@@ -76,6 +112,11 @@ export default function RootNavigator() {
         <Stack.Screen name="Profile"      component={ProfileScreen} />
         <Stack.Screen name="Search"       component={SearchScreen} />
         <Stack.Screen name="Stats"        component={StatsScreen} />
+        <Stack.Screen
+          name="RingingAlarm"
+          component={RingingAlarmScreen}
+          options={{ presentation: 'modal', gestureEnabled: false }}
+        />
       </Stack.Navigator>
     </>
   );
