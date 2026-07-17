@@ -40,13 +40,13 @@ The redesign applies to the current application structure:
 - Profile, preferences, account, help, and related modals
 - Shared buttons, text inputs, cards, menus, headers, tab bar, empty states, and loading states
 
-The main navigation remains the current five destinations:
+The main navigation remains limited to five destinations:
 
 1. Dashboard
 2. Focus
 3. Alarm
-4. Events
-5. Tasks
+4. Calculator
+5. Organize (`Tasks` route), containing Notes and Events
 
 Do not add reference-image features such as nutrition, premium subscriptions, or an AI companion unless they become separate product requirements later.
 
@@ -334,12 +334,12 @@ The current full-width bottom bar becomes a floating glass capsule inspired by t
 
 - Position: 16 px from left/right and 8 px above the bottom safe area.
 - Height: 68 px.
-- Five evenly distributed tab targets.
+- Five evenly distributed tab targets: Home, Focus, Alarm, Calculator, and Organize.
 - Inactive tabs: black/white monochrome outline icons with muted labels.
 - Active tab: 36 px orange circle with a white icon; no glow behind its label.
 - Labels may remain beneath inactive icons if needed for accessibility; keep them small and stable so the layout does not jump.
 - The active destination must not rely on color alone: use the filled circle and icon weight.
-- Preserve the current route order and route names.
+- Keep the `Tasks` route name for compatibility with existing Dashboard and Search links. Notes and Events are switched with a segmented control inside that destination; existing event detail, creation, alarm, calendar, and note editor flows remain intact.
 - Floating create/add buttons must not collide with the tab bar. Prefer a contextual header action or an inline primary button over a second floating circle.
 
 ## 10. Screen-by-screen direction
@@ -358,7 +358,16 @@ The current full-width bottom bar becomes a floating glass capsule inspired by t
 - Use a centered glass form panel on phones and tablets, maximum width 480 px.
 - Keep all current fields, Firebase behavior, validation, links, and password visibility actions.
 - Orange primary submit button; glass social/secondary actions if currently present.
+- Google is the only third-party authentication action. Use Google's official, full-color SDK button at full form width with the same pill silhouette as the other authentication buttons on Welcome, Sign In, and Sign Up; do not show Apple or a simulated provider action.
+- Google account selection feeds the same Firebase session and user-profile persistence flow as email authentication. Treat both first-time and returning Google accounts as one non-confusing continuation action.
+- Google button taps use the explicit Android account chooser so every device account and Add another account remain available. A successful Firebase credential must not be reported as failed because a later local-profile or cloud-sync write failed, and the official native button must be remounted after its account sheet closes if Android clears its rendered host.
+- Sign Up is account creation only: no profile photo, security badge, or other profile-preparation controls. Explain that Google creates the Firebase account automatically on first use, and offer email creation as the alternative.
+- Sign In and Sign Up fields use one compact outlined floating-label pattern with leading semantic icons: the label animates into the border on focus or when populated, the existing example placeholders appear on focus, input values stay stable, validation appears inline, and password visibility remains explicit. Place Forgot password directly below the password field, right-aligned.
+- Authentication surfaces fully consume the active theme tokens: dark mode uses smoked-glass cards and fields, light primary text, visible muted copy and dividers, orange focus/action states, and dark-safe warning/error treatments. Do not leave hard-coded light labels, icons, borders, or white field surfaces on Sign In or Sign Up.
 - Keyboard-open state must remain uncluttered and scrollable.
+- Never translate a network timeout, disabled provider, or Firebase configuration failure into "incorrect credentials." Show the actionable authentication error inline and reserve the credentials message for Firebase's invalid-credential response.
+- Preserve password input exactly as entered; trim email addresses but never trim passwords.
+- While authentication is pending, disable duplicate submission, keep a "Signing in..." label beside the progress indicator, and show a compact connection hint if Firebase has not responded after 3.5 seconds.
 
 ### Dashboard
 
@@ -374,14 +383,28 @@ Use the reference's day-planning screen as the structural inspiration, translate
 
 ### Tasks and note editor
 
+- The Tasks/Organize destination begins with a two-option `Notes` / `Events` segmented control. Switching changes the workspace content without adding another bottom tab.
 - Left-align `Notes`; keep category management and create-note actions in the header.
 - Search becomes a full-width glass input.
 - Filter tabs become a pill segmented control with an orange active state.
 - Task/note cards use a calm white-glass surface. Colorful note backgrounds should become a narrow category accent, icon tint, or extremely subtle 8–12% wash rather than a fully saturated card.
 - Checkbox: 24 px rounded square; completed is orange with a white check.
 - Priority appears as a compact semantic label, never a large block of color.
-- Do not use a second bottom-right FAB. Create is a 44 px orange header action so it cannot collide with floating navigation.
+- Note creation uses one 52 px orange action on the lower-right, positioned at least 16 px above the floating navigation capsule. Do not duplicate it in the header.
 - Preserve note colors, tags, todos, formatting, attachments, and editor operations as data/features even if their controls are visually restyled.
+
+### Calculator
+
+- Calculator is a primary tab and follows the same atmospheric background, top app bar, glass surfaces, orange action language, and floating-navigation clearance as the other main screens.
+- Use one large glass display and one grouped keypad surface; avoid individually elevated or decorative key cards.
+- Number keys use high-legibility glass surfaces, utility keys use orange-soft styling, and arithmetic/equals keys use solid orange.
+- Support decimal input, sign change, percent, backspace, clear, the four basic arithmetic operations, chained calculations, and division-by-zero feedback.
+- Place backspace in the final keypad row between decimal and equals. The top-right action opens a recent-calculation history sheet and may restore a result to the display.
+- Let the calculator surfaces fill the available vertical space and end at the navigation-clearance boundary; do not add decorative empty space beneath the keypad.
+- Follow a four-column calculator flow with the largest keys that fit while retaining 44 px minimum targets. A compact chevron above the keypad expands or hides the scientific rows without moving content beneath the floating navigation.
+- The optional scientific panel provides square root, pi, powers, factorial, degree/radian mode, trigonometric and inverse-trigonometric functions, Euler's number, natural logarithm, and base-10 logarithm. The standard keypad provides parentheses.
+- Scientific controls must execute with standard operator precedence and valid domain/error handling; they are not decorative shortcuts.
+- Keep touch targets at least 44 px and expose each key with an accessibility label.
 
 ### Focus
 
@@ -409,8 +432,22 @@ Use the reference's day-planning screen as the structural inspiration, translate
 - The selected date uses the raised white tile/orange state from the reference.
 - Event agenda rows follow the shared list-row pattern with a slim priority color marker.
 - Create/edit screens use grouped glass sections for date/time, recurrence, location, category, priority, and alarm options.
+- Put the all-day switch before date/time controls. All-day events hide time pickers; multi-day events expose a separate end date and never encode a date range in the notes field.
+- Show an explicit IANA time-zone field on create/edit and event detail. Store the zone with the event and calculate notification triggers from that zone so travel does not silently change the intended wall-clock time.
+- Custom event categories are user-level data, not form-local state. Persist them locally and in the signed-in user's cloud metadata, merge them without duplicates, and reuse them for future events.
+- Location selection is a full-screen map flow with current-location permission handling, tap-to-place coordinates, an editable place label, and explicit Cancel/Done actions. Store latitude and longitude with the label; directions use coordinates when available.
+- A selected map point remains usable if reverse geocoding fails. Permission denial must show inline recovery guidance and must not block manual map selection.
+- Never mount the native event map when its Android API key is absent from the build. Show an inline setup-safe fallback with current-location recovery instead of allowing a native crash.
 - Sticky bottom actions must clear the floating navigation and keyboard.
 - Event detail uses one hero card for title/date and smaller grouped cards for metadata and actions.
+- Event overflow actions, bulk reminder actions, reminder selection, notices, and destructive confirmations use glass-solid bottom sheets with an explicit Cancel, Close, or Keep event control. Do not use platform alert menus for Events actions.
+- Do not duplicate Edit or Delete actions in multiple menus on the same detail screen. The visible edit control and bottom delete action are sufficient.
+- Do not expose placeholder settings or metadata without backing behavior. Event status, sound labels, recurrence labels, and reminder counts must come from stored event data.
+- Every selected reminder time schedules its own notification. Daily, weekly, and monthly recurrence must preserve the correct reminder offset across hour and day boundaries.
+- All-day reminders use 9:00 AM in the event time zone as their notification anchor. Multi-day events appear on every included day in the Events calendar.
+- Automated event coverage includes create, edit, delete confirmation, recurrence, calendar selection, reminder toggling, date-range inclusion, time-zone conversion, permission-denied notification behavior, and cleanup after partial scheduling failures.
+- Android device QA uses the development-build notification probe to verify both the OS permission-denied state and actual notification delivery. Expo Go is not an acceptable delivery test environment.
+- Dashboard and Search entry points route Events through the Organize destination; do not reopen the removed standalone Events stack.
 
 ### Search
 
@@ -558,7 +595,7 @@ The redesign is complete when:
 
 ## 16. Non-goals
 
-- Adding new product functionality
+- Adding new product functionality outside an explicitly approved feature brief
 - Replacing the information architecture
 - Copying the reference app's brand, content, profile identity, or nutrition features
 - Using glass on every element

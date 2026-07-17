@@ -93,21 +93,8 @@ export const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  /* Social */
-  socialRow: { flexDirection: 'row', gap: 12, marginBottom: 18 },
-  socialBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.75)',
-    borderRadius: 999,
-    paddingVertical: 13,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.70)',
-  },
-  socialText: { fontSize: 15, color: '#222', fontWeight: '700' },
+  /* Google authentication */
+  googleButtonWrap: { width: '100%', marginBottom: 18 },
 
   /* Terms */
   terms: {

@@ -5,17 +5,19 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useEvents, AppEvent } from '@/context/EventStore';
 import { useTheme } from '@/context/ThemeContext';
 import { BurgerMenu } from '@/components/BurgerMenu';
+import { OrganizerSwitch, OrganizerSection } from '@/components/OrganizerSwitch';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { calS, styles } from './styles';
 import { AppBackground, ScreenSkeleton } from '@/components/ui';
+import { EventActionSheet } from '@/components/events';
+import { canScheduleEventReminders, eventOccursOnDate, eventStart, formatEventSchedule, nextUpcomingEvent } from '@/utils/eventDate';
 
 
 function parseTime(timeStr: string): { time: string; period: 'AM' | 'PM' } {
@@ -24,35 +26,39 @@ function parseTime(timeStr: string): { time: string; period: 'AM' | 'PM' } {
   return { time: parts[0] || '--:--', period };
 }
 
-export default function EventAlarmsScreen({ navigation }: any) {
+interface EventAlarmsScreenProps {
+  navigation: any;
+  organizerSection?: OrganizerSection;
+  onOrganizerSectionChange?: (value: OrganizerSection) => void;
+}
+
+export default function EventAlarmsScreen({
+  navigation,
+  organizerSection,
+  onOrganizerSectionChange,
+}: EventAlarmsScreenProps) {
   const { theme, isDark } = useTheme();
   const { events, isLoading, toggleAlarmActive, removeEvent } = useEvents();
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [calDate, setCalDate] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [menuEvent, setMenuEvent] = useState<AppEvent | null>(null);
+  const [deleteEvent, setDeleteEvent] = useState<AppEvent | null>(null);
+  const [manageVisible, setManageVisible] = useState(false);
   const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 700); };
 
-  const activeCount = events.filter(e => e.alarmActive).length;
-  const nextEvent   = events.find(e => e.alarmActive);
-
-  const handleManageAll = () =>
-    Alert.alert('Manage All Alarms', 'Bulk options', [
-      { text: 'Disable All',  onPress: () => events.forEach(e => { if (e.alarmActive)  toggleAlarmActive(e.id); }) },
-      { text: 'Enable All',   onPress: () => events.forEach(e => { if (!e.alarmActive) toggleAlarmActive(e.id); }) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-
-  const handleSettings = () =>
-    Alert.alert('Alarm Settings', 'Default ringtone, vibration and snooze settings coming soon.');
-
-  const openEventMenu = (event: AppEvent) =>
-    Alert.alert(event.title, undefined, [
-      { text: 'Edit Event',    onPress: () => navigation?.navigate('CreateEvent', { event }) },
-      { text: 'Toggle Alarm',  onPress: () => toggleAlarmActive(event.id) },
-      { text: 'Delete Event',  style: 'destructive', onPress: () => removeEvent(event.id) },
-      { text: 'Cancel',        style: 'cancel' },
-    ]);
+  const activeCount = events.filter(event => event.alarmActive && canScheduleEventReminders(event)).length;
+  const nextEvent = nextUpcomingEvent(events);
+  const orderedEvents = [...events].sort((left, right) => {
+    const leftTime = eventStart(left)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    const rightTime = eventStart(right)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    const now = Date.now();
+    const leftPast = leftTime < now;
+    const rightPast = rightTime < now;
+    if (leftPast !== rightPast) return leftPast ? 1 : -1;
+    return leftPast ? rightTime - leftTime : leftTime - rightTime;
+  });
 
   if (isLoading) {
     return <ScreenSkeleton variant="list" />;
@@ -64,7 +70,7 @@ export default function EventAlarmsScreen({ navigation }: any) {
       {/* Top Bar */}
       <View style={[styles.topBar, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }]}>
         <BurgerMenu navigation={navigation} />
-        <Text style={[styles.topBarTitle, { color: theme.text }]}>Event alarms</Text>
+        <Text style={[styles.topBarTitle, { color: theme.text }]}>Events</Text>
         <View style={styles.topBarRight}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => { setViewMode(v => v === 'list' ? 'calendar' : 'list'); setSelectedDay(null); }}>
             <Ionicons name={viewMode === 'list' ? 'calendar-outline' : 'list-outline'} size={22} color={theme.text} />
@@ -72,11 +78,12 @@ export default function EventAlarmsScreen({ navigation }: any) {
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation?.navigate('CreateEvent')}>
             <Ionicons name="add-outline" size={24} color={theme.text} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={handleSettings}>
-            <Ionicons name="settings-outline" size={22} color={theme.text} />
-          </TouchableOpacity>
         </View>
       </View>
+
+      {organizerSection && onOrganizerSectionChange ? (
+        <OrganizerSwitch value={organizerSection} onChange={onOrganizerSectionChange} />
+      ) : null}
 
       <ScrollView
         style={styles.scroll}
@@ -117,7 +124,7 @@ export default function EventAlarmsScreen({ navigation }: any) {
           <View style={styles.blueDot} />
           <Text style={[styles.sectionTitle, { color: theme.textDim }]}>EVENT ALARMS</Text>
           {events.length > 0 && (
-            <TouchableOpacity style={styles.manageAllBtn} onPress={handleManageAll}>
+            <TouchableOpacity style={styles.manageAllBtn} onPress={() => setManageVisible(true)}>
               <Text style={styles.manageAllText}>Manage All</Text>
             </TouchableOpacity>
           )}
@@ -139,18 +146,18 @@ export default function EventAlarmsScreen({ navigation }: any) {
         )}
 
         {/* Event Alarm Cards */}
-        {events.map(event => {
-          const { time, period } = parseTime(event.startTime);
-          const repeat = event.reminders.includes('Daily Repeat') ? 'EVERYDAY' : 'ONCE';
-          const notificationChips = event.reminders.filter(r => r !== 'Daily Repeat');
+        {orderedEvents.map(event => {
+          const { time, period } = event.allDay ? { time: 'ALL DAY', period: '' as const } : parseTime(event.startTime);
+          const recurrence = event.recurrence ?? 'none';
+          const repeat = recurrence === 'none' ? 'ONCE' : recurrence.toUpperCase();
+          const notificationChips = event.reminders;
+          const canSchedule = canScheduleEventReminders(event);
 
           return (
             <TouchableOpacity
               key={event.id}
               style={[styles.alarmCard, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}
               onPress={() => navigation?.navigate('EventDetail', { event })}
-              onLongPress={() => openEventMenu(event)}
-              delayLongPress={400}
               activeOpacity={0.82}
             >
               <View style={styles.alarmLeftBorder} />
@@ -167,14 +174,18 @@ export default function EventAlarmsScreen({ navigation }: any) {
                   </View>
                   <View style={styles.alarmTopActions}>
                     <Switch
+                      testID={`event-reminder-toggle-${event.id}`}
                       value={event.alarmActive}
                       onValueChange={() => toggleAlarmActive(event.id)}
+                      disabled={!canSchedule && !event.alarmActive}
                       trackColor={{ false: theme.divider, true: theme.accent.soft }}
-                      thumbColor={event.alarmActive ? BLUE : '#f0f0f0'}
+                      thumbColor={event.alarmActive ? theme.accent.base : '#f0f0f0'}
                       style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
                     />
                     <TouchableOpacity
-                      onPress={() => openEventMenu(event)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`More actions for ${event.title}`}
+                      onPress={() => setMenuEvent(event)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
                       <Ionicons name="ellipsis-vertical" size={16} color={theme.textDim} />
@@ -190,11 +201,8 @@ export default function EventAlarmsScreen({ navigation }: any) {
                 <View style={styles.alarmEventRow}>
                   <Ionicons name="calendar-outline" size={12} color={theme.textDim} />
                   <Text style={[styles.alarmEventText, { color: theme.textDim }]}>
-                    {event.startDate}{event.startDate && event.startTime ? ' · ' : ''}{event.startTime}
+                    {formatEventSchedule(event)}
                   </Text>
-                  <View style={[styles.statusBadge, styles.statusGoing]}>
-                    <Text style={[styles.statusText, styles.statusTextGoing]}>confirmed</Text>
-                  </View>
                 </View>
 
                 {/* Meta row */}
@@ -206,9 +214,6 @@ export default function EventAlarmsScreen({ navigation }: any) {
                       <Text style={[styles.alarmMetaDot, { color: theme.textDim }]}>·</Text>
                     </>
                   ) : null}
-                  <MaterialCommunityIcons name="music-note" size={12} color={theme.textDim} />
-                  <Text style={[styles.alarmMetaText, { color: theme.textDim }]}>Chimes</Text>
-                  <Text style={[styles.alarmMetaDot, { color: theme.textDim }]}>·</Text>
                   <View style={[styles.repeatBadge, { backgroundColor: isDark ? '#2A2A2A' : '#F0F0F0' }]}>
                     <Text style={[styles.repeatBadgeText, { color: theme.textSub }]}>{repeat}</Text>
                   </View>
@@ -251,6 +256,98 @@ export default function EventAlarmsScreen({ navigation }: any) {
         )}
       </ScrollView>
 
+      <EventActionSheet
+        visible={Boolean(menuEvent)}
+        title={menuEvent?.title ?? 'Event actions'}
+        message="Choose what you want to do with this event."
+        onClose={() => setMenuEvent(null)}
+        actions={menuEvent ? [
+          {
+            label: 'Edit event',
+            description: 'Change date, time, details, and reminders',
+            icon: 'create-outline',
+            tone: 'accent',
+            onPress: () => {
+              const event = menuEvent;
+              setMenuEvent(null);
+              navigation?.navigate('CreateEvent', { event });
+            },
+          },
+          {
+            label: menuEvent.alarmActive ? 'Turn reminders off' : 'Turn reminders on',
+            description: canScheduleEventReminders(menuEvent)
+              ? `${menuEvent.reminders.length} reminder${menuEvent.reminders.length === 1 ? '' : 's'} configured`
+              : menuEvent.alarmActive
+                ? 'This reminder time has passed; turn it off or edit the event'
+                : 'Choose a future reminder time in Edit event',
+            icon: menuEvent.alarmActive ? 'notifications-off-outline' : 'notifications-outline',
+            disabled: !canScheduleEventReminders(menuEvent) && !menuEvent.alarmActive,
+            onPress: () => {
+              toggleAlarmActive(menuEvent.id);
+              setMenuEvent(null);
+            },
+          },
+          {
+            label: 'Delete event',
+            description: 'Permanently remove this event and its reminders',
+            icon: 'trash-outline',
+            tone: 'danger',
+            onPress: () => {
+              setDeleteEvent(menuEvent);
+              setMenuEvent(null);
+            },
+          },
+        ] : []}
+      />
+
+      <EventActionSheet
+        visible={Boolean(deleteEvent)}
+        title="Delete event?"
+        message={deleteEvent ? `“${deleteEvent.title}” and its scheduled reminders will be permanently removed.` : undefined}
+        closeLabel="Keep event"
+        onClose={() => setDeleteEvent(null)}
+        actions={deleteEvent ? [{
+          label: 'Delete permanently',
+          icon: 'trash-outline',
+          tone: 'danger',
+          onPress: () => {
+            removeEvent(deleteEvent.id);
+            setDeleteEvent(null);
+          },
+        }] : []}
+      />
+
+      <EventActionSheet
+        visible={manageVisible}
+        title="Manage event reminders"
+        message="This changes notification reminders for all events that have at least one reminder time."
+        onClose={() => setManageVisible(false)}
+        actions={[
+          {
+            label: 'Turn all reminders on',
+            description: 'Events without reminder times are left unchanged',
+            icon: 'notifications-outline',
+            tone: 'accent',
+            onPress: () => {
+              events.forEach(event => {
+                if (!event.alarmActive && canScheduleEventReminders(event)) toggleAlarmActive(event.id);
+              });
+              setManageVisible(false);
+            },
+          },
+          {
+            label: 'Turn all reminders off',
+            icon: 'notifications-off-outline',
+            onPress: () => {
+              events.forEach(event => {
+                if (event.alarmActive) toggleAlarmActive(event.id);
+              });
+              setManageVisible(false);
+            },
+          },
+        ]}
+      />
+
     </SafeAreaView>
   );
 }
@@ -258,12 +355,6 @@ export default function EventAlarmsScreen({ navigation }: any) {
 // -- CALENDAR VIEW COMPONENT --------------------------------------------------
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
-function parseEventDate(dateStr: string): Date | null {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  return isNaN(d.getTime()) ? null : d;
-}
 
 function CalendarView({ events, theme, isDark, calDate, setCalDate, selectedDay, setSelectedDay, navigation }: any) {
   const year = calDate.getFullYear();
@@ -274,9 +365,8 @@ function CalendarView({ events, theme, isDark, calDate, setCalDate, selectedDay,
 
   const dayEvents: Record<number, AppEvent[]> = {};
   events.forEach((e: AppEvent) => {
-    const d = parseEventDate(e.startDate);
-    if (d && d.getFullYear() === year && d.getMonth() === month) {
-      const day = d.getDate();
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      if (!eventOccursOnDate(e, new Date(year, month, day))) continue;
       if (!dayEvents[day]) dayEvents[day] = [];
       dayEvents[day].push(e);
     }
@@ -358,7 +448,7 @@ function CalendarView({ events, theme, isDark, calDate, setCalDate, selectedDay,
               <View style={calS.eventDot} />
               <View style={{ flex: 1 }}>
                 <Text style={[calS.eventRowTitle, { color: theme.text }]} numberOfLines={1}>{ev.title}</Text>
-                <Text style={[calS.eventRowTime, { color: theme.textDim }]}>{ev.startTime}</Text>
+                <Text style={[calS.eventRowTime, { color: theme.textDim }]}>{ev.allDay ? 'All day' : ev.startTime}</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={theme.textDim} />
             </TouchableOpacity>

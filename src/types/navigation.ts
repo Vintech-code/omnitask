@@ -10,7 +10,6 @@ export type RootStackParamList = {
   Main:        undefined;
   CreateEvent: { event?: AppEvent } | undefined;
   EventDetail: { event: AppEvent };
-  EventAlarms: undefined;
   Profile:     undefined;
   Search:      undefined;
   Stats:       undefined;

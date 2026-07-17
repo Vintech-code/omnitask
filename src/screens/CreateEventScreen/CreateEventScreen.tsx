@@ -6,10 +6,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Alert,
+  Switch,
   Modal,
   Pressable,
-  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +17,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { fr, s } from './styles';
 import { AppBackground } from '@/components/ui';
+import { EventActionSheet, EventLocationPicker } from '@/components/events';
+import { COMMON_TIME_ZONES, parseEventDateTime, reminderMinutes, systemTimeZone } from '@/utils/eventDate';
 
 
 const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -36,12 +37,6 @@ function parseStoredDate(d: string): { y: number; mo: number; day: number } {
   const y = parseInt(parts[2]) || new Date().getFullYear();
   return { y, mo: mo < 0 ? new Date().getMonth() : mo, day };
 }
-
-const DEFAULT_CATEGORIES = [
-  'Work','Personal','Health','Education','Finance',
-  'Social','Shopping','Travel','Family','Fitness',
-  'Meeting','Birthday','Anniversary','Holiday','Other',
-];
 
 const PRIORITIES = ['Low', 'Medium', 'High'] as const;
 type Priority = typeof PRIORITIES[number];
@@ -80,8 +75,8 @@ function WheelCol({ items, selectedIndex, onSelect, width = 80, wheelKey }: Whee
       <View pointerEvents="none" style={{
         position: 'absolute', left: 0, right: 0,
         top: ITEM_H * 2, height: ITEM_H,
-        backgroundColor: 'rgba(74,144,217,0.10)',
-        borderTopWidth: 1, borderBottomWidth: 1, borderColor: BLUE,
+        backgroundColor: theme.accent.soft,
+        borderTopWidth: 1, borderBottomWidth: 1, borderColor: theme.accent.base,
       }} />
       <ScrollView
         ref={scrollRef}
@@ -144,29 +139,36 @@ function FormRow({ icon, label, children, theme }: any) {
 }
 // --- Main ---------------------------------------------------------------------
 export default function CreateEventScreen({ navigation, route }: any) {
-  const { addEvent, updateEvent } = useEvents();
-  const { theme, isDark } = useTheme();
+  const { addEvent, updateEvent, categories, addCategory } = useEvents();
+  const { theme } = useTheme();
   const editEvent: AppEvent | undefined = route?.params?.event;
   const now = new Date();
 
   const initStart = editEvent ? parseStoredTime(editEvent.startTime) : { hIdx: 7, mIdx: 0, pIdx: 0 };
-  const initEnd   = editEvent?.endTime ? parseStoredTime(editEvent.endTime) : { hIdx: 8, mIdx: 0, pIdx: 1 };
+  const initEnd   = editEvent?.endTime ? parseStoredTime(editEvent.endTime) : { hIdx: 8, mIdx: 0, pIdx: 0 };
   const initDate  = editEvent ? parseStoredDate(editEvent.startDate) : { y: now.getFullYear(), mo: now.getMonth(), day: now.getDate() };
+  const initEndDate = editEvent?.endDate ? parseStoredDate(editEvent.endDate) : initDate;
 
   const [title, setTitle]           = useState(editEvent?.title || '');
   const [description, setDescription] = useState(editEvent?.description || '');
+  const [allDay, setAllDay] = useState(editEvent?.allDay ?? false);
   const [startHourIdx, setStartHourIdx]   = useState(initStart.hIdx);
   const [startMinuteIdx, setStartMinuteIdx] = useState(initStart.mIdx);
   const [startPeriodIdx, setStartPeriodIdx] = useState(initStart.pIdx);
-  const [hasEnd, setHasEnd]         = useState(!!editEvent?.endTime);
+  const [hasEnd, setHasEnd] = useState(Boolean(editEvent?.endTime || editEvent?.endDate));
   const [endHourIdx, setEndHourIdx]     = useState(initEnd.hIdx);
   const [endMinuteIdx, setEndMinuteIdx]   = useState(initEnd.mIdx);
   const [endPeriodIdx, setEndPeriodIdx]   = useState(initEnd.pIdx);
   const [selYear, setSelYear]   = useState(initDate.y);
   const [selMonth, setSelMonth] = useState(initDate.mo);
   const [selDay, setSelDay]     = useState(initDate.day);
+  const [endYear, setEndYear] = useState(initEndDate.y);
+  const [endMonth, setEndMonth] = useState(initEndDate.mo);
+  const [endDay, setEndDay] = useState(initEndDate.day);
+  const [timeZone, setTimeZone] = useState(editEvent?.timeZone || systemTimeZone());
   const [location, setLocation] = useState(editEvent?.location || '');
-  const [categories, setCategories]     = useState<string[]>(DEFAULT_CATEGORIES);
+  const [latitude, setLatitude] = useState<number | undefined>(editEvent?.latitude);
+  const [longitude, setLongitude] = useState<number | undefined>(editEvent?.longitude);
   const [category, setCategory]         = useState(editEvent?.category || 'Work');
   const [customCatInput, setCustomCatInput] = useState('');
   const [priority, setPriority]     = useState<Priority>((editEvent?.priority as Priority) || 'Medium');
@@ -179,12 +181,17 @@ export default function CreateEventScreen({ navigation, route }: any) {
   const [tempMinuteIdx, setTempMinuteIdx] = useState(0);
   const [tempPeriodIdx, setTempPeriodIdx] = useState(0);
   const [calendarVisible, setCalendarVisible] = useState(false);
+  const [dateTarget, setDateTarget] = useState<'start' | 'end'>('start');
   const [calYear, setCalYear]   = useState(selYear);
   const [calMonth, setCalMonth] = useState(selMonth);
   const [calSel, setCalSel]     = useState<number | null>(selDay);
-  const [mapModalVisible, setMapModalVisible]   = useState(false);
+  const [locationPickerVisible, setLocationPickerVisible] = useState(false);
   const [categoryModal, setCategoryModal]       = useState(false);
+  const [timeZoneModal, setTimeZoneModal] = useState(false);
   const [addCatMode, setAddCatMode]             = useState(false);
+  const [reminderPickerVisible, setReminderPickerVisible] = useState(false);
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const formScrollRef = useRef<ScrollView>(null);
 
   const fmtTime = (hIdx: number, mIdx: number, pIdx: number) =>
     `${HOURS_LIST[hIdx]}:${MINUTES_LIST[mIdx]} ${PERIODS_LIST[pIdx]}`;
@@ -201,8 +208,30 @@ export default function CreateEventScreen({ navigation, route }: any) {
     setTimeTarget(null);
   };
 
-  const openCalendar = () => { setCalYear(selYear); setCalMonth(selMonth); setCalSel(selDay); setCalendarVisible(true); };
-  const confirmCalendar = () => { if (calSel) { setSelYear(calYear); setSelMonth(calMonth); setSelDay(calSel); } setCalendarVisible(false); };
+  const openCalendar = (target: 'start' | 'end') => {
+    setDateTarget(target);
+    if (target === 'start') {
+      setCalYear(selYear); setCalMonth(selMonth); setCalSel(selDay);
+    } else {
+      setCalYear(endYear); setCalMonth(endMonth); setCalSel(endDay);
+    }
+    setCalendarVisible(true);
+  };
+  const confirmCalendar = () => {
+    if (calSel) {
+      if (dateTarget === 'start') {
+        setSelYear(calYear); setSelMonth(calMonth); setSelDay(calSel);
+        const startValue = new Date(calYear, calMonth, calSel).getTime();
+        const endValue = new Date(endYear, endMonth, endDay).getTime();
+        if (endValue < startValue) {
+          setEndYear(calYear); setEndMonth(calMonth); setEndDay(calSel);
+        }
+      } else {
+        setEndYear(calYear); setEndMonth(calMonth); setEndDay(calSel);
+      }
+    }
+    setCalendarVisible(false);
+  };
   const calPrev = () => { if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); } else setCalMonth(m => m - 1); setCalSel(null); };
   const calNext = () => { if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); } else setCalMonth(m => m + 1); setCalSel(null); };
 
@@ -221,44 +250,63 @@ export default function CreateEventScreen({ navigation, route }: any) {
   const addCustomCategory = () => {
     const c = customCatInput.trim();
     if (!c) return;
-    if (!categories.includes(c)) setCategories(prev => [...prev, c]);
+    addCategory(c);
     setCategory(c); setCustomCatInput(''); setAddCatMode(false); setCategoryModal(false);
   };
 
-  const openMaps = () => {
-    const q = encodeURIComponent(location || 'map');
-    Linking.openURL(`https://maps.google.com/maps?q=${q}`).catch(() => Alert.alert('Maps not available'));
-    setMapModalVisible(false);
-  };
-  const openWaze = () => {
-    const q = encodeURIComponent(location || 'map');
-    Linking.openURL(`https://waze.com/ul?q=${q}`).catch(() => Alert.alert('Waze not available'));
-    setMapModalVisible(false);
+  const removeReminder = (r: string) => setReminders(p => p.filter(x => x !== r));
+  const addReminder = () => setReminderPickerVisible(true);
+
+  const selectReminder = (label: string) => {
+    setReminders(previous => [...new Set([...previous, label])]);
+    setReminderPickerVisible(false);
   };
 
-  const removeReminder = (r: string) => setReminders(p => p.filter(x => x !== r));
-  const addReminder = () =>
-    Alert.alert('Add Reminder', 'Choose a notification time', [
-      { text: '5 min before',  onPress: () => setReminders(p => [...new Set([...p, '5 minutes before'])]) },
-      { text: '15 min before', onPress: () => setReminders(p => [...new Set([...p, '15 minutes before'])]) },
-      { text: '30 min before', onPress: () => setReminders(p => [...new Set([...p, '30 minutes before'])]) },
-      { text: '1 hour before', onPress: () => setReminders(p => [...new Set([...p, '1 hour before'])]) },
-      { text: '1 day before',  onPress: () => setReminders(p => [...new Set([...p, '1 day before'])]) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+  const showValidation = (message: string) => {
+    setValidationMessage(message);
+    requestAnimationFrame(() => formScrollRef.current?.scrollTo({ y: 0, animated: true }));
+  };
 
   const handleSave = () => {
-    if (!title.trim()) { Alert.alert('Missing Title', 'Please enter an event title.'); return; }
+    if (!title.trim()) {
+      showValidation('Enter an event title before saving.');
+      return;
+    }
+    const startDateLabel = formatDateLabel(selYear, selMonth, selDay);
+    const endDateLabel = formatDateLabel(endYear, endMonth, endDay);
+    const startDateTime = parseEventDateTime(startDateLabel, allDay ? '12:00 AM' : fmtTime(startHourIdx, startMinuteIdx, startPeriodIdx), timeZone);
+    const endDateTime = parseEventDateTime(endDateLabel, allDay ? '11:59 PM' : fmtTime(endHourIdx, endMinuteIdx, endPeriodIdx), timeZone);
+    if (hasEnd && (!startDateTime || !endDateTime || endDateTime.getTime() < startDateTime.getTime() || (!allDay && endDateTime.getTime() === startDateTime.getTime()))) {
+      showValidation(allDay ? 'End date cannot be earlier than start date.' : 'End date and time must be later than the start.');
+      return;
+    }
+    if (recurrence === 'none' && reminders.length > 0) {
+      const reminderBase = parseEventDateTime(startDateLabel, allDay ? '09:00 AM' : fmtTime(startHourIdx, startMinuteIdx, startPeriodIdx), timeZone);
+      const hasPastReminder = reminders.some(label => {
+        const minutes = reminderMinutes(label);
+        return minutes === null || !reminderBase || reminderBase.getTime() - minutes * 60_000 <= Date.now();
+      });
+      if (hasPastReminder) {
+        showValidation('A reminder time has already passed. Choose a later event time or remove that reminder.');
+        return;
+      }
+    }
+    setValidationMessage(null);
     const event: AppEvent = {
       id: editEvent?.id || Date.now().toString(),
       title: title.trim(),
       description: description.trim(),
       startTime: fmtTime(startHourIdx, startMinuteIdx, startPeriodIdx),
-      startDate: formatDateLabel(selYear, selMonth, selDay),
-      endTime: hasEnd ? fmtTime(endHourIdx, endMinuteIdx, endPeriodIdx) : '',
+      startDate: startDateLabel,
+      endTime: hasEnd && !allDay ? fmtTime(endHourIdx, endMinuteIdx, endPeriodIdx) : '',
+      endDate: hasEnd ? endDateLabel : startDateLabel,
+      allDay,
+      timeZone,
       location: location.trim(),
+      latitude,
+      longitude,
       category, priority, reminders, recurrence,
-      alarmActive: editEvent?.alarmActive ?? true,
+      alarmActive: reminders.length > 0 ? (editEvent?.alarmActive ?? true) : false,
     };
     if (editEvent) {
       updateEvent(event);
@@ -269,7 +317,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
     }
   };
 
-  const cardBg = isDark ? theme.card : '#fff';
+  const cardBg = theme.glass.solid;
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
@@ -280,12 +328,11 @@ export default function CreateEventScreen({ navigation, route }: any) {
           <Text style={[s.cancelTxt, { color: theme.textSub }]}>Cancel</Text>
         </TouchableOpacity>
         <Text style={[s.headerTitle, { color: theme.text }]}>{editEvent ? 'Edit Event' : 'New Event'}</Text>
-        <TouchableOpacity onPress={handleSave} style={s.headerBtn}>
-          <Text style={[s.saveTxt, { color: BLUE }]}>{editEvent ? 'Update' : 'Save'}</Text>
-        </TouchableOpacity>
+        <View style={s.headerBtn} />
       </View>
 
       <ScrollView
+        ref={formScrollRef}
         style={s.scroll}
         contentContainerStyle={[s.content, { paddingBottom: 40 }]}
         showsVerticalScrollIndicator={false}
@@ -294,11 +341,15 @@ export default function CreateEventScreen({ navigation, route }: any) {
         {/* -- Title -- */}
         <View style={[s.titleCard, { backgroundColor: cardBg, borderColor: theme.border }]}>
           <TextInput
+            testID="event-title-input"
             style={[s.titleInput, { color: theme.text }]}
             placeholder="Event title"
             placeholderTextColor={theme.textDim}
             value={title}
-            onChangeText={setTitle}
+            onChangeText={value => {
+              setTitle(value);
+              if (validationMessage) setValidationMessage(null);
+            }}
             autoFocus
             maxLength={80}
             returnKeyType="next"
@@ -314,26 +365,33 @@ export default function CreateEventScreen({ navigation, route }: any) {
             textAlignVertical="top"
           />
         </View>
+        {validationMessage ? (
+          <View style={[s.validationBanner, { backgroundColor: `${theme.semantic.danger}12`, borderColor: `${theme.semantic.danger}38` }]}>
+            <Ionicons name="alert-circle-outline" size={18} color={theme.semantic.danger} />
+            <Text style={[s.validationText, { color: theme.semantic.danger }]}>{validationMessage}</Text>
+          </View>
+        ) : null}
 
         {/* -- Timing card -- */}
         <View style={[s.card, { backgroundColor: cardBg, borderColor: theme.border }]}>
-          {/* Start row */}
-          <TouchableOpacity style={[s.timeRow, { borderBottomColor: theme.border }]} onPress={() => openTimePicker('start')}>
+          <View style={[s.timeRow, { borderBottomColor: theme.border }]}>
             <View style={s.timeRowLeft}>
-              <Ionicons name="time-outline" size={17} color={BLUE} style={{ marginRight: 10 }} />
-              <Text style={[s.timeRowLabel, { color: theme.textDim }]}>Start</Text>
+              <Ionicons name="sunny-outline" size={17} color={BLUE} style={{ marginRight: 10 }} />
+              <Text style={[s.timeRowLabel, { color: theme.textDim }]}>All day</Text>
             </View>
-            <View style={s.timeRowRight}>
-              <Text style={[s.timeValue, { color: theme.text }]}>{fmtTime(startHourIdx, startMinuteIdx, startPeriodIdx)}</Text>
-              <Ionicons name="chevron-forward" size={14} color={theme.textDim} style={{ marginLeft: 4 }} />
-            </View>
-          </TouchableOpacity>
+            <Switch
+              testID="event-all-day-switch"
+              value={allDay}
+              onValueChange={setAllDay}
+              trackColor={{ false: theme.border, true: theme.accent.soft }}
+              thumbColor={allDay ? BLUE : theme.textDim}
+            />
+          </View>
 
-          {/* Date row */}
-          <TouchableOpacity style={[s.timeRow, { borderBottomColor: theme.border }]} onPress={openCalendar}>
+          <TouchableOpacity testID="event-start-date" style={[s.timeRow, { borderBottomColor: theme.border }]} onPress={() => openCalendar('start')}>
             <View style={s.timeRowLeft}>
               <Ionicons name="calendar-outline" size={17} color={BLUE} style={{ marginRight: 10 }} />
-              <Text style={[s.timeRowLabel, { color: theme.textDim }]}>Date</Text>
+              <Text style={[s.timeRowLabel, { color: theme.textDim }]}>Start date</Text>
             </View>
             <View style={s.timeRowRight}>
               <Text style={[s.timeValue, { color: theme.text }]}>{formatDateLabel(selYear, selMonth, selDay)}</Text>
@@ -341,25 +399,55 @@ export default function CreateEventScreen({ navigation, route }: any) {
             </View>
           </TouchableOpacity>
 
-          {/* End time row */}
-          {hasEnd ? (
-            <TouchableOpacity style={[s.timeRow, { borderBottomColor: 'transparent' }]} onPress={() => openTimePicker('end')}>
+          {!allDay ? (
+            <TouchableOpacity testID="event-start-time" style={[s.timeRow, { borderBottomColor: theme.border }]} onPress={() => openTimePicker('start')}>
               <View style={s.timeRowLeft}>
-                <Ionicons name="time-outline" size={17} color={theme.textDim} style={{ marginRight: 10 }} />
-                <Text style={[s.timeRowLabel, { color: theme.textDim }]}>End</Text>
+                <Ionicons name="time-outline" size={17} color={BLUE} style={{ marginRight: 10 }} />
+                <Text style={[s.timeRowLabel, { color: theme.textDim }]}>Start time</Text>
               </View>
               <View style={s.timeRowRight}>
-                <Text style={[s.timeValue, { color: theme.text }]}>{fmtTime(endHourIdx, endMinuteIdx, endPeriodIdx)}</Text>
-                <TouchableOpacity onPress={() => setHasEnd(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close-circle" size={16} color={theme.textDim} style={{ marginLeft: 6 }} />
-                </TouchableOpacity>
+                <Text style={[s.timeValue, { color: theme.text }]}>{fmtTime(startHourIdx, startMinuteIdx, startPeriodIdx)}</Text>
+                <Ionicons name="chevron-forward" size={14} color={theme.textDim} style={{ marginLeft: 4 }} />
               </View>
             </TouchableOpacity>
+          ) : null}
+
+          {hasEnd ? (
+            <>
+              <TouchableOpacity testID="event-end-date" style={[s.timeRow, { borderBottomColor: theme.border }]} onPress={() => openCalendar('end')}>
+                <View style={s.timeRowLeft}>
+                  <Ionicons name="calendar-outline" size={17} color={theme.textDim} style={{ marginRight: 10 }} />
+                  <Text style={[s.timeRowLabel, { color: theme.textDim }]}>End date</Text>
+                </View>
+                <View style={s.timeRowRight}>
+                  <Text style={[s.timeValue, { color: theme.text }]}>{formatDateLabel(endYear, endMonth, endDay)}</Text>
+                  <Ionicons name="chevron-forward" size={14} color={theme.textDim} style={{ marginLeft: 4 }} />
+                </View>
+              </TouchableOpacity>
+              {!allDay ? (
+                <TouchableOpacity testID="event-end-time" style={[s.timeRow, { borderBottomColor: 'transparent' }]} onPress={() => openTimePicker('end')}>
+                  <View style={s.timeRowLeft}>
+                    <Ionicons name="time-outline" size={17} color={theme.textDim} style={{ marginRight: 10 }} />
+                    <Text style={[s.timeRowLabel, { color: theme.textDim }]}>End time</Text>
+                  </View>
+                  <View style={s.timeRowRight}>
+                    <Text style={[s.timeValue, { color: theme.text }]}>{fmtTime(endHourIdx, endMinuteIdx, endPeriodIdx)}</Text>
+                    <Ionicons name="chevron-forward" size={14} color={theme.textDim} style={{ marginLeft: 4 }} />
+                  </View>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity testID="event-remove-end" style={[s.timeRow, { borderBottomColor: 'transparent' }]} onPress={() => setHasEnd(false)}>
+                <View style={s.timeRowLeft}>
+                  <Ionicons name="close-circle-outline" size={17} color={theme.textDim} style={{ marginRight: 10 }} />
+                  <Text style={[s.addEndTxt, { color: theme.textDim }]}>Remove end</Text>
+                </View>
+              </TouchableOpacity>
+            </>
           ) : (
-            <TouchableOpacity style={[s.timeRow, { borderBottomColor: 'transparent' }]} onPress={() => setHasEnd(true)}>
+            <TouchableOpacity testID="event-add-end" style={[s.timeRow, { borderBottomColor: 'transparent' }]} onPress={() => setHasEnd(true)}>
               <View style={s.timeRowLeft}>
                 <Ionicons name="add-circle-outline" size={17} color={theme.textDim} style={{ marginRight: 10 }} />
-                <Text style={[s.addEndTxt, { color: theme.textDim }]}>Add end time</Text>
+                <Text style={[s.addEndTxt, { color: theme.textDim }]}>Add end date{allDay ? '' : ' and time'}</Text>
               </View>
             </TouchableOpacity>
           )}
@@ -367,28 +455,29 @@ export default function CreateEventScreen({ navigation, route }: any) {
 
         {/* -- Details card -- */}
         <View style={[s.card, { backgroundColor: cardBg, borderColor: theme.border }]}>
-          {/* Location */}
-          <View style={[s.timeRow, { borderBottomColor: theme.border }]}>
+          <TouchableOpacity testID="event-location-picker" style={[s.timeRow, { borderBottomColor: theme.border }]} onPress={() => setLocationPickerVisible(true)}>
             <View style={s.timeRowLeft}>
               <Ionicons name="location-outline" size={17} color={BLUE} style={{ marginRight: 10 }} />
               <Text style={[s.timeRowLabel, { color: theme.textDim }]}>Location</Text>
             </View>
-            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
-              <TextInput
-                style={[s.inlineInput, { color: theme.text }]}
-                placeholder="Add location"
-                placeholderTextColor={theme.textDim}
-                value={location}
-                onChangeText={setLocation}
-                returnKeyType="done"
-              />
-              {location.length > 0 && (
-                <TouchableOpacity onPress={() => setMapModalVisible(true)}>
-                  <Ionicons name="map-outline" size={17} color={BLUE} />
-                </TouchableOpacity>
-              )}
+            <View style={s.timeRowRight}>
+              <Text numberOfLines={1} style={[s.timeValue, { color: location ? theme.text : theme.textDim, maxWidth: 170 }]}>
+                {location || 'Choose on map'}
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color={theme.textDim} style={{ marginLeft: 4 }} />
             </View>
-          </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity testID="event-time-zone" style={[s.timeRow, { borderBottomColor: theme.border }]} onPress={() => setTimeZoneModal(true)}>
+            <View style={s.timeRowLeft}>
+              <Ionicons name="globe-outline" size={17} color={BLUE} style={{ marginRight: 10 }} />
+              <Text style={[s.timeRowLabel, { color: theme.textDim }]}>Time zone</Text>
+            </View>
+            <View style={s.timeRowRight}>
+              <Text numberOfLines={1} style={[s.timeValue, { color: theme.text, maxWidth: 170 }]}>{timeZone}</Text>
+              <Ionicons name="chevron-forward" size={14} color={theme.textDim} style={{ marginLeft: 4 }} />
+            </View>
+          </TouchableOpacity>
 
           {/* Category */}
           <TouchableOpacity style={[s.timeRow, { borderBottomColor: theme.border }]} onPress={() => { setAddCatMode(false); setCategoryModal(true); }}>
@@ -436,6 +525,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
                 const label = r === 'none' ? 'Once' : r.charAt(0).toUpperCase() + r.slice(1);
                 return (
                   <TouchableOpacity
+                    testID={`event-recurrence-${r}`}
                     key={r}
                     style={[s.pill, { backgroundColor: active ? BLUE : theme.bg2, borderColor: active ? BLUE : theme.border }]}
                     onPress={() => setRecurrence(r)}
@@ -453,7 +543,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
           <View style={[s.cardHeaderRow, { borderBottomColor: theme.border }]}>
             <Ionicons name="notifications-outline" size={15} color={BLUE} />
             <Text style={[s.cardHeaderTxt, { color: theme.text }]}>Reminders</Text>
-            <TouchableOpacity style={s.addRemBtn} onPress={addReminder}>
+            <TouchableOpacity testID="event-add-reminder" style={s.addRemBtn} onPress={addReminder}>
               <Ionicons name="add" size={14} color={BLUE} />
               <Text style={s.addRemTxt}>Add</Text>
             </TouchableOpacity>
@@ -465,7 +555,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
               <View key={i} style={[s.remRow, { borderBottomColor: theme.border }, i === reminders.length - 1 && { borderBottomWidth: 0 }]}>
                 <Ionicons name="time-outline" size={15} color={theme.textDim} style={{ marginRight: 10 }} />
                 <Text style={[s.remTxt, { color: theme.textSub }]}>{r}</Text>
-                <TouchableOpacity onPress={() => removeReminder(r)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <TouchableOpacity testID={`event-remove-reminder-${i}`} onPress={() => removeReminder(r)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name="close" size={17} color={theme.textDim} />
                 </TouchableOpacity>
               </View>
@@ -476,7 +566,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
 
       {/* -- Save button -- */}
       <View style={[s.footer, { backgroundColor: theme.glass.solid, borderTopColor: theme.glass.border }]}>
-        <TouchableOpacity style={s.saveBtn} onPress={handleSave} activeOpacity={0.85}>
+        <TouchableOpacity testID="event-save" style={s.saveBtn} onPress={handleSave} activeOpacity={0.85}>
           <Text style={s.saveBtnTxt}>{editEvent ? 'Update Event' : 'Create Event'}</Text>
         </TouchableOpacity>
       </View>
@@ -484,7 +574,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
       {/* -- TIME PICKER MODAL -- */}
       <Modal visible={timeTarget !== null} animationType="slide" transparent onRequestClose={() => setTimeTarget(null)}>
         <Pressable style={s.overlay} onPress={() => setTimeTarget(null)} />
-        <View style={[s.sheet, { backgroundColor: theme.bg }]}>
+        <View style={[s.sheet, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
           <View style={[s.sheetHandle, { backgroundColor: theme.border }]} />
           <View style={[s.sheetHead, { borderBottomColor: theme.border }]}>
             <TouchableOpacity onPress={() => setTimeTarget(null)}>
@@ -507,13 +597,13 @@ export default function CreateEventScreen({ navigation, route }: any) {
       {/* -- CALENDAR MODAL -- */}
       <Modal visible={calendarVisible} animationType="slide" transparent onRequestClose={() => setCalendarVisible(false)}>
         <Pressable style={s.overlay} onPress={() => setCalendarVisible(false)} />
-        <View style={[s.calSheet, { backgroundColor: theme.bg }]}>
+        <View style={[s.calSheet, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
           <View style={[s.sheetHandle, { backgroundColor: theme.border }]} />
           <View style={[s.sheetHead, { borderBottomColor: theme.border }]}>
             <TouchableOpacity onPress={() => setCalendarVisible(false)}>
               <Text style={[s.sheetCancel, { color: theme.textDim }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[s.sheetTitle, { color: theme.text }]}>Select Date</Text>
+            <Text style={[s.sheetTitle, { color: theme.text }]}>{dateTarget === 'start' ? 'Start Date' : 'End Date'}</Text>
             <TouchableOpacity onPress={confirmCalendar}>
               <Text style={[s.sheetDone, { color: BLUE }]}>Done</Text>
             </TouchableOpacity>
@@ -533,7 +623,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
                 const isToday = day === now.getDate() && calMonth === now.getMonth() && calYear === now.getFullYear();
                 const isSel = day === calSel;
                 return (
-                  <TouchableOpacity key={ci} style={[s.calCell, isToday && s.calToday, isSel && s.calSel]} onPress={() => setCalSel(day)}>
+                  <TouchableOpacity testID={`calendar-day-${day}`} key={ci} style={[s.calCell, isToday && s.calToday, isSel && s.calSel]} onPress={() => setCalSel(day)}>
                     <Text style={[s.calCellTxt, { color: theme.text }, isToday && !isSel && { color: BLUE, fontWeight: '700' }, isSel && { color: '#fff', fontWeight: '700' }]}>{day}</Text>
                   </TouchableOpacity>
                 );
@@ -544,33 +634,57 @@ export default function CreateEventScreen({ navigation, route }: any) {
         </View>
       </Modal>
 
-      {/* -- MAP MODAL -- */}
-      <Modal visible={mapModalVisible} animationType="slide" transparent onRequestClose={() => setMapModalVisible(false)}>
-        <Pressable style={s.overlay} onPress={() => setMapModalVisible(false)} />
-        <View style={[s.mapSheet, { backgroundColor: theme.bg }]}>
+      <EventLocationPicker
+        visible={locationPickerVisible}
+        initialLabel={location}
+        initialLatitude={latitude}
+        initialLongitude={longitude}
+        onCancel={() => setLocationPickerVisible(false)}
+        onClear={() => {
+          setLocation('');
+          setLatitude(undefined);
+          setLongitude(undefined);
+          setLocationPickerVisible(false);
+        }}
+        onSelect={selection => {
+          setLocation(selection.label);
+          setLatitude(selection.latitude);
+          setLongitude(selection.longitude);
+          setLocationPickerVisible(false);
+        }}
+      />
+
+      <Modal visible={timeZoneModal} animationType="slide" transparent onRequestClose={() => setTimeZoneModal(false)}>
+        <Pressable style={s.overlay} onPress={() => setTimeZoneModal(false)} />
+        <View style={[s.catSheet, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
           <View style={[s.sheetHandle, { backgroundColor: theme.border }]} />
-          <Text style={[s.mapTitle, { color: theme.text }]}>Open in Maps</Text>
-          {location ? <Text style={[s.mapSub, { color: theme.textDim }]}>"{location}"</Text> : null}
-          <TouchableOpacity style={[s.mapBtn, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={openMaps}>
-            <Ionicons name="navigate-circle-outline" size={24} color="#4285F4" />
-            <Text style={[s.mapBtnTxt, { color: theme.text }]}>Google Maps</Text>
-            <Ionicons name="chevron-forward" size={15} color={theme.textDim} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[s.mapBtn, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={openWaze}>
-            <Ionicons name="car-outline" size={24} color="#33CCFF" />
-            <Text style={[s.mapBtnTxt, { color: theme.text }]}>Waze</Text>
-            <Ionicons name="chevron-forward" size={15} color={theme.textDim} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setMapModalVisible(false)} style={s.mapCancel}>
-            <Text style={[{ fontSize: 14, fontWeight: '500' }, { color: theme.textDim }]}>Cancel</Text>
-          </TouchableOpacity>
+          <View style={[s.sheetHead, { borderBottomColor: theme.border }]}>
+            <TouchableOpacity onPress={() => setTimeZoneModal(false)}>
+              <Text style={[s.sheetCancel, { color: theme.textDim }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[s.sheetTitle, { color: theme.text }]}>Time Zone</Text>
+            <View style={{ width: 60 }} />
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
+            {COMMON_TIME_ZONES.map(zone => (
+              <TouchableOpacity
+                testID={`time-zone-${zone}`}
+                key={zone}
+                style={[s.catRow, { borderBottomColor: theme.border }]}
+                onPress={() => { setTimeZone(zone); setTimeZoneModal(false); }}
+              >
+                <Text style={[s.catTxt, { color: zone === timeZone ? BLUE : theme.text }, zone === timeZone && { fontWeight: '700' }]}>{zone}</Text>
+                {zone === timeZone ? <Ionicons name="checkmark" size={18} color={BLUE} /> : null}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       </Modal>
 
       {/* -- CATEGORY MODAL -- */}
       <Modal visible={categoryModal} animationType="slide" transparent onRequestClose={() => setCategoryModal(false)}>
         <Pressable style={s.overlay} onPress={() => setCategoryModal(false)} />
-        <View style={[s.catSheet, { backgroundColor: theme.bg }]}>
+        <View style={[s.catSheet, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
           <View style={[s.sheetHandle, { backgroundColor: theme.border }]} />
           <View style={[s.sheetHead, { borderBottomColor: theme.border }]}>
             <TouchableOpacity onPress={() => setCategoryModal(false)}>
@@ -589,7 +703,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
             {addCatMode ? (
               <View style={[s.catRow, { borderBottomColor: theme.border, gap: 8 }]}>
                 <TextInput
-                  style={[s.catAddInput, { backgroundColor: theme.bg2, borderColor: theme.border, color: theme.text, flex: 1 }]}
+                  style={[s.catAddInput, { backgroundColor: theme.glass.secondary, borderColor: theme.border, color: theme.text, flex: 1 }]}
                   placeholder="New category"
                   placeholderTextColor={theme.textDim}
                   value={customCatInput}
@@ -610,6 +724,28 @@ export default function CreateEventScreen({ navigation, route }: any) {
           </ScrollView>
         </View>
       </Modal>
+
+      <EventActionSheet
+        visible={reminderPickerVisible}
+        title="Add reminder"
+        message="Choose when OmniTask should notify you before this event."
+        onClose={() => setReminderPickerVisible(false)}
+        actions={[
+          ['5 minutes before', '5 minutes before'],
+          ['15 minutes before', '15 minutes before'],
+          ['30 minutes before', '30 minutes before'],
+          ['1 hour before', '1 hour before'],
+          ['1 day before', '1 day before'],
+        ].map(([label, value]) => ({
+          label,
+          icon: 'time-outline' as const,
+          tone: 'accent' as const,
+          disabled: reminders.includes(value),
+          description: reminders.includes(value) ? 'Already added' : undefined,
+          onPress: () => selectReminder(value),
+        }))}
+      />
+
     </SafeAreaView>
   );
 }

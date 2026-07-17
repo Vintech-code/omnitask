@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
-import { FirebaseError } from 'firebase/app';
 import {
   createUserWithEmailAndPassword,
+  GoogleAuthProvider,
   onAuthStateChanged,
+  signInWithCredential,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   updateProfile,
@@ -13,6 +14,13 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { flushCloudMutations, queueCloudSet } from '../services/OfflineSyncService';
 import { KEYS, Storage } from '../services/StorageService';
+import { ensureAuthEndpointReachable } from '../services/AuthNetworkService';
+import { authErrorMessage } from '@/utils/authError';
+import {
+  clearGoogleSession,
+  isGoogleAuthCancelled,
+  requestGoogleIdentity,
+} from '@/services/GoogleAuthService';
 
 export interface User {
   id: string;
@@ -26,6 +34,7 @@ interface AuthContextType {
   hasSeenOnboarding: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
   markOnboardingSeen: () => Promise<void>;
@@ -37,6 +46,7 @@ const AuthContext = createContext<AuthContextType>({
   hasSeenOnboarding: false,
   signIn: async () => {},
   signUp: async () => {},
+  signInWithGoogle: async () => {},
   signOut: async () => {},
   updateUser: async () => {},
   markOnboardingSeen: async () => {},
@@ -45,17 +55,7 @@ const AuthContext = createContext<AuthContextType>({
 const userDocRef = (uid: string) => doc(db, 'users', uid);
 
 const firestoreErrorMessage = (error: unknown): string => {
-  if (!(error instanceof FirebaseError)) return 'Something went wrong. Please try again.';
-  switch (error.code) {
-    case 'auth/user-not-found': return 'No account found with that email.';
-    case 'auth/wrong-password': return 'Incorrect password. Please try again.';
-    case 'auth/email-already-in-use': return 'An account with this email already exists.';
-    case 'auth/invalid-email': return 'Please enter a valid email address.';
-    case 'auth/weak-password': return 'Password must be at least 6 characters.';
-    case 'auth/too-many-requests': return 'Too many attempts. Please try again later.';
-    case 'auth/network-request-failed': return 'You must be online to sign in or create an account.';
-    default: return error.message;
-  }
+  return authErrorMessage(error);
 };
 
 export { firestoreErrorMessage };
@@ -135,6 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
+      await ensureAuthEndpointReachable();
       await signInWithEmailAndPassword(auth, email.trim(), password);
     } catch (error) {
       throw new Error(firestoreErrorMessage(error));
@@ -143,6 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (name: string, email: string, password: string) => {
     try {
+      await ensureAuthEndpointReachable();
       const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
       await updateProfile(credential.user, { displayName: name.trim() });
       const created: User = {
@@ -162,8 +164,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const signInWithGoogle = async () => {
+    try {
+      const googleIdentity = await requestGoogleIdentity();
+      const googleCredential = GoogleAuthProvider.credential(googleIdentity.idToken);
+      const credential = await signInWithCredential(auth, googleCredential);
+      const resolved: User = {
+        id: credential.user.uid,
+        name: credential.user.displayName
+          ?? googleIdentity.user.name
+          ?? credential.user.email?.split('@')[0]
+          ?? 'User',
+        email: credential.user.email ?? googleIdentity.user.email ?? '',
+      };
+
+      // Firebase authentication is already complete at this point. Make local
+      // profile persistence best-effort so a cache/sync issue cannot report a
+      // successful Google login as failed and force the user to tap twice.
+      setUser(resolved);
+      void Storage.setForUser(KEYS.USER, credential.user.uid, resolved).catch(() => undefined);
+      void queueCloudSet(
+        credential.user.uid,
+        ['users', credential.user.uid],
+        resolved as unknown as Record<string, unknown>,
+      ).catch(() => undefined);
+    } catch (error) {
+      if (isGoogleAuthCancelled(error)) throw error;
+      throw new Error(firestoreErrorMessage(error));
+    }
+  };
+
   const signOut = async () => {
     await firebaseSignOut(auth);
+    await clearGoogleSession();
     setUser(null);
   };
 
@@ -194,6 +227,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       hasSeenOnboarding,
       signIn,
       signUp,
+      signInWithGoogle,
       signOut,
       updateUser,
       markOnboardingSeen,

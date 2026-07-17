@@ -1,37 +1,48 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { collection, onSnapshot, QuerySnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, QuerySnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
 import { auth, db } from '../config/firebase';
 import { KEYS, Storage } from '../services/StorageService';
 import { getPendingDeletePaths, queueCloudDelete, queueCloudSet } from '../services/OfflineSyncService';
-import { cancelNotification, scheduleEventNotification } from '../services/NotificationService';
+import { cancelEventNotifications, scheduleEventNotifications } from '../services/EventNotificationService';
 import type { AppEvent } from '@/types/event';
+import { DEFAULT_EVENT_CATEGORIES, normalizeEventCategories } from '@/utils/eventCategories';
 
 export type { AppEvent };
 
 interface EventContextType {
   events: AppEvent[];
+  categories: string[];
   isLoading: boolean;
   addEvent: (event: AppEvent) => void;
   updateEvent: (event: AppEvent) => void;
   removeEvent: (id: string) => void;
   toggleAlarmActive: (id: string) => void;
+  addCategory: (category: string) => void;
+  removeCategory: (category: string) => void;
 }
 
+export { DEFAULT_EVENT_CATEGORIES };
+
 const EventContext = createContext<EventContextType>({
-  events: [], isLoading: true,
+  events: [], categories: DEFAULT_EVENT_CATEGORIES, isLoading: true,
   addEvent: () => {}, updateEvent: () => {}, removeEvent: () => {}, toggleAlarmActive: () => {},
+  addCategory: () => {}, removeCategory: () => {},
 });
 
 const eventsCol = (uid: string) => collection(db, 'users', uid, 'events');
 const eventPath = (uid: string, id: string) => ['users', uid, 'events', id];
+const metaPath = (uid: string) => ['users', uid, 'meta', 'eventMeta'];
 const modified = (event: AppEvent) => event.updatedAt ?? 0;
+const clean = (value: Record<string, unknown>) => Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
 
 export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [events, setEvents] = useState<AppEvent[]>([]);
+  const [categories, setCategories] = useState(DEFAULT_EVENT_CATEGORIES);
   const [isLoading, setIsLoading] = useState(true);
   const eventsRef = useRef<AppEvent[]>([]);
+  const categoriesRef = useRef(DEFAULT_EVENT_CATEGORIES);
   const uidRef = useRef<string | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
 
@@ -39,6 +50,16 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     eventsRef.current = updated;
     setEvents(updated);
     if (uidRef.current) void Storage.setForUser(KEYS.EVENTS, uidRef.current, updated);
+  };
+
+  const persistCategories = (updated: string[], upload = true) => {
+    const normalized = normalizeEventCategories(updated);
+    categoriesRef.current = normalized;
+    setCategories(normalized);
+    const uid = uidRef.current;
+    if (!uid) return;
+    void Storage.setForUser(KEYS.EVENT_CATEGORIES, uid, normalized);
+    if (upload) void queueCloudSet(uid, metaPath(uid), { categories: normalized, updatedAt: Date.now() });
   };
 
   useEffect(() => {
@@ -49,15 +70,28 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         uidRef.current = null;
         eventsRef.current = [];
         setEvents([]);
+        categoriesRef.current = DEFAULT_EVENT_CATEGORIES;
+        setCategories(DEFAULT_EVENT_CATEGORIES);
         setIsLoading(false);
         return;
       }
 
       const uid = firebaseUser.uid;
       uidRef.current = uid;
-      const local = await Storage.getForUser<AppEvent[]>(KEYS.EVENTS, uid) ?? [];
-      persist(local);
+      const [local, localCategories] = await Promise.all([
+        Storage.getForUser<AppEvent[]>(KEYS.EVENTS, uid),
+        Storage.getForUser<string[]>(KEYS.EVENT_CATEGORIES, uid),
+      ]);
+      persist(local ?? []);
+      persistCategories([...DEFAULT_EVENT_CATEGORIES, ...(localCategories ?? [])], false);
       setIsLoading(false);
+
+      void getDoc(doc(db, metaPath(uid).join('/'))).then(snapshot => {
+        const cloudCategories = snapshot.data()?.categories;
+        if (uidRef.current === uid && Array.isArray(cloudCategories)) {
+          persistCategories([...categoriesRef.current, ...cloudCategories], false);
+        }
+      }).catch(() => undefined);
 
       unsubRef.current = onSnapshot(eventsCol(uid), async (snapshot: QuerySnapshot) => {
         if (uidRef.current !== uid) return;
@@ -70,7 +104,7 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const cloudItem = merged.get(localItem.id);
           if (!cloudItem || modified(localItem) > modified(cloudItem)) {
             merged.set(localItem.id, localItem);
-            void queueCloudSet(uid, eventPath(uid, localItem.id), localItem as unknown as Record<string, unknown>);
+            void queueCloudSet(uid, eventPath(uid, localItem.id), clean(localItem as unknown as Record<string, unknown>));
           }
         }
         persist([...merged.values()]);
@@ -90,10 +124,11 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ? [updatedEvent, ...eventsRef.current]
       : eventsRef.current.map(item => item.id === event.id ? updatedEvent : item);
     persist(updated);
-    void queueCloudSet(uid, eventPath(uid, event.id), updatedEvent as unknown as Record<string, unknown>);
-    void cancelNotification(`event_${event.id}`);
+    void queueCloudSet(uid, eventPath(uid, event.id), clean(updatedEvent as unknown as Record<string, unknown>));
     if (updatedEvent.alarmActive) {
-      void scheduleEventNotification(updatedEvent.id, updatedEvent.title, updatedEvent.startTime, updatedEvent.startDate, 15, updatedEvent.recurrence ?? 'none');
+      void scheduleEventNotifications(updatedEvent).catch(() => undefined);
+    } else {
+      void cancelEventNotifications(event.id);
     }
   };
 
@@ -105,15 +140,28 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!uid) return;
     persist(eventsRef.current.filter(event => event.id !== id));
     void queueCloudDelete(uid, eventPath(uid, id));
-    void cancelNotification(`event_${id}`);
+    void cancelEventNotifications(id);
   };
 
   const toggleAlarmActive = (id: string) => {
     const event = eventsRef.current.find(item => item.id === id);
-    if (event) save({ ...event, alarmActive: !event.alarmActive }, false);
+    if (event && (event.alarmActive || event.reminders.length > 0)) {
+      save({ ...event, alarmActive: !event.alarmActive }, false);
+    }
   };
 
-  return <EventContext.Provider value={{ events, isLoading, addEvent, updateEvent, removeEvent, toggleAlarmActive }}>{children}</EventContext.Provider>;
+  const addCategory = (category: string) => {
+    const trimmed = category.trim();
+    if (!categoriesRef.current.some(item => item.toLocaleLowerCase() === trimmed.toLocaleLowerCase())) {
+      persistCategories([...categoriesRef.current, trimmed]);
+    }
+  };
+  const removeCategory = (category: string) => {
+    if (DEFAULT_EVENT_CATEGORIES.includes(category)) return;
+    persistCategories(categoriesRef.current.filter(item => item !== category));
+  };
+
+  return <EventContext.Provider value={{ events, categories, isLoading, addEvent, updateEvent, removeEvent, toggleAlarmActive, addCategory, removeCategory }}>{children}</EventContext.Provider>;
 };
 
 export const useEvents = () => useContext(EventContext);

@@ -12,6 +12,7 @@ import { useAlarmStore } from '@/context/AlarmStore';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { sr } from './styles';
 import { AppBackground, ScreenSkeleton } from '@/components/ui';
+import { formatEventSchedule } from '@/utils/eventDate';
 
 
 type ResultType = 'note' | 'event' | 'alarm';
@@ -66,7 +67,7 @@ export default function SearchScreen({ navigation }: any) {
           out.push({
             id: `event-${e.id}`, type: 'event',
             title: e.title,
-            subtitle: `${e.startDate} · ${e.startTime}${e.location ? ' · ' + e.location : ''}`,
+            subtitle: `${formatEventSchedule(e)}${e.location ? ' · ' + e.location : ''}`,
             icon: 'calendar-outline',
             color: BLUE,
             payload: e,
@@ -100,7 +101,7 @@ export default function SearchScreen({ navigation }: any) {
     } else if (r.type === 'alarm') {
       navigation.navigate('Alarm');
     } else {
-      navigation.navigate('Main', { screen: 'Tasks' });
+      navigation.navigate('Main', { screen: 'Tasks', params: { section: 'notes' } });
     }
   };
 

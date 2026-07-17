@@ -10,11 +10,14 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import LottieView from 'lottie-react-native';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { styles } from './styles';
 import { AppBackground } from '@/components/ui';
+import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton';
+import { useAuth } from '@/context/AuthContext';
+import { isGoogleAuthCancelled } from '@/services/GoogleAuthService';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -50,6 +53,8 @@ const FEATURES = [
 ];
 
 export default function WelcomeScreen({ navigation }: any) {
+  const { signInWithGoogle, hasSeenOnboarding } = useAuth();
+  const [googleLoading, setGoogleLoading] = React.useState(false);
   const logoScale = useRef(new Animated.Value(0.75)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const contentY = useRef(new Animated.Value(30)).current;
@@ -63,6 +68,24 @@ export default function WelcomeScreen({ navigation }: any) {
       Animated.timing(contentY, { toValue: 0, duration: 600, delay: 200, useNativeDriver: true }),
     ]).start();
   }, []);
+
+  const handleGoogleSignIn = async () => {
+    if (googleLoading) return;
+    try {
+      setGoogleLoading(true);
+      await signInWithGoogle();
+      navigation.replace(hasSeenOnboarding ? 'Main' : 'Onboarding');
+    } catch (error) {
+      if (!isGoogleAuthCancelled(error)) {
+        Alert.alert(
+          'Google Sign-In Failed',
+          error instanceof Error ? error.message : 'Unable to continue with Google.',
+        );
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -114,15 +137,12 @@ export default function WelcomeScreen({ navigation }: any) {
           <View style={styles.dividerLine} />
         </View>
 
-        <View style={styles.socialRow}>
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.8} onPress={() => Alert.alert('Apple Sign In', 'Apple authentication is not available in this demo.')}>
-            <FontAwesome5 name="apple" size={17} color="#000" />
-            <Text style={styles.socialText}>Apple</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.socialBtn} activeOpacity={0.8} onPress={() => Alert.alert('Google Sign In', 'Google authentication is not available in this demo.')}>
-            <Ionicons name="logo-google" size={17} color="#DB4437" />
-            <Text style={styles.socialText}>Google</Text>
-          </TouchableOpacity>
+        <View style={styles.googleButtonWrap}>
+          <GoogleAuthButton
+            testID="welcome-google-sign-in"
+            loading={googleLoading}
+            onPress={handleGoogleSignIn}
+          />
         </View>
 
         <Text style={styles.terms}>

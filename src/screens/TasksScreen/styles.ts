@@ -13,9 +13,11 @@ export const styles = StyleSheet.create({
   headerTitle: { fontSize: 26, fontWeight: '700', flex: 1, textAlign: 'left', marginLeft: 14, letterSpacing: -0.4 },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconBtn: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  headerAddBtn: {
-    width: 42, height: 42, borderRadius: 21,
+  floatingAddBtn: {
+    position: 'absolute', right: 20,
+    width: 52, height: 52, borderRadius: 26,
     alignItems: 'center', justifyContent: 'center',
+    zIndex: 20,
   },
 
   // -- Search

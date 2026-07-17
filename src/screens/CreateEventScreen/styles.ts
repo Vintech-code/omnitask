@@ -33,6 +33,12 @@ export const s = StyleSheet.create({
   titleCard: {
     borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden',
   },
+  validationBanner: {
+    minHeight: 48, borderRadius: 16, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 9,
+  },
+  validationText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '600' },
   titleInput: {
     fontSize: 20, fontWeight: '700',
     paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10,
@@ -96,8 +102,8 @@ export const s = StyleSheet.create({
 
   // Shared modal
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  calSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 12 },
+  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1 },
+  calSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, paddingHorizontal: 12 },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 8, marginBottom: 2 },
   sheetHead: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -121,7 +127,7 @@ export const s = StyleSheet.create({
   calCellTxt: { fontSize: 14, fontWeight: '500' },
 
   // Map sheet
-  mapSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingBottom: 32 },
+  mapSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, paddingHorizontal: 16, paddingBottom: 32 },
   mapTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center', marginTop: 4, marginBottom: 4 },
   mapSub: { fontSize: 13, textAlign: 'center', marginBottom: 14 },
   mapBtn: {
@@ -132,7 +138,7 @@ export const s = StyleSheet.create({
   mapCancel: { alignItems: 'center', paddingVertical: 12 },
 
   // Category sheet
-  catSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  catSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1 },
   catRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 18, paddingVertical: 14,

@@ -7,7 +7,12 @@ export interface AppEvent {
   startTime: string;
   startDate: string;
   endTime: string;
+  endDate?: string;
+  allDay?: boolean;
+  timeZone?: string;
   location: string;
+  latitude?: number;
+  longitude?: number;
   category: string;
   priority: 'Low' | 'Medium' | 'High';
   reminders: string[];

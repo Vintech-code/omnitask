@@ -1,107 +1,38 @@
-﻿import { StyleSheet } from 'react-native';
-import { BRAND_BLUE as BLUE } from '@/theme/colors';
-
-export const fs = StyleSheet.create({
-  label: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 6 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    backgroundColor: 'rgba(255,255,255,0.78)',
-  },
-  input: { flex: 1, fontSize: 15, color: '#222' },
-});
+import { StyleSheet } from 'react-native';
+import { BRAND_BLUE as ORANGE } from '@/theme/colors';
 
 export const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 0,
-  },
-  back: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A' },
-  scroll: { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 40, alignItems: 'center', maxWidth: 480, width: '100%', alignSelf: 'center' },
-
-  /* Avatar */
-  avatarWrap: { position: 'relative', marginBottom: 10 },
-  avatarCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#E8E4F4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#C8BFEA',
-    borderStyle: 'dashed',
-  },
-  cameraBtn: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: BLUE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  avatarLabel: { fontSize: 15, fontWeight: '700', color: '#222', marginBottom: 4 },
-  avatarSub: { fontSize: 13, color: '#999', marginBottom: 4 },
-
-  /* Checkbox */
-  checkRow: { flexDirection: 'row', alignItems: 'flex-start', width: '100%', marginBottom: 22 },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: BLUE,
-    marginRight: 10,
-    marginTop: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: { backgroundColor: BLUE },
-  checkText: { flex: 1, fontSize: 13, color: '#555', lineHeight: 20 },
-  checkLink: { color: BLUE, fontWeight: '600' },
-
-  /* Button */
-  btnPrimary: {
+  headerBar: { height: 58, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  back: { width: 40, minHeight: 44, alignItems: 'flex-start', justifyContent: 'center' },
+  headerTitle: { fontSize: 17, fontWeight: '700', color: '#1A1A1A' },
+  headerSpacer: { width: 40 },
+  scroll: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36, maxWidth: 480, width: '100%', alignSelf: 'center' },
+  intro: { marginBottom: 20 },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '800', color: '#111', letterSpacing: -0.4, marginBottom: 7 },
+  subtitle: { maxWidth: 390, fontSize: 14, lineHeight: 21, color: '#6F7178' },
+  card: {
     width: '100%',
-    backgroundColor: BLUE,
-    borderRadius: 999,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 18,
+    padding: 18,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.84)',
+    backgroundColor: 'rgba(255,255,255,0.72)',
   },
-  btnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-
-  /* Footer */
-  signInRow: { flexDirection: 'row', marginBottom: 28 },
-  gray: { color: '#999', fontSize: 14 },
-  link: { color: BLUE, fontWeight: '700', fontSize: 14 },
-
-  /* Badge */
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.62)',
-    borderRadius: 20,
-    padding: 14,
-    width: '100%',
-  },
-  badgeIcon: { marginRight: 12 },
-  badgeTitle: { fontSize: 14, fontWeight: '700', color: '#222', marginBottom: 3 },
-  badgeSub: { fontSize: 12, color: '#888', lineHeight: 17 },
+  googleHelper: { marginTop: 9, paddingHorizontal: 8, textAlign: 'center', fontSize: 12, lineHeight: 17, color: '#73757C' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', width: '100%', marginVertical: 20 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#E2E3E7' },
+  dividerText: { marginHorizontal: 10, fontSize: 10, color: '#8B8D94', fontWeight: '700', letterSpacing: 0.7 },
+  fields: { gap: 14 },
+  errorNotice: { marginTop: 14, padding: 11, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  errorText: { flex: 1, fontSize: 13, lineHeight: 18, color: '#8F1D16' },
+  btnPrimary: { width: '100%', minHeight: 52, marginTop: 18, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: ORANGE },
+  disabled: { opacity: 0.7 },
+  btnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  terms: { marginTop: 14, paddingHorizontal: 6, textAlign: 'center', fontSize: 11, lineHeight: 17, color: '#85878E' },
+  termsLink: { color: ORANGE, fontWeight: '700' },
+  signInRow: { marginTop: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  gray: { color: '#777A81', fontSize: 14 },
+  link: { color: ORANGE, fontWeight: '800', fontSize: 14 },
 });

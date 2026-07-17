@@ -29,7 +29,6 @@ import SignUpScreen       from '@/screens/SignUpScreen';
 import OnboardingScreen   from '@/screens/OnboardingScreen';
 import CreateEventScreen  from '@/screens/CreateEventScreen';
 import EventDetailScreen  from '@/screens/EventDetailScreen';
-import EventAlarmsScreen  from '@/screens/EventAlarmsScreen';
 import ProfileScreen      from '@/screens/ProfileScreen';
 import SearchScreen       from '@/screens/SearchScreen';
 import StatsScreen        from '@/screens/StatsScreen';
@@ -108,7 +107,6 @@ export default function RootNavigator() {
         <Stack.Screen name="Main"         component={MainTabNavigator} />
         <Stack.Screen name="CreateEvent"  component={CreateEventScreen} />
         <Stack.Screen name="EventDetail"  component={EventDetailScreen} />
-        <Stack.Screen name="EventAlarms"  component={EventAlarmsScreen} />
         <Stack.Screen name="Profile"      component={ProfileScreen} />
         <Stack.Screen name="Search"       component={SearchScreen} />
         <Stack.Screen name="Stats"        component={StatsScreen} />

@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DashboardScreen from '@/screens/DashboardScreen';
 import FocusScreen from '@/screens/FocusScreen';
 import AlarmScreen from '@/screens/AlarmScreen';
-import EventAlarmsScreen from '@/screens/EventAlarmsScreen';
+import CalculatorScreen from '@/screens/CalculatorScreen';
 import TasksScreen from '@/screens/TasksScreen';
 import { useTheme } from '@/context/ThemeContext';
 import { floatingShadow, radii } from '@/theme';
@@ -93,12 +93,12 @@ export default function MainTabNavigator() {
         }}
       />
       <Tab.Screen
-        name="Events"
-        component={EventAlarmsScreen}
+        name="Calculator"
+        component={CalculatorScreen}
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused}>
-              <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={22} color={focused ? '#FFF' : theme.icon} />
+              <Ionicons name={focused ? 'calculator' : 'calculator-outline'} size={22} color={focused ? '#FFF' : theme.icon} />
             </TabIcon>
           ),
         }}
@@ -107,9 +107,10 @@ export default function MainTabNavigator() {
         name="Tasks"
         component={TasksScreen}
         options={{
+          tabBarLabel: 'Tasks',
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused}>
-              <MaterialCommunityIcons name={focused ? 'format-list-checks' : 'format-list-checkbox'} size={22} color={focused ? '#FFF' : theme.icon} />
+              <MaterialCommunityIcons name={focused ? 'note-text' : 'note-text-outline'} size={22} color={focused ? '#FFF' : theme.icon} />
             </TabIcon>
           ),
         }}

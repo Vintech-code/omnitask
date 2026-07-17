@@ -2,6 +2,7 @@
   "expo": {
     "name": "omnitask",
     "slug": "omnitask",
+    "scheme": "omnitask",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/omnitasklogo.png",
@@ -18,7 +19,9 @@
       "softwareKeyboardLayoutMode": "pan",
       "permissions": [
         "android.permission.SCHEDULE_EXACT_ALARM",
-        "android.permission.VIBRATE"
+        "android.permission.VIBRATE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -44,6 +47,12 @@
     "plugins": [
       "expo-audio",
       "expo-asset",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow OmniTask to use your location when choosing a place for an event."
+        }
+      ],
       [
         "expo-notifications",
         {

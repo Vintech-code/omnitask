@@ -20,6 +20,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/ThemeContext';
 import { BurgerMenu } from '@/components/BurgerMenu';
+import { OrganizerSwitch, OrganizerSection } from '@/components/OrganizerSwitch';
 import { NoteCard } from '@/components/NoteCard';
 import { useTaskStore } from '@/context/TaskStore';
 import { Note, NoteTag, ChecklistItem } from '@/types/note';
@@ -30,6 +31,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { styles } from './styles';
 import { AppBackground, ScreenSkeleton } from '@/components/ui';
+import EventAlarmsScreen from '@/screens/EventAlarmsScreen';
 
 const EMOJI_LIST = [
   '😀','😂','😍','🥰','😎','🤩','🥳','😜','🤔','😇','🙃','😴',
@@ -38,12 +40,20 @@ const EMOJI_LIST = [
   '🌟','🌈','☕','🍕','🎵','🎮','📚','💻','🏆','❤️','💙','💚',
 ];
 
-export default function TasksScreen({ navigation }: any) {
+export default function TasksScreen({ navigation, route }: any) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { notes, categories, isLoading, addNote, updateNote, removeNote, addCategory: storeAddCat, removeCategory: storeRemoveCat } = useTaskStore();
   const [refreshing, setRefreshing] = useState(false);
+  const [organizerSection, setOrganizerSection] = useState<OrganizerSection>('notes');
   const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 700); };
+
+  useEffect(() => {
+    const requestedSection = route?.params?.section;
+    if (requestedSection === 'notes' || requestedSection === 'events') {
+      setOrganizerSection(requestedSection);
+    }
+  }, [route?.params?.section]);
 
   // -- Notes state (now from TaskStore) ------------------------------------
   const [activeCategory, setActiveCategory] = useState<string>('All');
@@ -328,6 +338,16 @@ export default function TasksScreen({ navigation }: any) {
   // -- Render ----------------------------------------------------------------
   const allCatTabs = ['All', ...categories];
 
+  if (organizerSection === 'events') {
+    return (
+      <EventAlarmsScreen
+        navigation={navigation}
+        organizerSection={organizerSection}
+        onOrganizerSectionChange={setOrganizerSection}
+      />
+    );
+  }
+
   if (isLoading) {
     return <ScreenSkeleton variant="list" />;
   }
@@ -343,16 +363,10 @@ export default function TasksScreen({ navigation }: any) {
           <TouchableOpacity style={styles.iconBtn} onPress={() => setManageCatVisible(true)}>
             <MaterialCommunityIcons name="view-grid-plus-outline" size={22} color={theme.text} />
           </TouchableOpacity>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Create note"
-            style={[styles.headerAddBtn, { backgroundColor: theme.accent.base }]}
-            onPress={openNew}
-          >
-            <Ionicons name="add" size={22} color="#fff" />
-          </TouchableOpacity>
         </View>
       </View>
+
+      <OrganizerSwitch value={organizerSection} onChange={setOrganizerSection} />
 
       {/* -- Search bar -- */}
       <View style={[styles.searchBar, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
@@ -404,6 +418,22 @@ export default function TasksScreen({ navigation }: any) {
           </View>
         )}
       </ScrollView>
+
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Create note"
+        activeOpacity={0.82}
+        style={[
+          styles.floatingAddBtn,
+          {
+            bottom: Math.max(insets.bottom, 8) + 92,
+            backgroundColor: theme.accent.base,
+          },
+        ]}
+        onPress={openNew}
+      >
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
 
       {/* ----------------------------------------------------------
           NOTE EDITOR MODAL

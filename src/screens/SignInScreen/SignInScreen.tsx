@@ -2,42 +2,52 @@
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   ScrollView,
   Alert,
-  TextInput,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
-import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { s } from './styles';
 import { AppBackground } from '@/components/ui';
+import { GoogleAuthButton } from '@/components/auth/GoogleAuthButton';
+import { FloatingAuthField } from '@/components/auth/FloatingAuthField';
+import { isGoogleAuthCancelled } from '@/services/GoogleAuthService';
+import { useTheme } from '@/context/ThemeContext';
 
 
 export default function SignInScreen({ navigation }: any) {
-  const { signIn, hasSeenOnboarding } = useAuth();
+  const { theme } = useTheme();
+  const { signIn, signInWithGoogle, hasSeenOnboarding } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [slowConnection, setSlowConnection] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSignIn = async () => {
+    if (loading) return;
     const trimEmail = email.trim();
-    const trimPass = password.trim();
     if (!trimEmail) { Alert.alert('Validation', 'Please enter your email address.'); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimEmail)) { Alert.alert('Validation', 'Please enter a valid email address.'); return; }
-    if (!trimPass) { Alert.alert('Validation', 'Please enter your password.'); return; }
-    if (trimPass.length < 6) { Alert.alert('Validation', 'Password must be at least 6 characters.'); return; }
+    if (!password) { Alert.alert('Validation', 'Please enter your password.'); return; }
+    if (password.length < 6) { Alert.alert('Validation', 'Password must be at least 6 characters.'); return; }
+    let slowTimer: ReturnType<typeof setTimeout> | undefined;
     try {
+      setErrorMessage(null);
+      setSlowConnection(false);
       setLoading(true);
-      await signIn(trimEmail, trimPass);
+      slowTimer = setTimeout(() => setSlowConnection(true), 3500);
+      await signIn(trimEmail, password);
       navigation.replace(hasSeenOnboarding ? 'Main' : 'Onboarding');
-    } catch (e) {
-      Alert.alert('Sign In Failed', 'Unable to sign in. Please check your credentials.');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to sign in. Please try again.');
     } finally {
+      if (slowTimer) clearTimeout(slowTimer);
+      setSlowConnection(false);
       setLoading(false);
     }
   };
@@ -58,8 +68,20 @@ export default function SignInScreen({ navigation }: any) {
     }
   };
 
-  const handleSocialLogin = (provider: string) => {
-    Alert.alert(`${provider} Sign In`, `${provider} authentication is not available in this demo.`);
+  const handleGoogleSignIn = async () => {
+    if (loading || googleLoading) return;
+    try {
+      setErrorMessage(null);
+      setGoogleLoading(true);
+      await signInWithGoogle();
+      navigation.replace(hasSeenOnboarding ? 'Main' : 'Onboarding');
+    } catch (error) {
+      if (!isGoogleAuthCancelled(error)) {
+        setErrorMessage(error instanceof Error ? error.message : 'Unable to sign in with Google.');
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -68,95 +90,94 @@ export default function SignInScreen({ navigation }: any) {
       {/* Header bar */}
       <View style={s.headerBar}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
-          <Ionicons name="chevron-back" size={22} color="#222" />
+          <Ionicons name="chevron-back" size={22} color={theme.icon} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Sign In</Text>
+        <Text style={[s.headerTitle, { color: theme.content.primary }]}>Sign In</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         {/* Title */}
-        <Text style={s.title}>Welcome back</Text>
-        <Text style={s.sub}>
+        <Text style={[s.title, { color: theme.content.primary }]}>Welcome back</Text>
+        <Text style={[s.sub, { color: theme.content.secondary }]}>
           Sign in to access your reminders and pomodoro sessions.
         </Text>
 
-        {/* Email */}
-        <View style={s.fieldBlock}>
-          <Text style={s.label}>Email Address</Text>
-          <View style={s.inputRow}>
-            <Ionicons name="mail-outline" size={18} color="#AAA" style={s.inputIcon} />
-            <TextInput
-              style={s.input}
-              placeholder="name@example.com"
-              placeholderTextColor="#C0C0C0"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
-            />
-          </View>
-        </View>
-
-        {/* Password */}
-        <View style={s.fieldBlock}>
-          <View style={s.labelRow}>
-            <Text style={s.label}>Password</Text>
-            <TouchableOpacity onPress={handleForgotPassword}>
-              <Text style={s.forgot}>Forgot password?</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={s.inputRow}>
-            <Ionicons name="lock-closed-outline" size={18} color="#AAA" style={s.inputIcon} />
-            <TextInput
-              style={s.input}
-              placeholder="••••••••"
-              placeholderTextColor="#C0C0C0"
-              secureTextEntry={!showPass}
-              value={password}
-              onChangeText={setPassword}
-            />
-            <TouchableOpacity onPress={() => setShowPass(!showPass)}>
-              <Ionicons name={showPass ? 'eye' : 'eye-off'} size={18} color="#AAA" />
-            </TouchableOpacity>
-          </View>
+        <View style={s.fields}>
+          <FloatingAuthField
+            testID="sign-in-email"
+            label="Email address"
+            placeholder="name@example.com"
+            icon="mail-outline"
+            keyboardType="email-address"
+            value={email}
+            onChangeText={value => { setEmail(value); setErrorMessage(null); }}
+            autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="next"
+          />
+          <FloatingAuthField
+            testID="sign-in-password"
+            label="Password"
+            placeholder="••••••••"
+            icon="lock-closed-outline"
+            secure
+            value={password}
+            onChangeText={value => { setPassword(value); setErrorMessage(null); }}
+            autoComplete="current-password"
+            textContentType="password"
+            returnKeyType="done"
+            onSubmitEditing={() => void handleSignIn()}
+          />
+          <TouchableOpacity accessibilityRole="button" style={s.forgotButton} onPress={handleForgotPassword}>
+            <Text style={[s.forgot, { color: theme.accent.base }]}>Forgot password?</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Sign In button */}
-        <TouchableOpacity style={s.btnPrimary} onPress={handleSignIn} activeOpacity={0.85} disabled={loading}>
+        <TouchableOpacity testID="sign-in-submit" style={[s.btnPrimary, { backgroundColor: theme.accent.base }, loading && s.btnDisabled]} onPress={handleSignIn} activeOpacity={0.85} disabled={loading}>
           {loading
-            ? <ActivityIndicator color="#fff" />
+            ? <View style={s.loadingContent}><ActivityIndicator color="#fff" /><Text style={s.btnText}>Signing in...</Text></View>
             : <>
                 <Text style={s.btnText}>Sign In</Text>
                 <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />
               </>
           }
         </TouchableOpacity>
+        {slowConnection ? (
+          <View style={[s.connectionNotice, { backgroundColor: theme.dark ? 'rgba(240,174,61,0.14)' : '#FFF8E1', borderColor: theme.dark ? 'rgba(240,174,61,0.32)' : 'transparent' }]}>
+            <Ionicons name="cloud-offline-outline" size={17} color={theme.semantic.warning} />
+            <Text style={[s.connectionNoticeText, { color: theme.dark ? '#FFD28A' : '#7A5200' }]}>Still connecting to Firebase. Check Wi-Fi or mobile data.</Text>
+          </View>
+        ) : null}
+        {errorMessage ? (
+          <View testID="sign-in-error" style={[s.errorNotice, { backgroundColor: theme.dark ? 'rgba(240,112,106,0.14)' : '#FFEBEE', borderColor: theme.dark ? 'rgba(240,112,106,0.32)' : 'transparent' }]}>
+            <Ionicons name="alert-circle-outline" size={18} color={theme.semantic.danger} />
+            <Text style={[s.errorNoticeText, { color: theme.dark ? '#FFB4AF' : '#9A1B1B' }]}>{errorMessage}</Text>
+          </View>
+        ) : null}
 
         {/* Divider */}
         <View style={s.dividerRow}>
-          <View style={s.dividerLine} />
-          <Text style={s.dividerText}>OR CONTINUE WITH</Text>
-          <View style={s.dividerLine} />
+          <View style={[s.dividerLine, { backgroundColor: theme.divider }]} />
+          <Text style={[s.dividerText, { color: theme.content.muted }]}>OR CONTINUE WITH</Text>
+          <View style={[s.dividerLine, { backgroundColor: theme.divider }]} />
         </View>
 
-        {/* Social buttons */}
-        <View style={s.socialRow}>
-          <TouchableOpacity style={s.socialBtn} activeOpacity={0.8} onPress={() => handleSocialLogin('Apple')}>
-            <FontAwesome5 name="apple" size={18} color="#000" style={{ marginRight: 8 }} />
-            <Text style={s.socialText}>Apple</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.socialBtn} activeOpacity={0.8} onPress={() => handleSocialLogin('Google')}>
-            <Ionicons name="logo-google" size={18} color="#DB4437" style={{ marginRight: 8 }} />
-            <Text style={s.socialText}>Google</Text>
-          </TouchableOpacity>
+        <View style={s.googleButtonWrap}>
+          <GoogleAuthButton
+            testID="google-sign-in"
+            loading={googleLoading}
+            disabled={loading}
+            onPress={handleGoogleSignIn}
+          />
         </View>
 
         {/* Footer */}
         <View style={s.footerRow}>
-          <Text style={s.gray}>Don't have an account? </Text>
+          <Text style={[s.gray, { color: theme.content.secondary }]}>Don't have an account? </Text>
           <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
-            <Text style={s.link}>Sign Up</Text>
+            <Text style={[s.link, { color: theme.accent.base }]}>Sign Up</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

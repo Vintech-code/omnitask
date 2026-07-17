@@ -10,6 +10,7 @@ import { useAlarmStore } from '@/context/AlarmStore';
 import { useTaskStore } from '@/context/TaskStore';
 import { AppBackground, GlassCard, GlassIconButton, PillButton, ScreenSkeleton } from '@/components/ui';
 import { hydrateFocusSessions } from '@/services/FocusStatsService';
+import { eventStart, formatEventSchedule } from '@/utils/eventDate';
 import { styles } from './styles';
 
 const priorityColor = (priority: string, theme: ReturnType<typeof useTheme>['theme']) => ({
@@ -30,6 +31,13 @@ export default function DashboardScreen({ navigation }: any) {
   const [sessions, setSessions] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(new Date());
+
+  const upcomingEvents = useMemo(() => events
+    .map(event => ({ event, date: eventStart(event) }))
+    .filter(item => item.date && item.date.getTime() >= now.getTime())
+    .sort((left, right) => left.date!.getTime() - right.date!.getTime())
+    .slice(0, 6)
+    .map(item => item.event), [events, now]);
 
   useEffect(() => {
     if (user) void hydrateFocusSessions(user.id, setSessions);
@@ -89,7 +97,7 @@ export default function DashboardScreen({ navigation }: any) {
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <Text style={[styles.eyebrow, { color: theme.content.secondary }]}>{greeting}</Text>
-            <Text style={[styles.title, { color: theme.content.primary }]}>{firstName}'s day</Text>
+            <Text style={[styles.title, { color: theme.content.primary }]}>{firstName}!</Text>
           </View>
           <View style={styles.headerActions}>
             <GlassIconButton name="search-outline" onPress={() => navigation.navigate('Search')} accessibilityLabel="Search" />
@@ -129,14 +137,14 @@ export default function DashboardScreen({ navigation }: any) {
 
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: theme.content.primary }]}>Upcoming events</Text>
-          <TouchableOpacity style={styles.inlineAction} onPress={() => navigation.navigate('EventAlarms')}>
+          <TouchableOpacity style={styles.inlineAction} onPress={() => navigation.navigate('Tasks', { section: 'events' })}>
             <Text style={[styles.inlineActionText, { color: theme.accent.base }]}>See all</Text>
             <Ionicons name="arrow-forward" size={15} color={theme.accent.base} />
           </TouchableOpacity>
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
-          {events.length ? events.slice(0, 6).map(event => (
+          {upcomingEvents.length ? upcomingEvents.map(event => (
             <TouchableOpacity key={event.id} activeOpacity={0.82} onPress={() => navigation.navigate('EventDetail', { event })}>
               <GlassCard style={styles.eventCard} padding={16}>
                 <View style={styles.eventTopRow}>
@@ -149,7 +157,7 @@ export default function DashboardScreen({ navigation }: any) {
                 <View style={styles.metaRow}>
                   <Ionicons name="time-outline" size={14} color={theme.content.muted} />
                   <Text style={[styles.metaText, { color: theme.content.muted }]} numberOfLines={1}>
-                    {event.startTime || event.startDate}
+                    {formatEventSchedule(event)}
                   </Text>
                 </View>
                 <View style={styles.metaRow}>
@@ -211,7 +219,7 @@ export default function DashboardScreen({ navigation }: any) {
             <Text style={[styles.sectionTitle, { color: theme.content.primary }]}>Agenda</Text>
             <Text style={[styles.sectionSub, { color: theme.content.muted }]}>{notes.length} notes and task lists</Text>
           </View>
-          <PillButton label="Add" icon="add-circle-outline" variant="secondary" onPress={() => navigation.navigate('Tasks')} style={styles.addButton} />
+          <PillButton label="Add" icon="add-circle-outline" variant="secondary" onPress={() => navigation.navigate('Tasks', { section: 'notes' })} style={styles.addButton} />
         </View>
 
         <GlassCard padding={0} style={styles.agendaCard}>
@@ -222,7 +230,7 @@ export default function DashboardScreen({ navigation }: any) {
                 key={note.id}
                 style={[styles.agendaRow, index < recentNotes.length - 1 && { borderBottomColor: theme.divider, borderBottomWidth: 1 }]}
                 activeOpacity={0.72}
-                onPress={() => navigation.navigate('Tasks')}
+                onPress={() => navigation.navigate('Tasks', { section: 'notes' })}
               >
                 <View style={[styles.agendaIcon, { backgroundColor: theme.accent.soft }]}>
                   <Ionicons name={note.todos?.length ? 'checkbox-outline' : 'document-text-outline'} size={20} color={theme.accent.base} />

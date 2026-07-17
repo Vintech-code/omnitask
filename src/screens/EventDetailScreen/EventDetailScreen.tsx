@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   Linking,
   Switch,
 } from 'react-native';
@@ -17,6 +16,8 @@ import * as Haptics from 'expo-haptics';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { s } from './styles';
 import { AppBackground } from '@/components/ui';
+import { EventActionSheet } from '@/components/events';
+import { canScheduleEventReminders } from '@/utils/eventDate';
 
 const GREEN = '#3DAE7C';
 const RED   = '#E53935';
@@ -28,28 +29,20 @@ const PRIORITY_COLOR: Record<string, { bg: string; text: string; accent: string 
 
 export default function EventDetailScreen({ route, navigation }: any) {
   const { theme, isDark } = useTheme();
-  const { removeEvent, toggleAlarmActive } = useEvents();
-  const event: AppEvent | undefined = route?.params?.event;
-  const [alarmActive, setAlarmActive] = useState(event?.alarmActive ?? false);
+  const { events, removeEvent, toggleAlarmActive } = useEvents();
+  const routeEvent: AppEvent | undefined = route?.params?.event;
+  const event = events.find(item => item.id === routeEvent?.id);
+  const [deleteVisible, setDeleteVisible] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const alarmActive = event?.alarmActive ?? false;
+  const canSchedule = event ? canScheduleEventReminders(event) : false;
 
   const priority = PRIORITY_COLOR[event?.priority ?? 'Medium'] ?? PRIORITY_COLOR.Medium;
 
-  const handleDelete = () =>
-    Alert.alert('Delete Event', `Delete "${event?.title}"? This cannot be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          removeEvent(event!.id);
-          navigation.goBack();
-        },
-      },
-    ]);
-
   const handleToggleAlarm = () => {
+    if (!event || (!canSchedule && !event.alarmActive)) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    toggleAlarmActive(event!.id);
-    setAlarmActive(v => !v);
+    toggleAlarmActive(event.id);
   };
 
   if (!event) {
@@ -79,16 +72,6 @@ export default function EventDetailScreen({ route, navigation }: any) {
         <View style={s.topRight}>
           <TouchableOpacity style={s.iconBtn} onPress={() => navigation.navigate('CreateEvent', { event })}>
             <Ionicons name="create-outline" size={22} color={theme.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.iconBtn}
-            onPress={() => Alert.alert(event.title, undefined, [
-              { text: 'Edit Event',   onPress: () => navigation.navigate('CreateEvent', { event }) },
-              { text: 'Delete Event', style: 'destructive', onPress: handleDelete },
-              { text: 'Cancel', style: 'cancel' },
-            ])}
-          >
-            <Ionicons name="ellipsis-vertical" size={22} color={theme.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -120,15 +103,23 @@ export default function EventDetailScreen({ route, navigation }: any) {
               {event.startDate ? (
                 <View style={[s.datetimeChip, { backgroundColor: isDark ? '#1A2A3A' : '#EBF4FF' }]}>
                   <Ionicons name="calendar-outline" size={14} color={BLUE} />
-                  <Text style={[s.datetimeText, { color: BLUE }]}>{event.startDate}</Text>
+                  <Text style={[s.datetimeText, { color: BLUE }]}>
+                    {event.startDate}{event.endDate && event.endDate !== event.startDate ? ` – ${event.endDate}` : ''}
+                  </Text>
                 </View>
               ) : null}
-              {event.startTime ? (
+              {event.allDay || event.startTime ? (
                 <View style={[s.datetimeChip, { backgroundColor: isDark ? '#1A2A3A' : '#EBF4FF' }]}>
                   <Ionicons name="time-outline" size={14} color={BLUE} />
                   <Text style={[s.datetimeText, { color: BLUE }]}>
-                    {event.startTime}{event.endTime ? ` · ${event.endTime}` : ''}
+                    {event.allDay ? 'All day' : `${event.startTime}${event.endTime ? ` – ${event.endTime}` : ''}`}
                   </Text>
+                </View>
+              ) : null}
+              {event.timeZone ? (
+                <View style={[s.datetimeChip, { backgroundColor: isDark ? '#1A2A3A' : '#EBF4FF' }]}>
+                  <Ionicons name="globe-outline" size={14} color={BLUE} />
+                  <Text style={[s.datetimeText, { color: BLUE }]}>{event.timeZone}</Text>
                 </View>
               ) : null}
             </View>
@@ -144,13 +135,20 @@ export default function EventDetailScreen({ route, navigation }: any) {
             <View style={{ flex: 1, marginLeft: 14 }}>
               <Text style={[s.alarmLabel, { color: theme.text }]}>Event Alarm</Text>
               <Text style={[s.alarmSub, { color: alarmActive ? BLUE : theme.textDim }]}>
-                {alarmActive ? 'Notifications enabled for this event' : 'Alarm is turned off'}
+                {!canSchedule
+                  ? alarmActive
+                    ? 'Reminder time has passed; edit this event or turn it off'
+                    : 'Choose a future reminder time to enable notifications'
+                  : alarmActive
+                    ? `${event.reminders.length} reminder${event.reminders.length === 1 ? '' : 's'} enabled`
+                    : 'Reminders are turned off'}
               </Text>
             </View>
             <Switch
               value={alarmActive}
               onValueChange={handleToggleAlarm}
-              trackColor={{ false: isDark ? '#444' : '#DDD', true: '#B8D4F5' }}
+              disabled={!canSchedule && !alarmActive}
+              trackColor={{ false: theme.divider, true: theme.accent.soft }}
               thumbColor={alarmActive ? BLUE : '#f0f0f0'}
               ios_backgroundColor={isDark ? '#444' : '#DDD'}
             />
@@ -173,10 +171,10 @@ export default function EventDetailScreen({ route, navigation }: any) {
           <TouchableOpacity
             style={[s.card, { backgroundColor: theme.card, borderColor: theme.border }]}
             onPress={() => {
-              const q = encodeURIComponent(event.location || '');
-              Linking.openURL(`https://maps.google.com/maps?q=${q}`).catch(() =>
-                Alert.alert('Maps', 'Could not open Google Maps.')
-              );
+              const q = typeof event.latitude === 'number' && typeof event.longitude === 'number'
+                ? `${event.latitude},${event.longitude}`
+                : encodeURIComponent(event.location || '');
+              Linking.openURL(`https://maps.google.com/maps?q=${q}`).catch(() => setNotice('Could not open a maps app on this device.'));
             }}
             activeOpacity={0.8}
           >
@@ -184,22 +182,15 @@ export default function EventDetailScreen({ route, navigation }: any) {
               <Ionicons name="location-outline" size={15} color={theme.textDim} />
               <Text style={[s.sectionLabel, { color: theme.textDim }]}>LOCATION</Text>
             </View>
-            <View style={[s.mapBox, { backgroundColor: isDark ? '#1A2530' : '#E8EEF4' }]}>
-              <View style={s.mapGrid}>
-                {[...Array(4)].map((_, i) => (
-                  <View key={i} style={[s.mapLine, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)' }]} />
-                ))}
-              </View>
-              <Ionicons name="location" size={32} color={RED} />
-              <View style={s.directionsChip}>
-                <Ionicons name="navigate-outline" size={12} color={BLUE} />
-                <Text style={s.directionsText}>Directions</Text>
-              </View>
-            </View>
             <View style={s.locationLabel}>
-              <Ionicons name="location-outline" size={16} color={BLUE} style={{ marginRight: 8 }} />
+              <View style={[s.locationIcon, { backgroundColor: theme.accent.soft }]}>
+                <Ionicons name="location-outline" size={20} color={theme.accent.base} />
+              </View>
               <Text style={[s.locationText, { color: theme.text }]} numberOfLines={2}>{event.location}</Text>
-              <Ionicons name="open-outline" size={14} color={BLUE} style={{ marginLeft: 'auto' }} />
+              <View style={[s.openMapsButton, { backgroundColor: theme.accent.soft }]}>
+                <Ionicons name="navigate-outline" size={15} color={theme.accent.base} />
+                <Text style={[s.openMapsText, { color: theme.accent.base }]}>Open maps</Text>
+              </View>
             </View>
           </TouchableOpacity>
         ) : null}
@@ -249,7 +240,7 @@ export default function EventDetailScreen({ route, navigation }: any) {
         {/* Delete */}
         <TouchableOpacity
           style={[s.deleteBtn, { backgroundColor: isDark ? '#2A1A1A' : '#FFF0F0', borderColor: '#FFCDD2' }]}
-          onPress={handleDelete}
+          onPress={() => setDeleteVisible(true)}
         >
           <Ionicons name="trash-outline" size={18} color={RED} />
           <Text style={[s.deleteTxt, { color: RED }]}>Delete Event</Text>
@@ -257,6 +248,33 @@ export default function EventDetailScreen({ route, navigation }: any) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <EventActionSheet
+        visible={deleteVisible}
+        title="Delete event?"
+        message={`“${event.title}” and its scheduled reminders will be permanently removed.`}
+        closeLabel="Keep event"
+        onClose={() => setDeleteVisible(false)}
+        actions={[{
+          label: 'Delete permanently',
+          icon: 'trash-outline',
+          tone: 'danger',
+          onPress: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            setDeleteVisible(false);
+            removeEvent(event.id);
+            navigation.goBack();
+          },
+        }]}
+      />
+
+      <EventActionSheet
+        visible={Boolean(notice)}
+        title="Maps unavailable"
+        message={notice ?? undefined}
+        closeLabel="Close"
+        onClose={() => setNotice(null)}
+      />
     </SafeAreaView>
   );
 }

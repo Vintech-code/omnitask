@@ -60,8 +60,8 @@ export const styles = StyleSheet.create({
   emptyTitle: { fontSize: 15, fontWeight: '700' },
   emptySub: { fontSize: 12 },
   emptyAddBtn: {
-    backgroundColor: BLUE, borderRadius: 10,
-    paddingHorizontal: 20, paddingVertical: 10, marginTop: 8,
+    backgroundColor: BLUE, borderRadius: 999,
+    minHeight: 48, paddingHorizontal: 22, justifyContent: 'center', marginTop: 8,
   },
   emptyAddText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
