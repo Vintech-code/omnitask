@@ -4,7 +4,7 @@
  * Owns the auth-guarded root stack and notification listeners.
  * Extracted from App.tsx to keep App.tsx a pure provider wrapper.
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
@@ -22,6 +22,8 @@ import {
   snoozeAlarmNotification,
 } from '@/services/NotificationService';
 import { openRingingAlarm } from '@/navigation/navigationRef';
+import { openEventDetail } from '@/navigation/navigationRef';
+import { useEvents } from '@/context/EventStore';
 
 import WelcomeScreen      from '@/screens/WelcomeScreen';
 import SignInScreen       from '@/screens/SignInScreen';
@@ -45,6 +47,9 @@ const Stack = createStackNavigator<RootStackParamList>();
 export default function RootNavigator() {
   const { isDark }           = useTheme();
   const { user, isLoading, emailVerified, hasSeenOnboarding } = useAuth();
+  const { events } = useEvents();
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
   const isExpoGo = isRunningInExpoGo();
 
   // Request push-notification permission on first launch
@@ -62,6 +67,12 @@ export default function RootNavigator() {
     });
 
     const handleResponse = async (response: Notifications.NotificationResponse) => {
+      const data = response.notification.request.content.data;
+      if (data?.type === 'event-weather' && typeof data.eventId === 'string') {
+        const event = eventsRef.current.find(item => item.id === data.eventId);
+        if (event) openEventDetail(event);
+        return;
+      }
       const payload = getAlarmPayload(response.notification);
       if (!payload) return;
       if (response.actionIdentifier === ALARM_STOP_ACTION) {

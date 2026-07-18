@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const KEYS = {
   EVENTS:           'omnitask_events',
   EVENT_CATEGORIES: 'omnitask_event_categories',
+  EVENT_WEATHER_WARNINGS: 'omnitask_event_weather_warnings',
   TASKS:            'omnitask_tasks',
   TASK_CATEGORIES:  'omnitask_task_categories',
   ALARMS:           'omnitask_alarms',

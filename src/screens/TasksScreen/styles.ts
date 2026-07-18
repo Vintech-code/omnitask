@@ -6,13 +6,15 @@ export const styles = StyleSheet.create({
 
   // -- Header
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 14,
-    borderBottomWidth: 0,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14,
+    gap: 12,
   },
-  headerTitle: { fontSize: 26, fontWeight: '700', flex: 1, textAlign: 'left', marginLeft: 14, letterSpacing: -0.4 },
+  headerCopy: { flex: 1 },
+  headerTitle: { fontSize: 27, lineHeight: 32, fontWeight: '800', letterSpacing: -0.5 },
+  headerSubtitle: { marginTop: 2, fontSize: 11, lineHeight: 15, fontWeight: '600' },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  iconBtn: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  iconBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
   floatingAddBtn: {
     position: 'absolute', right: 20,
     width: 52, height: 52, borderRadius: 26,
@@ -23,9 +25,9 @@ export const styles = StyleSheet.create({
   // -- Search
   searchBar: {
     flexDirection: 'row', alignItems: 'center',
-    borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)',
-    marginHorizontal: 20, marginTop: 6, marginBottom: 2,
-    paddingHorizontal: 14, minHeight: 50,
+    borderRadius: 18, borderWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: 20, marginTop: 8, marginBottom: 2,
+    paddingHorizontal: 14, minHeight: 52,
   },
   searchInput: { flex: 1, fontSize: 15 },
 
@@ -33,11 +35,12 @@ export const styles = StyleSheet.create({
   catChipsScroll: { flexGrow: 0 },
   catChipsRow: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingVertical: 10, gap: 8,
+    paddingHorizontal: 20, paddingVertical: 10, gap: 8,
   },
   catChip: {
-    paddingHorizontal: 16, paddingVertical: 8,
-    borderRadius: 20, borderWidth: 1,
+    minHeight: 38, paddingHorizontal: 15,
+    borderRadius: 19, borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center', justifyContent: 'center',
   },
   catChipActive: {},
   catChipText: { fontSize: 13, fontWeight: '600' },
@@ -50,10 +53,14 @@ export const styles = StyleSheet.create({
 
   // -- Grid
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 124 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 164 },
   columns: { flexDirection: 'row', gap: 8 },
   column: { flex: 1, gap: 8 },
   listColumn: { gap: 10 },
+  listHeading: { marginHorizontal: 4, marginBottom: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  listTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
+  listCount: { fontSize: 12, fontWeight: '700' },
+  notesGroup: { borderRadius: 24, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
 
   // -- Note card
   noteCard: {
@@ -77,65 +84,76 @@ export const styles = StyleSheet.create({
   // -- Editor
   editorSafe: { flex: 1 },
   editorTopBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.06)',
+    minHeight: 68,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 10,
+    gap: 12,
   },
-  editorIconBtn: { padding: 6 },
-  editorTopCenter: { flexDirection: 'row', alignItems: 'center', gap: 18 },
-  editorTopRight: { flexDirection: 'row', alignItems: 'center' },
+  editorIconBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
+  editorHeading: { flex: 1 },
+  editorHeadingTitle: { fontSize: 19, lineHeight: 24, fontWeight: '800' },
+  editorHeadingSub: { marginTop: 1, fontSize: 10, lineHeight: 14, fontWeight: '600' },
+  editorTopRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  editorMoreBtn: { width: 40, height: 44, alignItems: 'center', justifyContent: 'center' },
+  editorDoneBtn: { minWidth: 64, minHeight: 40, borderRadius: 20, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
+  editorDoneText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  optionsPanel: { marginHorizontal: 20, marginBottom: 8, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   colorPickerRow: {
-    flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10,
-    paddingHorizontal: 16, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.06)',
+    flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+    paddingHorizontal: 14, paddingVertical: 12,
   },
+  optionsLabel: { width: 48, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   colorSwatch: {
-    width: 28, height: 28, borderRadius: 14,
+    width: 26, height: 26, borderRadius: 13,
     borderWidth: 2, borderColor: 'transparent',
   },
-  colorSwatchActive: { borderColor: '#555' },
-  editorBody: { paddingHorizontal: 18, paddingBottom: 20 },
+  optionActions: { minHeight: 46, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center' },
+  optionAction: { minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  optionActionText: { fontSize: 13, fontWeight: '700' },
+  editorFlex: { flex: 1 },
+  editorScroll: { flex: 1 },
+  editorBody: { paddingHorizontal: 20, paddingBottom: 20 },
+  editorPaper: { minHeight: 260, borderRadius: 24, borderWidth: StyleSheet.hairlineWidth, borderTopWidth: 4, padding: 18 },
   editorMetaWrap: {
     position: 'relative',
     zIndex: 10,
-    paddingHorizontal: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
+    paddingHorizontal: 20,
   },
   editorMeta: {
     flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', paddingVertical: 12,
+    justifyContent: 'space-between', paddingVertical: 8,
   },
-  editorDate: { fontSize: 13, color: '#888' },
+  editorDatePill: { minHeight: 34, borderRadius: 17, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  editorDate: { fontSize: 11, fontWeight: '600' },
   catSelector: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1, borderColor: '#DDD', borderRadius: 20,
-    paddingHorizontal: 12, paddingVertical: 5, backgroundColor: 'rgba(255,255,255,0.6)',
+    minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderWidth: StyleSheet.hairlineWidth, borderRadius: 17,
+    paddingHorizontal: 11,
   },
-  catSelectorText: { fontSize: 13, color: '#555', fontWeight: '600' },
+  catSelectorText: { fontSize: 12, fontWeight: '700' },
   catDropdown: {
     position: 'absolute',
-    right: 0,
+    right: 20,
     top: 46,
     width: 230,
-    backgroundColor: '#fff', borderRadius: 14,
-    borderWidth: 1, borderColor: '#E8E8E8',
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
     zIndex: 999,
   },
   catDropdownItem: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 13,
-    borderBottomWidth: 1, borderBottomColor: '#F5F5F5',
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(128,128,128,0.18)',
   },
-  catDropdownText: { fontSize: 15, color: '#333', fontWeight: '500' },
+  catDropdownText: { fontSize: 14, fontWeight: '600' },
   editorTitle: {
-    fontSize: 26, fontWeight: '700', color: '#111',
+    fontSize: 28, fontWeight: '800',
     marginBottom: 12, lineHeight: 32,
   },
   editorText: {
-    fontSize: 15, color: '#333', lineHeight: 24,
-    minHeight: 140, textAlignVertical: 'top',
+    fontSize: 15, lineHeight: 24,
+    minHeight: 170, textAlignVertical: 'top',
   },
 
   // -- Floating tags bar
@@ -161,6 +179,7 @@ export const styles = StyleSheet.create({
   tagsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   editorTag: {
     borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
+    flexDirection: 'row', alignItems: 'center', gap: 5,
   },
   editorTagText: { fontSize: 12, fontWeight: '700', color: '#fff' },
   addTagBtn: {
@@ -200,16 +219,20 @@ export const styles = StyleSheet.create({
 
   // Toolbar dock sits at the bottom of the flex column.
   toolbarDock: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.07)',
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
   },
 
   // -- Bottom editor bar
   editorBottomBar: {
-    paddingVertical: 10,
-    borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.07)',
+    paddingVertical: 6,
   },
-  editorBarBtn: { padding: 8 },
+  editorBottomContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 8 },
+  editorBarBtn: { minWidth: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  toolbarDivider: { width: StyleSheet.hairlineWidth, height: 22, marginHorizontal: 2 },
 
   // -- Manage categories
   manageSafe: { flex: 1 },
@@ -220,6 +243,9 @@ export const styles = StyleSheet.create({
   },
   manageBackBtn: { marginRight: 14 },
   manageTitle: { fontSize: 18, fontWeight: '700' },
+  manageScroll: { flex: 1 },
+  manageScrollContent: { padding: 20 },
+  manageGroup: { borderRadius: 22, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   manageBanner: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#FFF8E1', borderRadius: 12,
@@ -231,7 +257,7 @@ export const styles = StyleSheet.create({
   manageCatRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 16,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   manageCatName: { fontSize: 16, fontWeight: '600' },
   manageCatCount: { fontSize: 14, fontWeight: '400' },
@@ -275,14 +301,18 @@ export const styles = StyleSheet.create({
 
   // -- Editor tab bar
   editorTabBar: {
-    flexDirection: 'row', borderBottomWidth: 1,
+    minHeight: 44,
+    marginHorizontal: 20,
+    marginBottom: 10,
+    padding: 3,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 4,
   },
   editorTabBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 11,
-  },
-  editorTabBtnActive: {
-    borderBottomWidth: 2, borderBottomColor: BLUE,
+    minHeight: 36, gap: 6, borderRadius: 13,
   },
   editorTabTxt: { fontSize: 13, fontWeight: '700' },
 
@@ -292,33 +322,30 @@ export const styles = StyleSheet.create({
     marginBottom: 14,
   },
   todoAddInput: {
-    flex: 1, borderRadius: 12, borderWidth: 1, borderColor: '#DDD',
+    flex: 1, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 14, paddingVertical: 10,
-    fontSize: 15, color: '#111', backgroundColor: '#FAFAFA',
+    fontSize: 15,
   },
   todoAddBtn: {
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center',
   },
-  todoEmptyText: { fontSize: 14, color: '#bbb', textAlign: 'center', paddingVertical: 20 },
+  todoEmptyText: { fontSize: 13, lineHeight: 19, textAlign: 'center', paddingVertical: 24 },
   todoItem: {
     flexDirection: 'row', alignItems: 'center',
     gap: 10, paddingVertical: 8,
     borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)',
   },
   todoCheckbox: { padding: 2 },
-  todoItemText: { flex: 1, fontSize: 15, color: '#333' },
+  todoItemText: { flex: 1, fontSize: 15 },
   todoItemDone: { textDecorationLine: 'line-through', color: '#aaa' },
   todoRemoveBtn: { padding: 4 },
 
   // -- Format popover (bold / italic / headings)
   formatPopover: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginHorizontal: 12,
-    marginBottom: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 16,
+    margin: 8,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 8,
     paddingVertical: 8,
     gap: 6,
@@ -331,11 +358,12 @@ export const styles = StyleSheet.create({
   formatBtn: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 38,
     paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#F2F2F7',
+    borderRadius: 10,
   },
-  formatBtnText: { fontSize: 15, color: '#222' },
+  formatBtnText: { fontSize: 15 },
 
   // -- Font family picker row
   fontRow: {
@@ -347,7 +375,6 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: '#F2F2F7',
     borderWidth: 1,
     borderColor: 'transparent',
   },
@@ -355,17 +382,14 @@ export const styles = StyleSheet.create({
     backgroundColor: '#E6F0FB',
     borderColor: BLUE,
   },
-  fontChipText: { fontSize: 13, color: '#444' },
+  fontChipText: { fontSize: 13 },
   fontChipTextActive: { color: BLUE, fontWeight: '700' },
 
   // -- Emoji picker
   emojiPicker: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginHorizontal: 12,
-    marginBottom: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 16,
+    margin: 8,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: 10,
   },
   emojiGrid: {
@@ -379,6 +403,15 @@ export const styles = StyleSheet.create({
     padding: 4,
   },
   emojiText: { fontSize: 22 },
+  savedTagsRow: { marginTop: 12, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 7 },
+  savedTagText: { fontSize: 10, fontWeight: '800' },
+  tagColorMark: { width: 6, height: 6, borderRadius: 3 },
+  tagComposer: { margin: 8, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tagComposerInput: { minWidth: 100, flex: 1, minHeight: 40, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 11, fontSize: 13 },
+  tagPalette: { alignItems: 'center', gap: 5 },
+  tagColorChoice: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: 'transparent' },
+  tagAddConfirm: { minHeight: 40, borderRadius: 12, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+  tagAddConfirmText: { color: '#fff', fontSize: 12, fontWeight: '800' },
 
   // -- Link insert modal
   linkOverlay: {

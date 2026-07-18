@@ -1,30 +1,29 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, Alert } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Alert, Image, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../context/ThemeContext';
 import { Note } from '../../types/note';
-import { BRAND_BLUE } from '../../theme/colors';
 import { styles } from './styles';
 
 interface Props {
   note: Note;
   onPress:  (note: Note) => void;
   onDelete: (id: string) => void;
+  isLast?: boolean;
 }
 
-export function NoteCard({ note, onPress, onDelete }: Props) {
+export function NoteCard({ note, onPress, onDelete, isLast = false }: Props) {
   const { theme } = useTheme();
+  const completed = note.todos?.filter(item => item.done).length ?? 0;
+  const checklistTotal = note.todos?.length ?? 0;
+  const title = note.title.trim() || 'Untitled note';
 
   return (
     <TouchableOpacity
       style={[
         styles.noteCard,
-        {
-          backgroundColor: theme.glass.solid,
-          borderColor: theme.glass.border,
-          borderLeftColor: note.cardColor,
-        },
+        !isLast && { borderBottomColor: theme.divider, borderBottomWidth: 1 },
       ]}
       onPress={() => onPress(note)}
       onLongPress={() => {
@@ -37,55 +36,57 @@ export function NoteCard({ note, onPress, onDelete }: Props) {
         }
       }}
       delayLongPress={500}
-      activeOpacity={0.85}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${title}`}
     >
-      {note.title.length > 0 && (
-        <Text style={[styles.noteCardTitle, { color: theme.text }]} numberOfLines={2}>
-          {note.title}
-        </Text>
-      )}
-
-      {note.body.length > 0 && (
-        <Text style={[styles.noteCardBody, { color: theme.textSub }]} numberOfLines={5}>
-          {note.body}
-        </Text>
-      )}
-
-      {note.tags && note.tags.length > 0 && (
-        <View style={[styles.noteCardTagsRow, { flexDirection: 'row', flexWrap: 'wrap' }]}>
-          {note.tags.map((tag, i) => (
-            <View
-              key={i}
-              style={[styles.noteCardTag, { borderColor: tag.color, backgroundColor: `${tag.color}22` }]}
-            >
-              <Text style={[styles.noteCardTagText, { color: tag.color }]}>{tag.label}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {note.todos && note.todos.length > 0 && (
-        <View style={styles.noteCardTodoBadge}>
-          <MaterialCommunityIcons
-            name="checkbox-marked-outline"
-            size={12}
-            color={BRAND_BLUE}
-          />
-          <Text style={styles.noteCardTodoBadgeTxt}>
-            {note.todos.filter(t => t.done).length}/{note.todos.length}
-          </Text>
-        </View>
-      )}
-
-      {note.images && note.images.length > 0 && (
-        <Image
-          source={{ uri: note.images[0] }}
-          style={styles.noteCardImage}
-          resizeMode="cover"
+      <View style={[styles.noteIcon, { backgroundColor: note.cardColor }]}>
+        <Ionicons
+          name={checklistTotal > 0 ? 'checkbox-outline' : 'document-text-outline'}
+          size={20}
+          color="#4A4A46"
         />
-      )}
+      </View>
 
-      <Text style={[styles.noteCardDate, { color: theme.textDim }]}>{note.date}</Text>
+      <View style={styles.noteContent}>
+        <View style={styles.titleRow}>
+          <Text style={[styles.noteCardTitle, { color: theme.text }]} numberOfLines={1}>{title}</Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.textDim} />
+        </View>
+        {note.body.length > 0 ? (
+          <Text style={[styles.noteCardBody, { color: theme.textSub }]} numberOfLines={2}>{note.body}</Text>
+        ) : checklistTotal === 0 ? (
+          <Text style={[styles.noteCardBody, { color: theme.textDim }]} numberOfLines={1}>Empty note</Text>
+        ) : null}
+
+        <View style={styles.metaRow}>
+          <Text style={[styles.noteCardDate, { color: theme.textDim }]} numberOfLines={1}>
+            {note.category} · {note.date}
+          </Text>
+          {checklistTotal > 0 ? (
+            <View style={[styles.checklistMeta, { backgroundColor: theme.accent.soft }]}>
+              <MaterialCommunityIcons name="check-circle-outline" size={12} color={theme.accent.base} />
+              <Text style={[styles.checklistText, { color: theme.accent.base }]}>{completed}/{checklistTotal}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {note.tags && note.tags.length > 0 ? (
+          <View style={styles.noteCardTagsRow}>
+            {note.tags.slice(0, 2).map((tag, index) => (
+              <View key={`${tag.label}-${index}`} style={[styles.noteCardTag, { backgroundColor: `${tag.color}20` }]}>
+                <View style={[styles.tagDot, { backgroundColor: tag.color }]} />
+                <Text style={[styles.noteCardTagText, { color: theme.textSub }]}>{tag.label}</Text>
+              </View>
+            ))}
+            {note.tags.length > 2 ? <Text style={[styles.moreTagsText, { color: theme.textDim }]}>+{note.tags.length - 2}</Text> : null}
+          </View>
+        ) : null}
+      </View>
+
+      {note.images && note.images.length > 0 ? (
+        <Image source={{ uri: note.images[0] }} style={styles.noteCardImage} resizeMode="cover" />
+      ) : null}
     </TouchableOpacity>
   );
 }

@@ -19,12 +19,13 @@ interface TaskContextType {
   updateNote: (note: Note) => void;
   removeNote: (id: string) => void;
   addCategory: (category: string) => void;
+  renameCategory: (from: string, to: string) => void;
   removeCategory: (category: string) => void;
 }
 
 const TaskContext = createContext<TaskContextType>({
   notes: [], categories: DEFAULT_CATEGORIES, isLoading: true,
-  addNote: () => {}, updateNote: () => {}, removeNote: () => {}, addCategory: () => {}, removeCategory: () => {},
+  addNote: () => {}, updateNote: () => {}, removeNote: () => {}, addCategory: () => {}, renameCategory: () => {}, removeCategory: () => {},
 });
 
 const notesCol = (uid: string) => collection(db, 'users', uid, 'notes');
@@ -131,9 +132,38 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addCategory = (category: string) => {
     if (!categoriesRef.current.includes(category)) persistCategories([...categoriesRef.current, category]);
   };
-  const removeCategory = (category: string) => persistCategories(categoriesRef.current.filter(item => item !== category));
+  const renameCategory = (from: string, to: string) => {
+    const nextName = to.trim();
+    if (!nextName || nextName === from || categoriesRef.current.includes(nextName)) return;
+    const updatedNotes = notesRef.current.map(note => note.category === from ? { ...note, category: nextName, updatedAt: Date.now() } : note);
+    persistNotes(updatedNotes);
+    const uid = uidRef.current;
+    if (uid) {
+      updatedNotes
+        .filter(note => note.category === nextName)
+        .forEach(note => void queueCloudSet(uid, notePath(uid, note.id), clean(note as unknown as Record<string, unknown>)));
+    }
+    persistCategories(categoriesRef.current.map(category => category === from ? nextName : category));
+  };
+  const removeCategory = (category: string) => {
+    const affectedNotes = notesRef.current.filter(note => note.category === category);
+    if (affectedNotes.length > 0) {
+      const updatedNotes = notesRef.current.map(note => note.category === category
+        ? { ...note, category: 'Uncategorized', updatedAt: Date.now() }
+        : note);
+      persistNotes(updatedNotes);
+      const uid = uidRef.current;
+      if (uid) {
+        updatedNotes
+          .filter(note => note.category === 'Uncategorized')
+          .forEach(note => void queueCloudSet(uid, notePath(uid, note.id), clean(note as unknown as Record<string, unknown>)));
+      }
+    }
+    const remaining = categoriesRef.current.filter(item => item !== category);
+    persistCategories(affectedNotes.length > 0 && !remaining.includes('Uncategorized') ? [...remaining, 'Uncategorized'] : remaining);
+  };
 
-  return <TaskContext.Provider value={{ notes, categories, isLoading, addNote, updateNote, removeNote, addCategory, removeCategory }}>{children}</TaskContext.Provider>;
+  return <TaskContext.Provider value={{ notes, categories, isLoading, addNote, updateNote, removeNote, addCategory, renameCategory, removeCategory }}>{children}</TaskContext.Provider>;
 };
 
 export const useTaskStore = () => useContext(TaskContext);

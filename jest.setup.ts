@@ -14,6 +14,7 @@ jest.mock('react-native-maps', () => {
 jest.mock('expo-location', () => ({
   Accuracy: { Balanced: 3 },
   requestForegroundPermissionsAsync: jest.fn(async () => ({ status: 'denied' })),
+  getForegroundPermissionsAsync: jest.fn(async () => ({ status: 'denied' })),
   getCurrentPositionAsync: jest.fn(),
   reverseGeocodeAsync: jest.fn(async () => []),
 }));

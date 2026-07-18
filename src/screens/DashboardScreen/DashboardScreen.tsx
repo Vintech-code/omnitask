@@ -12,6 +12,8 @@ import { AppBackground, GlassCard, GlassIconButton, PillButton, ScreenSkeleton }
 import { hydrateFocusSessions } from '@/services/FocusStatsService';
 import { eventStart, formatEventSchedule } from '@/utils/eventDate';
 import { styles } from './styles';
+import { WeatherCard } from '@/components/weather';
+import { useCurrentWeather } from '@/hooks/useCurrentWeather';
 
 const priorityColor = (priority: string, theme: ReturnType<typeof useTheme>['theme']) => ({
   High: theme.semantic.danger,
@@ -31,6 +33,7 @@ export default function DashboardScreen({ navigation }: any) {
   const [sessions, setSessions] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(new Date());
+  const currentWeather = useCurrentWeather();
 
   const upcomingEvents = useMemo(() => events
     .map(event => ({ event, date: eventStart(event) }))
@@ -59,19 +62,12 @@ export default function DashboardScreen({ navigation }: any) {
     return [...active].sort((a, b) => toMinutes(a) - toMinutes(b))[0] ?? null;
   }, [alarms]);
 
-  const week = useMemo(() => Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(now);
-    date.setDate(now.getDate() + index - 3);
-    return date;
-  }), [now.toDateString()]);
-
   const recentNotes = useMemo(
     () => [...notes].sort((a, b) => b.timestamp - a.timestamp).slice(0, 4),
     [notes],
   );
 
   const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 18 ? 'Good afternoon' : 'Good evening';
-  const dateLabel = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const nextAlarmLabel = nextAlarm
     ? `${String(nextAlarm.hour).padStart(2, '0')}:${String(nextAlarm.minute).padStart(2, '0')} ${nextAlarm.period}`
     : '--:--';
@@ -79,7 +75,7 @@ export default function DashboardScreen({ navigation }: any) {
   const onRefresh = () => {
     setRefreshing(true);
     if (user) void hydrateFocusSessions(user.id, setSessions);
-    setTimeout(() => setRefreshing(false), 650);
+    void currentWeather.refresh().finally(() => setRefreshing(false));
   };
 
   if (eventsLoading || alarmsLoading || notesLoading) {
@@ -101,6 +97,7 @@ export default function DashboardScreen({ navigation }: any) {
           </View>
           <View style={styles.headerActions}>
             <GlassIconButton name="search-outline" onPress={() => navigation.navigate('Search')} accessibilityLabel="Search" />
+            <GlassIconButton name="stats-chart-outline" onPress={() => navigation.navigate('Stats')} accessibilityLabel="View statistics" />
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Open profile"
@@ -112,28 +109,16 @@ export default function DashboardScreen({ navigation }: any) {
           </View>
         </View>
 
-        <View style={styles.dateHeading}>
-          <View>
-            <Text style={[styles.sectionTitle, { color: theme.content.primary }]}>Plan your day</Text>
-            <Text style={[styles.dateLabel, { color: theme.content.muted }]}>{dateLabel}</Text>
-          </View>
-          <GlassIconButton name="stats-chart-outline" onPress={() => navigation.navigate('Stats')} accessibilityLabel="View statistics" />
-        </View>
-
-        <GlassCard variant="subtle" padding={8} style={styles.weekCard} contentStyle={styles.weekRow}>
-          {week.map(date => {
-            const selected = date.toDateString() === now.toDateString();
-            return (
-              <View key={date.toISOString()} style={[styles.day, selected && { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
-                <Text style={[styles.dayName, { color: selected ? theme.accent.base : theme.content.muted }]}>
-                  {date.toLocaleDateString('en-US', { weekday: 'narrow' })}
-                </Text>
-                <Text style={[styles.dayNumber, { color: theme.content.primary }]}>{date.getDate()}</Text>
-                <View style={[styles.dayDot, { backgroundColor: selected ? theme.accent.base : 'transparent' }]} />
-              </View>
-            );
-          })}
-        </GlassCard>
+        <WeatherCard
+          date={now}
+          weather={currentWeather.weather}
+          hourly={currentWeather.hourly}
+          location={currentWeather.locationLabel}
+          status={currentWeather.status}
+          error={currentWeather.error}
+          onEnableLocation={() => void currentWeather.requestPermission()}
+          onRetry={() => void currentWeather.refresh()}
+        />
 
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: theme.content.primary }]}>Upcoming events</Text>
@@ -146,7 +131,7 @@ export default function DashboardScreen({ navigation }: any) {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
           {upcomingEvents.length ? upcomingEvents.map(event => (
             <TouchableOpacity key={event.id} activeOpacity={0.82} onPress={() => navigation.navigate('EventDetail', { event })}>
-              <GlassCard style={styles.eventCard} padding={16}>
+              <GlassCard style={styles.eventCard} padding={14}>
                 <View style={styles.eventTopRow}>
                   <View style={[styles.eventIcon, { backgroundColor: theme.accent.soft }]}>
                     <Ionicons name="calendar-outline" size={18} color={theme.accent.base} />

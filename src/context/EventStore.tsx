@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { collection, doc, getDoc, onSnapshot, QuerySnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -6,6 +7,7 @@ import { auth, db } from '../config/firebase';
 import { KEYS, Storage } from '../services/StorageService';
 import { getPendingDeletePaths, queueCloudDelete, queueCloudSet } from '../services/OfflineSyncService';
 import { cancelEventNotifications, scheduleEventNotifications } from '../services/EventNotificationService';
+import { syncEventWeatherWarnings } from '../services/EventWeatherNotificationService';
 import type { AppEvent } from '@/types/event';
 import { DEFAULT_EVENT_CATEGORIES, normalizeEventCategories } from '@/utils/eventCategories';
 
@@ -45,6 +47,15 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const categoriesRef = useRef(DEFAULT_EVENT_CATEGORIES);
   const uidRef = useRef<string | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
+  const weatherSyncRef = useRef<Promise<void> | null>(null);
+
+  const syncWeather = () => {
+    const uid = uidRef.current;
+    if (!uid || weatherSyncRef.current) return;
+    weatherSyncRef.current = syncEventWeatherWarnings(eventsRef.current, uid)
+      .catch(() => undefined)
+      .finally(() => { weatherSyncRef.current = null; });
+  };
 
   const persist = (updated: AppEvent[]) => {
     eventsRef.current = updated;
@@ -113,6 +124,21 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => {
       unsubAuth();
       unsubRef.current?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading) syncWeather();
+  }, [events, isLoading]);
+
+  useEffect(() => {
+    const appState = AppState.addEventListener('change', state => {
+      if (state === 'active') syncWeather();
+    });
+    const interval = setInterval(syncWeather, 60 * 60_000);
+    return () => {
+      appState.remove();
+      clearInterval(interval);
     };
   }, []);
 

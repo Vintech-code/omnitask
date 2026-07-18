@@ -1,0 +1,45 @@
+[debug] [2026-07-18T14:34:15.202Z] ----------------------------------------------------------------------
+[debug] [2026-07-18T14:34:15.205Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\User\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js apps:android:sha:list 1:385511004673:android:17df0a96ec257e0b9dbe00 --project omnitask-d5b47
+[debug] [2026-07-18T14:34:15.205Z] CLI Version:   15.8.0
+[debug] [2026-07-18T14:34:15.205Z] Platform:      win32
+[debug] [2026-07-18T14:34:15.205Z] Node Version:  v22.22.0
+[debug] [2026-07-18T14:34:15.205Z] Time:          Sat Jul 18 2026 22:34:15 GMT+0800 (Philippine Standard Time)
+[debug] [2026-07-18T14:34:15.205Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-18T14:34:15.403Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-18T14:34:15.404Z] > authorizing via signed-in user (clarkcabatuan09@gmail.com)
+[debug] [2026-07-18T14:34:15.407Z] Checked if tokens are valid: false, expires at: 1784360156565
+[debug] [2026-07-18T14:34:15.407Z] Checked if tokens are valid: false, expires at: 1784360156565
+[debug] [2026-07-18T14:34:15.408Z] > refreshing access token with scopes: []
+[debug] [2026-07-18T14:34:15.410Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-07-18T14:34:15.410Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-07-18T14:34:16.765Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-07-18T14:34:16.765Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-07-18T14:34:16.781Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/omnitask-d5b47/androidApps/1:385511004673:android:17df0a96ec257e0b9dbe00/sha [none]
+[debug] [2026-07-18T14:34:17.928Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/omnitask-d5b47/androidApps/1:385511004673:android:17df0a96ec257e0b9dbe00/sha 200
+[debug] [2026-07-18T14:34:17.929Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/omnitask-d5b47/androidApps/1:385511004673:android:17df0a96ec257e0b9dbe00/sha {"certificates":[{"name":"projects/omnitask-d5b47/androidApps/1:385511004673:android:17df0a96ec257e0b9dbe00/sha/5e248a65ed8e5852","shaHash":"3bfd921f36a05f0ab913a2b73a04a79bf8772274","certType":"SHA_1"},{"name":"projects/omnitask-d5b47/androidApps/1:385511004673:android:17df0a96ec257e0b9dbe00/sha/d0909c09ecc1d1fd","shaHash":"5e8f16062ea3cd2c4a0d547876baa6f38cabf625","certType":"SHA_1"}]}
+[info] ┌───────────────────────────────────────────────┬──────────────────┬──────────────────────────────────────────┬───────────────┐
+│ App Id                                        │ SHA Id           │ SHA Hash                                 │ SHA Hash Type │
+├───────────────────────────────────────────────┼──────────────────┼──────────────────────────────────────────┼───────────────┤
+│ 1:385511004673:android:17df0a96ec257e0b9dbe00 │ 5e248a65ed8e5852 │ 3bfd921f36a05f0ab913a2b73a04a79bf8772274 │ SHA_1         │
+├───────────────────────────────────────────────┼──────────────────┼──────────────────────────────────────────┼───────────────┤
+│ 1:385511004673:android:17df0a96ec257e0b9dbe00 │ d0909c09ecc1d1fd │ 5e8f16062ea3cd2c4a0d547876baa6f38cabf625 │ SHA_1         │
+└───────────────────────────────────────────────┴──────────────────┴──────────────────────────────────────────┴───────────────┘
+[info] 
+[info] 2 SHA hash(es) total.
+[debug] [2026-07-18T14:45:08.808Z] ----------------------------------------------------------------------
+[debug] [2026-07-18T14:45:08.809Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\User\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js apps:android:sha:create 1:385511004673:android:17df0a96ec257e0b9dbe00 C5:B0:AE:F7:18:B1:FA:CC:55:9A:45:2B:94:48:A2:69:7A:89:12:43 --project omnitask-d5b47
+[debug] [2026-07-18T14:45:08.810Z] CLI Version:   15.8.0
+[debug] [2026-07-18T14:45:08.810Z] Platform:      win32
+[debug] [2026-07-18T14:45:08.810Z] Node Version:  v22.22.0
+[debug] [2026-07-18T14:45:08.810Z] Time:          Sat Jul 18 2026 22:45:08 GMT+0800 (Philippine Standard Time)
+[debug] [2026-07-18T14:45:08.810Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-18T14:45:08.986Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-18T14:45:08.987Z] > authorizing via signed-in user (clarkcabatuan09@gmail.com)
+[debug] [2026-07-18T14:45:08.991Z] Checked if tokens are valid: true, expires at: 1784388855766
+[debug] [2026-07-18T14:45:08.992Z] Checked if tokens are valid: true, expires at: 1784388855766
+[debug] [2026-07-18T14:45:08.993Z] >>> [apiv2][query] POST https://firebase.googleapis.com/v1beta1/projects/omnitask-d5b47/androidApps/1:385511004673:android:17df0a96ec257e0b9dbe00/sha [none]
+[debug] [2026-07-18T14:45:08.993Z] >>> [apiv2][body] POST https://firebase.googleapis.com/v1beta1/projects/omnitask-d5b47/androidApps/1:385511004673:android:17df0a96ec257e0b9dbe00/sha {"shaHash":"C5:B0:AE:F7:18:B1:FA:CC:55:9A:45:2B:94:48:A2:69:7A:89:12:43","certType":"SHA_1"}
+[debug] [2026-07-18T14:45:12.979Z] <<< [apiv2][status] POST https://firebase.googleapis.com/v1beta1/projects/omnitask-d5b47/androidApps/1:385511004673:android:17df0a96ec257e0b9dbe00/sha 200
+[debug] [2026-07-18T14:45:12.979Z] <<< [apiv2][body] POST https://firebase.googleapis.com/v1beta1/projects/omnitask-d5b47/androidApps/1:385511004673:android:17df0a96ec257e0b9dbe00/sha {"name":"projects/omnitask-d5b47/androidApps/1:385511004673:android:17df0a96ec257e0b9dbe00/sha/efc82cd7a8065261","shaHash":"c5b0aef718b1facc559a452b9448a2697a891243","certType":"SHA_1"}

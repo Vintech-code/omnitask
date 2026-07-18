@@ -43,7 +43,7 @@ const EMOJI_LIST = [
 export default function TasksScreen({ navigation, route }: any) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { notes, categories, isLoading, addNote, updateNote, removeNote, addCategory: storeAddCat, removeCategory: storeRemoveCat } = useTaskStore();
+  const { notes, categories, isLoading, addNote, updateNote, removeNote, addCategory: storeAddCat, renameCategory: storeRenameCat, removeCategory: storeRemoveCat } = useTaskStore();
   const [refreshing, setRefreshing] = useState(false);
   const [organizerSection, setOrganizerSection] = useState<OrganizerSection>('notes');
   const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 700); };
@@ -76,7 +76,7 @@ export default function TasksScreen({ navigation, route }: any) {
   const [colorPickerVisible, setColorPickerVisible] = useState(false);
   const [addTagMode, setAddTagMode]               = useState(false);
   const [newTagName, setNewTagName]               = useState('');
-  const [newTagColor, setNewTagColor]             = useState(TAG_PALETTE[0]);
+  const [newTagColor, setNewTagColor]             = useState<string>(TAG_PALETTE[0]);
   const [edImages, setEdImages]                   = useState<string[]>([]);
 
   // -- Undo / Redo history -------------------------------------------------
@@ -106,6 +106,8 @@ export default function TasksScreen({ navigation, route }: any) {
   }, []);
   const [manageCatVisible, setManageCatVisible] = useState(false);
   const [newCatName, setNewCatName]               = useState('');
+  const [renamingCategory, setRenamingCategory]   = useState<string | null>(null);
+  const [renameCategoryValue, setRenameCategoryValue] = useState('');
 
   const handleAddCategory = () => {
     const name = newCatName.trim();
@@ -355,20 +357,28 @@ export default function TasksScreen({ navigation, route }: any) {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
       <AppBackground />
-      {/* -- Header -- */}
-      <View style={[styles.header, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }]}>
+      <View style={styles.header}>
         <BurgerMenu navigation={navigation} />
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Notes</Text>
+        <View style={styles.headerCopy}>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Notes</Text>
+          <Text style={[styles.headerSubtitle, { color: theme.textDim }]}>
+            {notes.length === 0 ? 'Capture ideas and action items' : `${notes.length} note${notes.length === 1 ? '' : 's'} in your workspace`}
+          </Text>
+        </View>
         <View style={styles.headerIcons}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => setManageCatVisible(true)}>
-            <MaterialCommunityIcons name="view-grid-plus-outline" size={22} color={theme.text} />
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Manage note categories"
+            style={[styles.iconBtn, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}
+            onPress={() => setManageCatVisible(true)}
+          >
+            <MaterialCommunityIcons name="shape-outline" size={21} color={theme.text} />
           </TouchableOpacity>
         </View>
       </View>
 
       <OrganizerSwitch value={organizerSection} onChange={setOrganizerSection} />
 
-      {/* -- Search bar -- */}
       <View style={[styles.searchBar, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
           <Ionicons name="search-outline" size={16} color={theme.textDim} style={{ marginRight: 8 }} />
           <TextInput
@@ -385,7 +395,6 @@ export default function TasksScreen({ navigation, route }: any) {
           )}
       </View>
 
-      {/* -- Category chips -- */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -403,18 +412,33 @@ export default function TasksScreen({ navigation, route }: any) {
         ))}
       </ScrollView>
 
-      {/* -- Notes grid -- */}
       <ScrollView style={[styles.scroll, { backgroundColor: 'transparent' }]} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.textDim} />}>
         {filteredNotes.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="document-text-outline" size={48} color={theme.textDim} />
             <Text style={[styles.emptyTitle, { color: theme.textDim }]}>No notes yet</Text>
-            <Text style={[styles.emptySub, { color: theme.textDim }]}>Tap + to create your first note</Text>
+      <Text style={[styles.emptySub, { color: theme.textDim }]}>Use the orange add button to capture your first idea.</Text>
           </View>
         ) : (
-          <View style={styles.listColumn}>
-            {filteredNotes.map(note => <NoteCard key={note.id} note={note} onPress={openEdit} onDelete={deleteNote} />)}
+          <View>
+            <View style={styles.listHeading}>
+              <Text style={[styles.listTitle, { color: theme.textDim }]}>
+                {activeCategory === 'All' ? 'RECENT NOTES' : activeCategory.toUpperCase()}
+              </Text>
+              <Text style={[styles.listCount, { color: theme.textDim }]}>{filteredNotes.length}</Text>
+            </View>
+            <View style={[styles.notesGroup, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}>
+              {filteredNotes.map((note, index) => (
+                <NoteCard
+                  key={note.id}
+                  note={note}
+                  onPress={openEdit}
+                  onDelete={deleteNote}
+                  isLast={index === filteredNotes.length - 1}
+                />
+              ))}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -444,74 +468,93 @@ export default function TasksScreen({ navigation, route }: any) {
         transparent={false}
         onRequestClose={saveNote}
       >
-        <SafeAreaView style={[styles.editorSafe, { backgroundColor: edCardColor }]} edges={['top']}>
-          {/* Editor top bar */}
-          <View style={[styles.editorTopBar, { backgroundColor: edCardColor }]}>
-            <TouchableOpacity onPress={saveNote} style={styles.editorIconBtn}>
-              <Ionicons name="checkmark" size={24} color="#333" />
+        <SafeAreaView style={[styles.editorSafe, { backgroundColor: theme.bg }]} edges={['top', 'bottom']}>
+          <AppBackground />
+          <View style={styles.editorTopBar}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Close and save note"
+              onPress={saveNote}
+              style={[styles.editorIconBtn, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}
+            >
+              <Ionicons name="close" size={21} color={theme.text} />
             </TouchableOpacity>
-            <View style={styles.editorTopCenter}>
-              <TouchableOpacity onPress={undo}>
-                <Ionicons name="arrow-undo-outline" size={20} color="#555" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={redo}>
-                <Ionicons name="arrow-redo-outline" size={20} color="#555" />
-              </TouchableOpacity>
+            <View style={styles.editorHeading}>
+              <Text style={[styles.editorHeadingTitle, { color: theme.text }]}>{editNote ? 'Edit note' : 'New note'}</Text>
+              <Text style={[styles.editorHeadingSub, { color: theme.textDim }]}>Saved to {edCategory}</Text>
             </View>
             <View style={styles.editorTopRight}>
-              <TouchableOpacity onPress={() => setColorPickerVisible(v => !v)} style={styles.editorIconBtn}>
-                <Ionicons name="color-palette-outline" size={20} color="#555" />
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="More note options"
+                onPress={() => setColorPickerVisible(value => !value)}
+                style={styles.editorMoreBtn}
+              >
+                <Ionicons name="ellipsis-horizontal" size={21} color={theme.textSub} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.editorIconBtn} onPress={shareNote}>
-                <Ionicons name="share-outline" size={20} color="#555" />
+              <TouchableOpacity style={[styles.editorDoneBtn, { backgroundColor: theme.accent.base }]} onPress={saveNote}>
+                <Text style={styles.editorDoneText}>Done</Text>
               </TouchableOpacity>
-              {editNote && (
-                <TouchableOpacity style={styles.editorIconBtn} onPress={() => deleteNote(editNote.id)}>
-                  <Ionicons name="trash-outline" size={20} color="#E05252" />
-                </TouchableOpacity>
-              )}
             </View>
           </View>
 
-          {/* Card color picker */}
           {colorPickerVisible && (
-            <View style={[styles.colorPickerRow, { backgroundColor: edCardColor }]}>
-              {CARD_COLORS.map(c => (
-                <TouchableOpacity
-                  key={c}
-                  style={[styles.colorSwatch, { backgroundColor: c }, edCardColor === c && styles.colorSwatchActive]}
-                  onPress={() => { setEdCardColor(c); setColorPickerVisible(false); }}
-                />
-              ))}
+            <View style={[styles.optionsPanel, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
+              <View style={styles.colorPickerRow}>
+                <Text style={[styles.optionsLabel, { color: theme.textDim }]}>COLOR</Text>
+                {CARD_COLORS.map(color => (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="Change note color"
+                    key={color}
+                    style={[styles.colorSwatch, { backgroundColor: color }, edCardColor === color && { borderColor: theme.accent.base }]}
+                    onPress={() => setEdCardColor(color)}
+                  />
+                ))}
+              </View>
+              <View style={[styles.optionActions, { borderTopColor: theme.divider }]}>
+                <TouchableOpacity style={styles.optionAction} onPress={shareNote}>
+                  <Ionicons name="share-outline" size={19} color={theme.textSub} />
+                  <Text style={[styles.optionActionText, { color: theme.textSub }]}>Share</Text>
+                </TouchableOpacity>
+                {editNote ? (
+                  <TouchableOpacity style={styles.optionAction} onPress={() => deleteNote(editNote.id)}>
+                    <Ionicons name="trash-outline" size={19} color={theme.semantic.danger} />
+                    <Text style={[styles.optionActionText, { color: theme.semantic.danger }]}>Delete</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             </View>
           )}
 
-          {/* -- Date + category row (fixed, outside ScrollView) -- */}
-          <View style={[styles.editorMetaWrap, { backgroundColor: edCardColor }]}>
+          <View style={styles.editorMetaWrap}>
             <View style={styles.editorMeta}>
-              <Text style={styles.editorDate}>{editNote ? editNote.date : formatDate(Date.now())}</Text>
-              <TouchableOpacity style={styles.catSelector} onPress={() => setCatPickerVisible(v => !v)}>
-                <MaterialCommunityIcons name="notebook-outline" size={15} color="#777" style={{ marginRight: 5 }} />
-                <Text style={styles.catSelectorText}>{edCategory}</Text>
-                <Ionicons name={catPickerVisible ? 'chevron-up' : 'chevron-down'} size={14} color="#777" style={{ marginLeft: 4 }} />
+              <View style={[styles.editorDatePill, { backgroundColor: theme.glass.secondary }]}>
+                <Ionicons name="time-outline" size={14} color={theme.textDim} />
+                <Text style={[styles.editorDate, { color: theme.textDim }]}>{editNote ? editNote.date : formatDate(Date.now())}</Text>
+              </View>
+              <TouchableOpacity style={[styles.catSelector, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]} onPress={() => setCatPickerVisible(v => !v)}>
+                <MaterialCommunityIcons name="notebook-outline" size={15} color={theme.accent.base} />
+                <Text style={[styles.catSelectorText, { color: theme.textSub }]}>{edCategory}</Text>
+                <Ionicons name={catPickerVisible ? 'chevron-up' : 'chevron-down'} size={14} color={theme.textDim} />
               </TouchableOpacity>
             </View>
 
             {/* Category dropdown overlay */}
             {catPickerVisible && (
-              <View style={styles.catDropdown}>
+              <View style={[styles.catDropdown, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
                 <TouchableOpacity style={styles.catDropdownItem} onPress={() => { setManageCatVisible(true); setCatPickerVisible(false); }}>
                   <Ionicons name="add-circle-outline" size={16} color={BLUE} style={{ marginRight: 10 }} />
                   <Text style={[styles.catDropdownText, { color: BLUE }]}>Add</Text>
                 </TouchableOpacity>
-                {[...categories, 'Uncategorized'].map(c => (
+                {[...new Set([...categories, 'Uncategorized'])].map(c => (
                   <TouchableOpacity
                     key={c}
                     style={styles.catDropdownItem}
                     onPress={() => { setEdCategory(c); setCatPickerVisible(false); }}
                   >
-                    <MaterialCommunityIcons name="notebook-outline" size={16} color="#555" style={{ marginRight: 10 }} />
-                    <Text style={styles.catDropdownText}>{c}</Text>
+                    <MaterialCommunityIcons name="notebook-outline" size={16} color={theme.textSub} style={{ marginRight: 10 }} />
+                    <Text style={[styles.catDropdownText, { color: theme.text }]}>{c}</Text>
                     {edCategory === c && <Ionicons name="checkmark" size={16} color={BLUE} style={{ marginLeft: 'auto' }} />}
                   </TouchableOpacity>
                 ))}
@@ -519,53 +562,50 @@ export default function TasksScreen({ navigation, route }: any) {
             )}
           </View>
 
-          {/* -- Note/Todos tab bar -- */}
-          <View style={[styles.editorTabBar, { backgroundColor: edCardColor, borderBottomColor: 'rgba(0,0,0,0.07)' }]}>
+          <View style={[styles.editorTabBar, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}>
             <TouchableOpacity
-              style={[styles.editorTabBtn, editorTab === 'note' && styles.editorTabBtnActive]}
+              style={[styles.editorTabBtn, editorTab === 'note' && { backgroundColor: theme.glass.solid }]}
               onPress={() => setEditorTab('note')}
             >
-              <Ionicons name="create-outline" size={15} color={editorTab === 'note' ? BLUE : '#888'} />
-              <Text style={[styles.editorTabTxt, { color: editorTab === 'note' ? BLUE : '#888' }]}>Note</Text>
+              <Ionicons name="create-outline" size={15} color={editorTab === 'note' ? theme.accent.base : theme.textDim} />
+              <Text style={[styles.editorTabTxt, { color: editorTab === 'note' ? theme.accent.base : theme.textDim }]}>Note</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.editorTabBtn, editorTab === 'todos' && styles.editorTabBtnActive]}
+              style={[styles.editorTabBtn, editorTab === 'todos' && { backgroundColor: theme.glass.solid }]}
               onPress={() => setEditorTab('todos')}
             >
-              <MaterialCommunityIcons name="checkbox-marked-outline" size={15} color={editorTab === 'todos' ? BLUE : '#888'} />
-              <Text style={[styles.editorTabTxt, { color: editorTab === 'todos' ? BLUE : '#888' }]}>
+              <MaterialCommunityIcons name="checkbox-marked-outline" size={15} color={editorTab === 'todos' ? theme.accent.base : theme.textDim} />
+              <Text style={[styles.editorTabTxt, { color: editorTab === 'todos' ? theme.accent.base : theme.textDim }]}>
                 {edTodos.length > 0 ? `Checklist (${edTodos.filter(t => t.done).length}/${edTodos.length})` : 'Checklist'}
               </Text>
             </TouchableOpacity>
           </View>
 
-          <View style={{ flex: 1 }}>
-            {/* -- Scrollable content area -- */}
+          <View style={styles.editorFlex}>
             <ScrollView
-              style={{ flex: 1 }}
+              style={styles.editorScroll}
               contentContainerStyle={[styles.editorBody, { paddingBottom: 20 }]}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {/* -- Title (always visible) -- */}
-              <TextInput
-                style={styles.editorTitle}
-                placeholder="Title"
-                placeholderTextColor="#C0C0C0"
-                value={edTitle}
-                onChangeText={setEdTitle}
-                multiline
-                maxLength={120}
-              />
+              <View style={[styles.editorPaper, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border, borderTopColor: edCardColor }]}>
+                <TextInput
+                  style={[styles.editorTitle, { color: theme.text }]}
+                  placeholder="Title"
+                  placeholderTextColor={theme.textDim}
+                  value={edTitle}
+                  onChangeText={setEdTitle}
+                  multiline
+                  maxLength={120}
+                />
 
-              {/* -- Note tab -- */}
-              {editorTab === 'note' && (
+                {editorTab === 'note' && (
                 <>
                   <TextInput
                     ref={bodyRef}
-                    style={[styles.editorText, edFontFamily ? { fontFamily: edFontFamily } : null]}
-                    placeholder="Note here"
-                    placeholderTextColor="#C0C0C0"
+                    style={[styles.editorText, { color: theme.textSub }, edFontFamily ? { fontFamily: edFontFamily } : null]}
+                    placeholder="Write notes, ideas, meeting points..."
+                    placeholderTextColor={theme.textDim}
                     value={edBody}
                     onChangeText={handleBodyChange}
                     onSelectionChange={e => setBodySel(e.nativeEvent.selection)}
@@ -597,14 +637,13 @@ export default function TasksScreen({ navigation, route }: any) {
                 </>
               )}
 
-              {/* -- Checklist tab -- */}
-              {editorTab === 'todos' && (
+                {editorTab === 'todos' && (
                 <View style={{ paddingBottom: 12 }}>
                   <View style={styles.todoAddRow}>
                     <TextInput
-                      style={styles.todoAddInput}
+                      style={[styles.todoAddInput, { color: theme.text, backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}
                       placeholder="Add item…"
-                      placeholderTextColor="#bbb"
+                      placeholderTextColor={theme.textDim}
                       value={newTodoText}
                       onChangeText={setNewTodoText}
                       onSubmitEditing={addTodo}
@@ -615,7 +654,7 @@ export default function TasksScreen({ navigation, route }: any) {
                     </TouchableOpacity>
                   </View>
                   {edTodos.length === 0 && (
-                    <Text style={styles.todoEmptyText}>No checklist items yet</Text>
+                    <Text style={[styles.todoEmptyText, { color: theme.textDim }]}>Add tasks, study steps, or meeting follow-ups.</Text>
                   )}
                   {edTodos.map(item => (
                     <View key={item.id} style={styles.todoItem}>
@@ -625,51 +664,78 @@ export default function TasksScreen({ navigation, route }: any) {
                           : <MaterialCommunityIcons name="checkbox-blank-outline" size={22} color="#aaa" />
                         }
                       </TouchableOpacity>
-                      <Text style={[styles.todoItemText, item.done && styles.todoItemDone]}>{item.text}</Text>
+                      <Text style={[styles.todoItemText, { color: theme.text }, item.done && { color: theme.textDim, textDecorationLine: 'line-through' }]}>{item.text}</Text>
                       <TouchableOpacity onPress={() => removeTodo(item.id)} style={styles.todoRemoveBtn}>
                         <Ionicons name="close" size={18} color="#bbb" />
                       </TouchableOpacity>
                     </View>
                   ))}
                 </View>
-              )}
+                )}
+              </View>
+
+              {edTags.length > 0 ? (
+                <View style={styles.savedTagsRow}>
+                  {edTags.map((tag, index) => (
+                    <TouchableOpacity
+                      key={`${tag.label}-${index}`}
+                      style={[styles.editorTag, { backgroundColor: `${tag.color}25` }]}
+                      onLongPress={() => setEdTags(items => items.filter((_, itemIndex) => itemIndex !== index))}
+                    >
+                      <View style={[styles.tagColorMark, { backgroundColor: tag.color }]} />
+                      <Text style={[styles.savedTagText, { color: theme.textSub }]}>{tag.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
             </ScrollView>
 
             {/* ---------------------------------------------------
                 TOOLBAR — pinned above keyboard
             --------------------------------------------------- */}
-            <View style={[styles.toolbarDock, { backgroundColor: edCardColor }]}>
+            <View style={[styles.toolbarDock, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
 
               {/* Format + font popover */}
               {formatPopoverVisible && (
-                <View style={[styles.formatPopover, { backgroundColor: edCardColor }]}>
+                <View style={[styles.formatPopover, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
                   <View style={styles.formatRow}>
-                    <TouchableOpacity style={styles.formatBtn} onPress={() => { wrapText('**'); setFormatPopoverVisible(false); }}>
-                      <Text style={[styles.formatBtnText, { fontWeight: 'bold' }]}>B</Text>
+                    <TouchableOpacity style={[styles.formatBtn, { backgroundColor: theme.glass.secondary }]} onPress={() => { wrapText('**'); setFormatPopoverVisible(false); }}>
+                      <Text style={[styles.formatBtnText, { color: theme.text, fontWeight: 'bold' }]}>B</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.formatBtn} onPress={() => { wrapText('_'); setFormatPopoverVisible(false); }}>
-                      <Text style={[styles.formatBtnText, { fontStyle: 'italic' }]}>I</Text>
+                    <TouchableOpacity style={[styles.formatBtn, { backgroundColor: theme.glass.secondary }]} onPress={() => { wrapText('_'); setFormatPopoverVisible(false); }}>
+                      <Text style={[styles.formatBtnText, { color: theme.text, fontStyle: 'italic' }]}>I</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.formatBtn} onPress={() => { wrapText('~~', '~~'); setFormatPopoverVisible(false); }}>
-                      <Text style={[styles.formatBtnText, { textDecorationLine: 'line-through' }]}>S</Text>
+                    <TouchableOpacity style={[styles.formatBtn, { backgroundColor: theme.glass.secondary }]} onPress={() => { wrapText('~~', '~~'); setFormatPopoverVisible(false); }}>
+                      <Text style={[styles.formatBtnText, { color: theme.text, textDecorationLine: 'line-through' }]}>S</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.formatBtn} onPress={() => { insertLinePrefix('# '); setFormatPopoverVisible(false); }}>
-                      <Text style={styles.formatBtnText}>H1</Text>
+                    <TouchableOpacity style={[styles.formatBtn, { backgroundColor: theme.glass.secondary }]} onPress={() => { insertLinePrefix('# '); setFormatPopoverVisible(false); }}>
+                      <Text style={[styles.formatBtnText, { color: theme.text }]}>H1</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.formatBtn} onPress={() => { insertLinePrefix('## '); setFormatPopoverVisible(false); }}>
-                      <Text style={styles.formatBtnText}>H2</Text>
+                    <TouchableOpacity style={[styles.formatBtn, { backgroundColor: theme.glass.secondary }]} onPress={() => { insertLinePrefix('• '); setFormatPopoverVisible(false); }}>
+                      <Ionicons name="list-outline" size={18} color={theme.text} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.formatRow}>
+                    <TouchableOpacity style={[styles.formatBtn, { backgroundColor: theme.glass.secondary }]} onPress={() => { insertLinePrefix('## '); setFormatPopoverVisible(false); }}>
+                      <Text style={[styles.formatBtnText, { color: theme.text }]}>H2</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.formatBtn, { backgroundColor: theme.glass.secondary }]} onPress={() => { insertLinePrefix('1. '); setFormatPopoverVisible(false); }}>
+                      <MaterialCommunityIcons name="format-list-numbered" size={18} color={theme.text} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.formatBtn, { backgroundColor: theme.glass.secondary }]} onPress={() => { wrapText('==', '=='); setFormatPopoverVisible(false); }}>
+                      <Ionicons name="brush-outline" size={18} color={theme.text} />
                     </TouchableOpacity>
                   </View>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.fontRow} keyboardShouldPersistTaps="handled">
                     {FONT_FAMILIES.map(f => (
                       <TouchableOpacity key={f.label}
-                        style={[styles.fontChip, edFontFamily === f.value && styles.fontChipActive]}
+                        style={[styles.fontChip, { backgroundColor: theme.glass.secondary }, edFontFamily === f.value && styles.fontChipActive]}
                         onPress={() => { setEdFontFamily(f.value); bodyRef.current?.focus(); }}>
                         <Text style={[
                           styles.fontChipText,
                           f.value ? { fontFamily: f.value } : null,
-                          edFontFamily === f.value && styles.fontChipTextActive,
+                          { color: edFontFamily === f.value ? theme.accent.base : theme.textSub },
                         ]}>{f.label}</Text>
                       </TouchableOpacity>
                     ))}
@@ -679,7 +745,7 @@ export default function TasksScreen({ navigation, route }: any) {
 
               {/* Emoji picker */}
               {emojiPickerVisible && (
-                <View style={[styles.emojiPicker, { backgroundColor: edCardColor }]}>
+                <View style={[styles.emojiPicker, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
                   <View style={styles.emojiGrid}>
                     {EMOJI_LIST.map((em, i) => (
                       <TouchableOpacity key={i} style={styles.emojiBtn}
@@ -691,55 +757,67 @@ export default function TasksScreen({ navigation, route }: any) {
                 </View>
               )}
 
+              {addTagMode ? (
+                <View style={[styles.tagComposer, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
+                  <TextInput
+                    style={[styles.tagComposerInput, { color: theme.text, borderColor: theme.glass.border, backgroundColor: theme.glass.secondary }]}
+                    placeholder="Tag name"
+                    placeholderTextColor={theme.textDim}
+                    value={newTagName}
+                    onChangeText={setNewTagName}
+                    maxLength={20}
+                    autoFocus
+                    onSubmitEditing={addTag}
+                  />
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tagPalette}>
+                    {TAG_PALETTE.map(color => (
+                      <TouchableOpacity key={color} style={[styles.tagColorChoice, { backgroundColor: color }, newTagColor === color && { borderColor: theme.text }]} onPress={() => setNewTagColor(color)} />
+                    ))}
+                  </ScrollView>
+                  <TouchableOpacity style={[styles.tagAddConfirm, { backgroundColor: theme.accent.base }]} onPress={addTag}>
+                    <Text style={styles.tagAddConfirmText}>Add tag</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
               {/* Toolbar row */}
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 style={styles.editorBottomBar}
-                contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 }}
+                contentContainerStyle={styles.editorBottomContent}
                 keyboardShouldPersistTaps="handled"
               >
+                <TouchableOpacity style={styles.editorBarBtn} onPress={undo}>
+                  <Ionicons name="arrow-undo-outline" size={21} color={theme.textSub} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.editorBarBtn} onPress={redo}>
+                  <Ionicons name="arrow-redo-outline" size={21} color={theme.textSub} />
+                </TouchableOpacity>
+                <View style={[styles.toolbarDivider, { backgroundColor: theme.divider }]} />
                 <TouchableOpacity style={styles.editorBarBtn}
                   onPress={() => { setFormatPopoverVisible(v => !v); setEmojiPickerVisible(false); }}>
-                  <MaterialCommunityIcons name="format-font" size={22} color={formatPopoverVisible ? BLUE : '#555'} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.editorBarBtn} onPress={() => insertLinePrefix('? ')}>
-                  <MaterialCommunityIcons name="checkbox-marked-outline" size={22} color="#555" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.editorBarBtn} onPress={() => {
-                  bodyRef.current?.focus();
-                  Alert.alert('Voice Input', 'Tap the microphone on your keyboard to dictate.');
-                }}>
-                  <Ionicons name="mic-outline" size={22} color="#555" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.editorBarBtn} onPress={() => wrapText('==', '==')}>
-                  <Ionicons name="brush-outline" size={22} color="#555" />
+                  <MaterialCommunityIcons name="format-font" size={22} color={formatPopoverVisible ? theme.accent.base : theme.textSub} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.editorBarBtn} onPress={pickAndInsertImage}>
-                  <Ionicons name="image-outline" size={22} color="#555" />
+                  <Ionicons name="image-outline" size={22} color={theme.textSub} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.editorBarBtn}
                   onPress={() => { setEmojiPickerVisible(v => !v); setFormatPopoverVisible(false); }}>
-                  <Ionicons name="happy-outline" size={22} color={emojiPickerVisible ? BLUE : '#555'} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.editorBarBtn} onPress={() => wrapText('~~', '~~')}>
-                  <MaterialCommunityIcons name="format-strikethrough" size={22} color="#555" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.editorBarBtn} onPress={() => insertLinePrefix('• ')}>
-                  <Ionicons name="list-outline" size={22} color="#555" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.editorBarBtn} onPress={() => insertLinePrefix('1. ')}>
-                  <MaterialCommunityIcons name="format-list-numbered" size={22} color="#555" />
+                  <Ionicons name="happy-outline" size={22} color={emojiPickerVisible ? theme.accent.base : theme.textSub} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.editorBarBtn}
                   onPress={() => { setLinkText(''); setLinkUrl(''); setLinkModalVisible(true); }}>
-                  <Ionicons name="link-outline" size={22} color="#555" />
+                  <Ionicons name="link-outline" size={22} color={theme.textSub} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.editorBarBtn} onPress={() => setAddTagMode(value => !value)}>
+                  <Ionicons name="pricetag-outline" size={22} color={addTagMode ? theme.accent.base : theme.textSub} />
                 </TouchableOpacity>
               </ScrollView>
 
-            </View> {/* end toolbarDock */}
+            </View>
 
-          </View> {/* end flex:1 container */}
+          </View>
 
           {/* -- Link insert sheet -- */}
           <Modal
@@ -749,29 +827,29 @@ export default function TasksScreen({ navigation, route }: any) {
             onRequestClose={() => setLinkModalVisible(false)}
           >
             <Pressable style={styles.linkOverlay} onPress={() => setLinkModalVisible(false)}>
-              <Pressable style={styles.linkSheet} onPress={e => e.stopPropagation()}>
-                <Text style={styles.linkSheetTitle}>Insert Link</Text>
+              <Pressable style={[styles.linkSheet, { backgroundColor: theme.glass.solid }]} onPress={e => e.stopPropagation()}>
+                <Text style={[styles.linkSheetTitle, { color: theme.text }]}>Insert link</Text>
                 <TextInput
-                  style={styles.linkInput}
+                  style={[styles.linkInput, { color: theme.text, backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}
                   placeholder="Display text (optional)"
-                  placeholderTextColor="#aaa"
+                  placeholderTextColor={theme.textDim}
                   value={linkText}
                   onChangeText={setLinkText}
                 />
                 <TextInput
-                  style={styles.linkInput}
+                  style={[styles.linkInput, { color: theme.text, backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}
                   placeholder="https://..."
-                  placeholderTextColor="#aaa"
+                  placeholderTextColor={theme.textDim}
                   value={linkUrl}
                   onChangeText={setLinkUrl}
                   keyboardType="url"
                   autoCapitalize="none"
                 />
                 <View style={styles.linkActions}>
-                  <TouchableOpacity style={styles.linkCancel} onPress={() => setLinkModalVisible(false)}>
+              <TouchableOpacity style={[styles.linkCancel, { backgroundColor: theme.glass.secondary }]} onPress={() => setLinkModalVisible(false)}>
                     <Text style={{ color: '#888', fontWeight: '600' }}>Cancel</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.linkConfirm} onPress={() => {
+                  <TouchableOpacity style={[styles.linkConfirm, { backgroundColor: theme.accent.base }]} onPress={() => {
                     if (!linkUrl.trim()) { Alert.alert('URL required', 'Please enter a URL.'); return; }
                     const display = linkText.trim() || linkUrl.trim();
                     insertAtCursor(`[${display}](${linkUrl.trim()})`);
@@ -801,22 +879,13 @@ export default function TasksScreen({ navigation, route }: any) {
             <TouchableOpacity onPress={() => setManageCatVisible(false)} style={styles.manageBackBtn}>
               <Ionicons name="arrow-back" size={22} color={theme.text} />
             </TouchableOpacity>
-            <Text style={[styles.manageTitle, { color: theme.text }]}>Manage Category</Text>
+            <Text style={[styles.manageTitle, { color: theme.text }]}>Categories</Text>
           </View>
 
-          {/* Info banner */}
-          <View style={styles.manageBanner}>
-            <Ionicons name="megaphone-outline" size={18} color="#E09C52" style={{ marginRight: 8 }} />
-            <Text style={styles.manageBannerText}>You can rename or delete categories here.</Text>
-            <TouchableOpacity style={{ padding: 2 }}>
-              <Ionicons name="close" size={16} color="#E09C52" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={{ flex: 1 }}>
-            {/* All row */}
-            <View style={[styles.manageCatRow, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-              <MaterialCommunityIcons name="drag" size={20} color={theme.textDim} style={{ marginRight: 12 }} />
+          <ScrollView style={styles.manageScroll} contentContainerStyle={styles.manageScrollContent}>
+            <View style={[styles.manageGroup, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}>
+            <View style={[styles.manageCatRow, { borderBottomColor: theme.divider }]}>
+              <MaterialCommunityIcons name="book-multiple-outline" size={20} color={theme.textDim} style={{ marginRight: 12 }} />
               <Text style={[styles.manageCatName, { color: theme.text }]}>
                 {`All (${notes.length})`}
               </Text>
@@ -825,18 +894,15 @@ export default function TasksScreen({ navigation, route }: any) {
             {categories.map(cat => {
               const count = notes.filter(n => n.category === cat).length;
               return (
-                <View key={cat} style={[styles.manageCatRow, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-                  <MaterialCommunityIcons name="drag" size={20} color={theme.textDim} style={{ marginRight: 12 }} />
+                <View key={cat} style={[styles.manageCatRow, { borderBottomColor: theme.divider }]}>
+                  <MaterialCommunityIcons name="notebook-outline" size={20} color={theme.textDim} style={{ marginRight: 12 }} />
                   <Text style={[styles.manageCatName, { color: theme.text }]}>
                     {`${cat} (${count})`}
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginLeft: 'auto' }}>
-                    <Ionicons name="lock-open-outline" size={18} color={theme.textDim} />
                     <TouchableOpacity onPress={() =>
                       Alert.alert(cat, undefined, [
-                        { text: 'Rename', onPress: () => Alert.prompt?.('Rename', '', (name: string) => {
-                          if (name?.trim()) { storeRemoveCat(cat); storeAddCat(name.trim()); }
-                        })},
+                        { text: 'Rename', onPress: () => { setRenamingCategory(cat); setRenameCategoryValue(cat); } },
                         { text: 'Delete', style: 'destructive', onPress: () => deleteCategory(cat) },
                         { text: 'Cancel', style: 'cancel' },
                       ])
@@ -847,8 +913,7 @@ export default function TasksScreen({ navigation, route }: any) {
                 </View>
               );
             })}
-
-            <View style={{ height: 20 }} />
+            </View>
           </ScrollView>
 
           {/* -- Add Category bar -- */}
@@ -868,10 +933,38 @@ export default function TasksScreen({ navigation, route }: any) {
               onPress={handleAddCategory}
             >
               <Ionicons name="add" size={18} color="#fff" style={{ marginRight: 6 }} />
-              <Text style={styles.addCatBtnText}>ADD CATEGORY</Text>
+              <Text style={styles.addCatBtnText}>Add category</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
+      </Modal>
+
+      <Modal visible={Boolean(renamingCategory)} transparent animationType="fade" onRequestClose={() => setRenamingCategory(null)}>
+        <Pressable style={styles.linkOverlay} onPress={() => setRenamingCategory(null)}>
+          <Pressable style={[styles.linkSheet, { backgroundColor: theme.glass.solid }]} onPress={event => event.stopPropagation()}>
+            <Text style={[styles.linkSheetTitle, { color: theme.text }]}>Rename category</Text>
+            <TextInput
+              autoFocus
+              style={[styles.linkInput, { color: theme.text, backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}
+              placeholder="Category name"
+              placeholderTextColor={theme.textDim}
+              value={renameCategoryValue}
+              onChangeText={setRenameCategoryValue}
+              maxLength={30}
+            />
+            <View style={styles.linkActions}>
+              <TouchableOpacity style={[styles.linkCancel, { backgroundColor: theme.glass.secondary }]} onPress={() => setRenamingCategory(null)}>
+                <Text style={{ color: theme.textSub, fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.linkConfirm, { backgroundColor: theme.accent.base }]} onPress={() => {
+                if (renamingCategory && renameCategoryValue.trim()) storeRenameCat(renamingCategory, renameCategoryValue);
+                setRenamingCategory(null);
+              }}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Rename</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );
