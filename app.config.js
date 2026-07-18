@@ -3,7 +3,12 @@ const path = require('path');
 const base = require('./app.json');
 
 module.exports = () => {
-  const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
+  const rawGoogleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY?.trim();
+  const googleMapsApiKey = rawGoogleMapsApiKey
+    && !/^YOUR_|REPLACE_|CHANGE_ME$/i.test(rawGoogleMapsApiKey)
+    && /^AIza[\w-]{30,}$/.test(rawGoogleMapsApiKey)
+      ? rawGoogleMapsApiKey
+      : undefined;
   const googleServicesFile = './google-services.json';
   const hasGoogleServices = fs.existsSync(path.join(__dirname, googleServicesFile));
   return {
@@ -21,11 +26,9 @@ module.exports = () => {
       ...(hasGoogleServices ? { googleServicesFile } : {}),
     },
     plugins: [
-      ...(base.expo.plugins || []),
-      ...(hasGoogleServices
-        ? [['react-native-nitro-google-signin', { androidGoogleServicesFile: googleServicesFile }]]
-        : []),
-    ],
+  ...(base.expo.plugins || []),
+  '@react-native-google-signin/google-signin',
+],
     extra: {
       ...(base.expo.extra || {}),
       googleAuthenticationConfigured: hasGoogleServices,

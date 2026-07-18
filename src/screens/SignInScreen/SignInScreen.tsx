@@ -20,7 +20,7 @@ import { useTheme } from '@/context/ThemeContext';
 
 export default function SignInScreen({ navigation }: any) {
   const { theme } = useTheme();
-  const { signIn, signInWithGoogle, hasSeenOnboarding } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,7 +42,6 @@ export default function SignInScreen({ navigation }: any) {
       setLoading(true);
       slowTimer = setTimeout(() => setSlowConnection(true), 3500);
       await signIn(trimEmail, password);
-      navigation.replace(hasSeenOnboarding ? 'Main' : 'Onboarding');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to sign in. Please try again.');
     } finally {
@@ -52,21 +51,7 @@ export default function SignInScreen({ navigation }: any) {
     }
   };
 
-  const handleForgotPassword = async () => {
-    const trimEmail = email.trim();
-    if (!trimEmail) {
-      Alert.alert('Reset Password', 'Enter your email address first.');
-      return;
-    }
-    try {
-      const { sendPasswordResetEmail } = await import('firebase/auth');
-      const { auth } = await import('@/config/firebase');
-      await sendPasswordResetEmail(auth, trimEmail);
-      Alert.alert('Email Sent', `A password reset link was sent to:\n${trimEmail}`);
-    } catch {
-      Alert.alert('Error', 'Could not send reset email. Check your email address and try again.');
-    }
-  };
+  const handleForgotPassword = () => navigation.navigate('ForgotPassword', { email: email.trim() || undefined });
 
   const handleGoogleSignIn = async () => {
     if (loading || googleLoading) return;
@@ -74,7 +59,6 @@ export default function SignInScreen({ navigation }: any) {
       setErrorMessage(null);
       setGoogleLoading(true);
       await signInWithGoogle();
-      navigation.replace(hasSeenOnboarding ? 'Main' : 'Onboarding');
     } catch (error) {
       if (!isGoogleAuthCancelled(error)) {
         setErrorMessage(error instanceof Error ? error.message : 'Unable to sign in with Google.');
@@ -100,7 +84,7 @@ export default function SignInScreen({ navigation }: any) {
         {/* Title */}
         <Text style={[s.title, { color: theme.content.primary }]}>Welcome back</Text>
         <Text style={[s.sub, { color: theme.content.secondary }]}>
-          Sign in to access your reminders and pomodoro sessions.
+          Sign in to access your tasks, reminders, and Pomodoro sessions.
         </Text>
 
         <View style={s.fields}>

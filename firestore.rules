@@ -2,15 +2,32 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function hasVerifiedEmail() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
     // OmniTask stores profiles and app data below users/{uid}. A signed-in
-    // user may access only their own document and nested collections.
+    // user may access only their own document and nested collections. An
+    // unverified password user may create only the minimal profile required by
+    // the server-side welcome-email trigger; app data remains inaccessible.
     match /users/{userId} {
-      allow read, create, update, delete: if request.auth != null
-        && request.auth.uid == userId;
+      allow create: if isOwner(userId)
+        && (
+          hasVerifiedEmail()
+          || (
+            request.resource.data.keys().hasOnly(['id', 'name', 'email'])
+            && request.resource.data.id == userId
+            && request.resource.data.email == request.auth.token.email
+          )
+        );
+      allow read, update, delete: if isOwner(userId) && hasVerifiedEmail();
 
       match /{document=**} {
-        allow read, create, update, delete: if request.auth != null
-          && request.auth.uid == userId;
+        allow read, create, update, delete: if isOwner(userId) && hasVerifiedEmail();
       }
     }
 

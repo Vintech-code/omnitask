@@ -53,7 +53,7 @@ const FEATURES = [
 ];
 
 export default function WelcomeScreen({ navigation }: any) {
-  const { signInWithGoogle, hasSeenOnboarding } = useAuth();
+  const { signInWithGoogle } = useAuth();
   const [googleLoading, setGoogleLoading] = React.useState(false);
   const logoScale = useRef(new Animated.Value(0.75)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -74,7 +74,6 @@ export default function WelcomeScreen({ navigation }: any) {
     try {
       setGoogleLoading(true);
       await signInWithGoogle();
-      navigation.replace(hasSeenOnboarding ? 'Main' : 'Onboarding');
     } catch (error) {
       if (!isGoogleAuthCancelled(error)) {
         Alert.alert(

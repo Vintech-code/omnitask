@@ -19,7 +19,7 @@ import { s } from './styles';
 
 export default function SignUpScreen({ navigation }: any) {
   const { theme } = useTheme();
-  const { signUp, signInWithGoogle, hasSeenOnboarding } = useAuth();
+  const { signUp, signInWithGoogle } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -48,7 +48,6 @@ export default function SignUpScreen({ navigation }: any) {
       setErrorMessage(null);
       setLoading(true);
       await signUp(trimmedName, trimmedEmail, password);
-      navigation.replace('Onboarding');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to create your account. Please try again.');
     } finally {
@@ -62,7 +61,6 @@ export default function SignUpScreen({ navigation }: any) {
       setErrorMessage(null);
       setGoogleLoading(true);
       await signInWithGoogle();
-      navigation.replace(hasSeenOnboarding ? 'Main' : 'Onboarding');
     } catch (error) {
       if (!isGoogleAuthCancelled(error)) {
         setErrorMessage(error instanceof Error ? error.message : 'Unable to continue with Google.');
@@ -92,7 +90,7 @@ export default function SignUpScreen({ navigation }: any) {
           <Text style={[s.title, { color: theme.content.primary }]}>Create your account</Text>
           <Text style={[s.subtitle, { color: theme.content.secondary }]}>One account keeps your tasks, events, and focus sessions together.</Text>
         </View>
-
+        
         <View style={[s.card, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}>
           <GoogleAuthButton
             testID="google-sign-up"
@@ -100,7 +98,7 @@ export default function SignUpScreen({ navigation }: any) {
             disabled={loading}
             onPress={handleGoogleContinue}
           />
-          <Text style={[s.googleHelper, { color: theme.content.secondary }]}>New here? Google creates your OmniTask account automatically.</Text>
+         
 
           <View style={s.dividerRow}>
             <View style={[s.dividerLine, { backgroundColor: theme.divider }]} />

@@ -26,6 +26,8 @@ import { openRingingAlarm } from '@/navigation/navigationRef';
 import WelcomeScreen      from '@/screens/WelcomeScreen';
 import SignInScreen       from '@/screens/SignInScreen';
 import SignUpScreen       from '@/screens/SignUpScreen';
+import ForgotPasswordScreen from '@/screens/ForgotPasswordScreen';
+import EmailVerificationScreen from '@/screens/EmailVerificationScreen';
 import OnboardingScreen   from '@/screens/OnboardingScreen';
 import CreateEventScreen  from '@/screens/CreateEventScreen';
 import EventDetailScreen  from '@/screens/EventDetailScreen';
@@ -42,7 +44,7 @@ const Stack = createStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
   const { isDark }           = useTheme();
-  const { user, isLoading }  = useAuth();
+  const { user, isLoading, emailVerified, hasSeenOnboarding } = useAuth();
   const isExpoGo = isRunningInExpoGo();
 
   // Request push-notification permission on first launch
@@ -97,24 +99,31 @@ export default function RootNavigator() {
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack.Navigator
-        initialRouteName={user ? 'Main' : 'Welcome'}
+        key={!user ? 'guest' : emailVerified ? 'verified' : 'verification-required'}
+        initialRouteName={!user ? 'Welcome' : emailVerified ? (hasSeenOnboarding ? 'Main' : 'Onboarding') : 'EmailVerification'}
         screenOptions={{ headerShown: false }}
       >
-        <Stack.Screen name="Welcome"      component={WelcomeScreen} />
-        <Stack.Screen name="SignIn"       component={SignInScreen} />
-        <Stack.Screen name="SignUp"       component={SignUpScreen} />
-        <Stack.Screen name="Onboarding"   component={OnboardingScreen} />
-        <Stack.Screen name="Main"         component={MainTabNavigator} />
-        <Stack.Screen name="CreateEvent"  component={CreateEventScreen} />
-        <Stack.Screen name="EventDetail"  component={EventDetailScreen} />
-        <Stack.Screen name="Profile"      component={ProfileScreen} />
-        <Stack.Screen name="Search"       component={SearchScreen} />
-        <Stack.Screen name="Stats"        component={StatsScreen} />
-        <Stack.Screen
-          name="RingingAlarm"
-          component={RingingAlarmScreen}
-          options={{ presentation: 'modal', gestureEnabled: false }}
-        />
+        {!user ? (
+          <>
+            <Stack.Screen name="Welcome" component={WelcomeScreen} />
+            <Stack.Screen name="SignIn" component={SignInScreen} />
+            <Stack.Screen name="SignUp" component={SignUpScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          </>
+        ) : !emailVerified ? (
+          <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} />
+        ) : (
+          <>
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="Main" component={MainTabNavigator} />
+            <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
+            <Stack.Screen name="EventDetail" component={EventDetailScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="Search" component={SearchScreen} />
+            <Stack.Screen name="Stats" component={StatsScreen} />
+            <Stack.Screen name="RingingAlarm" component={RingingAlarmScreen} options={{ presentation: 'modal', gestureEnabled: false }} />
+          </>
+        )}
       </Stack.Navigator>
     </>
   );

@@ -80,7 +80,6 @@ export default function EventDetailScreen({ route, navigation }: any) {
 
         {/* Hero Card */}
         <View style={[s.heroCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={[s.heroAccent, { backgroundColor: priority.accent }]} />
           <View style={s.heroBody}>
             <View style={s.badgeRow}>
               <View style={[s.badge, { backgroundColor: priority.bg }]}>

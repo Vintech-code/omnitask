@@ -16,7 +16,6 @@ export const s = StyleSheet.create({
     borderRadius: 26, borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden', marginBottom: 10,
   },
-  heroAccent: { height: 5 },
   heroBody: { padding: 16 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   badge: {

@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "omnitask",
+    "name": "OmniTask",
     "slug": "omnitask",
     "scheme": "omnitask",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/omnitasklogo.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+    "androidStatusBar": {
+      "backgroundColor": "#F3F3F1",
+      "barStyle": "dark-content",
+      "translucent": false
     },
     "ios": {
       "supportsTablet": true
@@ -29,10 +29,8 @@
         "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#F3F3F1",
+        "foregroundImage": "./assets/omnitasklogo.png"
       },
       "package": "com.vincentements_007.omnitask"
     },
@@ -45,6 +43,19 @@
       }
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F3F3F1",
+          "image": "./assets/omnitasklogo.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#F8F8F5",
+            "image": "./assets/omnitasklogo.png"
+          }
+        }
+      ],
       "expo-audio",
       "expo-asset",
       [

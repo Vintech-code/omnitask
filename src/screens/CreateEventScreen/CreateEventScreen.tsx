@@ -320,7 +320,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
   const cardBg = theme.glass.solid;
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: 'transparent' }]} edges={['top']}>
+    <SafeAreaView style={[s.safe, { backgroundColor: 'transparent' }]} edges={['top', 'bottom']}>
       <AppBackground />
       {/* -- Header -- */}
       <View style={[s.header, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }]}>

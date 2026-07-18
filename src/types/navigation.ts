@@ -6,6 +6,8 @@ export type RootStackParamList = {
   Welcome:     undefined;
   SignIn:      undefined;
   SignUp:      undefined;
+  ForgotPassword: { email?: string } | undefined;
+  EmailVerification: undefined;
   Onboarding:  undefined;
   Main:        undefined;
   CreateEvent: { event?: AppEvent } | undefined;

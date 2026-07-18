@@ -69,7 +69,6 @@ export const styles = StyleSheet.create({
     flexDirection: 'row', borderRadius: 22, borderWidth: 1,
     marginBottom: 10, overflow: 'hidden',
   },
-  alarmLeftBorder: { width: 3, backgroundColor: BLUE },
   alarmCardBody: { flex: 1, paddingHorizontal: 16, paddingVertical: 14 },
 
   alarmTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },

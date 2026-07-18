@@ -1,6 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { GoogleSignInButton } from 'react-native-nitro-google-signin';
+import React from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 type Props = {
   loading?: boolean;
@@ -9,66 +15,73 @@ type Props = {
   testID?: string;
 };
 
+/**
+ * A stable React Native surface using Google's approved local G asset.
+ * Authentication still opens the native Google account chooser; only the
+ * unreliable Nitro HybridView button host has been replaced.
+ */
 export function GoogleAuthButton({ loading = false, disabled = false, onPress, testID }: Props) {
-  const [nativeInstance, setNativeInstance] = useState(0);
-  const wasLoading = useRef(false);
-
-  useEffect(() => {
-    if (wasLoading.current && !loading) {
-      // Android's native Google HybridView can remain blank after its account
-      // sheet closes. Recreating only that host restores the official button.
-      setNativeInstance(current => current + 1);
-    }
-    wasLoading.current = loading;
-  }, [loading]);
+  const unavailable = loading || disabled;
 
   return (
-    <View style={[styles.clip, (loading || disabled) && styles.disabled]}>
-      <GoogleSignInButton
-        key={nativeInstance}
-        testID={testID}
-        accessibilityLabel="Sign in with Google"
-        colorScheme="light"
-        size="wide"
-        contentAlignment="center"
-        signInBehavior="none"
-        loading={false}
-        disabled={disabled}
-        onPress={onPress}
-        style={styles.button}
-      />
+    <TouchableOpacity
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel="Continue with Google"
+      accessibilityState={{ disabled: unavailable, busy: loading }}
+      activeOpacity={0.82}
+      disabled={unavailable}
+      onPress={() => void onPress()}
+      style={[styles.button, unavailable && styles.disabled]}
+    >
       {loading ? (
-        <View pointerEvents="none" style={styles.loadingOverlay}>
+        <View style={styles.content}>
           <ActivityIndicator size="small" color="#FF7A00" />
-          <Text style={styles.loadingText}>Connecting...</Text>
+          <Text style={styles.text}>Connecting...</Text>
         </View>
-      ) : null}
-    </View>
+      ) : (
+        <>
+          <View style={styles.logoViewport}>
+            <Image
+              source={require('../../../assets/google-g.png')}
+              resizeMode="contain"
+              style={styles.logoArtwork}
+            />
+          </View>
+          <Text style={styles.text}>Continue with Google</Text>
+          <View style={styles.trailingSpace} />
+        </>
+      )}
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  clip: {
-    width: '100%',
-    height: 52,
-    borderRadius: 26,
-    overflow: 'hidden',
-    backgroundColor: 'transparent',
-  },
   button: {
     width: '100%',
     height: 52,
-    transform: [{ scaleX: 1.22 }, { scaleY: 1.16 }],
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 26,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#DADCE0',
     backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+  },
+  content: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 9,
   },
-  loadingText: { color: '#303030', fontSize: 14, fontWeight: '700' },
-  disabled: { opacity: 0.68 },
+  logoViewport: { width: 28, height: 28, overflow: 'hidden' },
+  // The approved source asset includes its own square button boundary. Enlarge
+  // and crop it here so only the standard multicolor G appears in our pill.
+  logoArtwork: { position: 'absolute', width: 56, height: 56, left: -14, top: -14 },
+  trailingSpace: { width: 28, height: 28 },
+  text: { color: '#1F1F1F', fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  disabled: { opacity: 0.62 },
 });

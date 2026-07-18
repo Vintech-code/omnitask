@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import MapView, { MapPressEvent, Marker, Region } from 'react-native-maps';
+import { ActivityIndicator, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import MapView, { MapPressEvent, Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -50,6 +50,9 @@ export function EventLocationPicker({
   const [label, setLabel] = useState(initialLabel);
   const [status, setStatus] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapLoadTimedOut, setMapLoadTimedOut] = useState(false);
+  const [mapAttempt, setMapAttempt] = useState(0);
   const mapsConfigured = mapEnabled ?? Constants.expoConfig?.extra?.googleMapsConfigured === true;
 
   const describeCoordinate = async (latitude: number, longitude: number) => {
@@ -90,6 +93,8 @@ export function EventLocationPicker({
 
   useEffect(() => {
     if (!visible) return;
+    setMapLoaded(false);
+    setMapLoadTimedOut(false);
     setLabel(initialLabel);
     setStatus(null);
     if (typeof initialLatitude === 'number' && typeof initialLongitude === 'number') {
@@ -105,6 +110,12 @@ export function EventLocationPicker({
       }
     }
   }, [visible, initialLatitude, initialLongitude, initialLabel]);
+
+  useEffect(() => {
+    if (!visible || !mapsConfigured || mapLoaded) return;
+    const timeout = setTimeout(() => setMapLoadTimedOut(true), 12_000);
+    return () => clearTimeout(timeout);
+  }, [visible, mapsConfigured, mapLoaded, mapAttempt]);
 
   const selectPoint = (event: MapPressEvent) => {
     const next = event.nativeEvent.coordinate;
@@ -136,11 +147,18 @@ export function EventLocationPicker({
         <View style={[styles.mapFrame, { borderColor: theme.glass.border }]}>
           {mapsConfigured ? (
             <MapView
+              key={`event-location-map-${mapAttempt}`}
               testID="event-location-map"
               style={StyleSheet.absoluteFill}
+              provider={PROVIDER_GOOGLE}
+              mapType="standard"
               region={region}
               onRegionChangeComplete={setRegion}
               onPress={selectPoint}
+              onMapLoaded={() => {
+                setMapLoaded(true);
+                setMapLoadTimedOut(false);
+              }}
               showsUserLocation
               showsMyLocationButton={false}
             >
@@ -155,6 +173,34 @@ export function EventLocationPicker({
               <Text style={[styles.mapUnavailableText, { color: theme.textSub }]}>Use your current location now, or rebuild OmniTask with its Google Maps API key to choose a pin.</Text>
             </View>
           )}
+          {mapsConfigured && !mapLoaded ? (
+            <View style={[styles.mapLoading, { backgroundColor: theme.glass.solid }]}>
+              {mapLoadTimedOut ? (
+                <>
+                  <Ionicons name="map-outline" size={30} color={theme.accent.base} />
+                  <Text style={[styles.mapLoadingTitle, { color: theme.text }]}>Map couldn’t load</Text>
+                  <Text style={[styles.mapLoadingText, { color: theme.textSub }]}>Check your connection and Google Maps key access, then try again.</Text>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={[styles.retryButton, { backgroundColor: theme.accent.base }]}
+                    onPress={() => {
+                      setMapLoaded(false);
+                      setMapLoadTimedOut(false);
+                      setMapAttempt(value => value + 1);
+                    }}
+                  >
+                    <Ionicons name="refresh" size={17} color="#fff" />
+                    <Text style={styles.retryText}>Retry map</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <ActivityIndicator size="large" color={theme.accent.base} />
+                  <Text style={[styles.mapLoadingTitle, { color: theme.text }]}>Loading map…</Text>
+                </>
+              )}
+            </View>
+          ) : null}
           <TouchableOpacity
             testID="event-use-current-location"
             accessibilityRole="button"
@@ -209,6 +255,11 @@ const styles = StyleSheet.create({
   mapUnavailableIcon: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   mapUnavailableTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center', marginBottom: 7 },
   mapUnavailableText: { maxWidth: 310, fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  mapLoading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+  mapLoadingTitle: { fontSize: 16, fontWeight: '800', textAlign: 'center', marginTop: 12 },
+  mapLoadingText: { maxWidth: 290, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 6 },
+  retryButton: { minHeight: 44, borderRadius: radii.pill, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 14 },
+  retryText: { color: '#fff', fontSize: 13, fontWeight: '800' },
   currentButton: { position: 'absolute', right: 12, top: 12, minHeight: 44, borderRadius: radii.pill, borderWidth: 1, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 7 },
   currentLabel: { fontSize: 13, fontWeight: '700' },
   form: { padding: 16 },

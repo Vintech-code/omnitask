@@ -346,6 +346,7 @@ The current full-width bottom bar becomes a floating glass capsule inspired by t
 
 ### Welcome and onboarding
 
+- Launch begins with an OmniTask-branded native splash, then a brief transform/opacity animation using `omnitasklogo.png`; the transition must not expose a blank frame or delay navigation initialization. The Android adaptive icon uses the same logo so Google account selection and system surfaces do not show an Expo placeholder.
 - Use the atmospheric pearl background across all pages.
 - Place existing Lottie artwork inside a large, edge-free light area rather than a bordered card.
 - Keep the OmniTask mark compact at the top.
@@ -360,6 +361,7 @@ The current full-width bottom bar becomes a floating glass capsule inspired by t
 - Orange primary submit button; glass social/secondary actions if currently present.
 - Google is the only third-party authentication action. Use Google's official, full-color SDK button at full form width with the same pill silhouette as the other authentication buttons on Welcome, Sign In, and Sign Up; do not show Apple or a simulated provider action.
 - Google account selection feeds the same Firebase session and user-profile persistence flow as email authentication. Treat both first-time and returning Google accounts as one non-confusing continuation action.
+- Firebase's credential result decides whether a Google identity is new or returning, regardless of whether the action started on Sign In or Sign Up. Returning UIDs must restore their existing local/cloud workspace, skip onboarding, and never initialize or overwrite empty account data. Onboarding completion is scoped and synced per UID rather than shared as one device-wide flag.
 - Google button taps use the explicit Android account chooser so every device account and Add another account remain available. A successful Firebase credential must not be reported as failed because a later local-profile or cloud-sync write failed, and the official native button must be remounted after its account sheet closes if Android clears its rendered host.
 - Sign Up is account creation only: no profile photo, security badge, or other profile-preparation controls. Explain that Google creates the Firebase account automatically on first use, and offer email creation as the alternative.
 - Sign In and Sign Up fields use one compact outlined floating-label pattern with leading semantic icons: the label animates into the border on focus or when populated, the existing example placeholders appear on focus, input values stay stable, validation appears inline, and password visibility remains explicit. Place Forgot password directly below the password field, right-aligned.
@@ -368,6 +370,7 @@ The current full-width bottom bar becomes a floating glass capsule inspired by t
 - Never translate a network timeout, disabled provider, or Firebase configuration failure into "incorrect credentials." Show the actionable authentication error inline and reserve the credentials message for Firebase's invalid-credential response.
 - Preserve password input exactly as entered; trim email addresses but never trim passwords.
 - While authentication is pending, disable duplicate submission, keep a "Signing in..." label beside the progress indicator, and show a compact connection hint if Firebase has not responded after 3.5 seconds.
+- Email/password accounts are gated at the root navigator until Firebase reports `emailVerified`. The verification screen shows the account email, a Firebase-backed resend action with a 60-second cooldown, a manual refresh action, and logout. Password reset is a separate request/success flow and never reveals whether an address is registered. On the Spark plan, Firebase Authentication securely sends verification and reset messages through its built-in templates; no provider secret is stored in the app. The optional SendGrid Cloud Functions implementation remains isolated for a future Blaze upgrade. Trusted Google identities are already verified by Firebase and bypass the verification gate.
 
 ### Dashboard
 

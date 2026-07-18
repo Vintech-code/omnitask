@@ -50,9 +50,10 @@ export const styles = StyleSheet.create({
     paddingTop: 16,
   },
   btnPrimary: {
+    width: '100%',
+    height: 52,
     backgroundColor: BLUE,
     borderRadius: 999,
-    paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -65,11 +66,13 @@ export const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   btnSecondary: {
+    width: '100%',
+    height: 52,
     borderWidth: 1.5,
     borderColor: '#DDE2EE',
     borderRadius: 999,
-    paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 18,
   },
   btnSecondaryText: {

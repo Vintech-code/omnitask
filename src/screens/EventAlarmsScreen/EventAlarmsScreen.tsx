@@ -160,7 +160,6 @@ export default function EventAlarmsScreen({
               onPress={() => navigation?.navigate('EventDetail', { event })}
               activeOpacity={0.82}
             >
-              <View style={styles.alarmLeftBorder} />
               <View style={styles.alarmCardBody}>
                 {/* Time + Toggle */}
                 <View style={styles.alarmTopRow}>

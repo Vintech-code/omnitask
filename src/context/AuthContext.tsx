@@ -1,12 +1,14 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import {
   createUserWithEmailAndPassword,
+  getAdditionalUserInfo,
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithCredential,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
+  reload,
   updateProfile,
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -14,13 +16,18 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { flushCloudMutations, queueCloudSet } from '../services/OfflineSyncService';
 import { KEYS, Storage } from '../services/StorageService';
-import { ensureAuthEndpointReachable } from '../services/AuthNetworkService';
+import { ensureAuthEndpointReachable, withAuthTimeout } from '../services/AuthNetworkService';
 import { authErrorMessage } from '@/utils/authError';
 import {
   clearGoogleSession,
   isGoogleAuthCancelled,
   requestGoogleIdentity,
 } from '@/services/GoogleAuthService';
+import { requestVerificationEmail } from '@/services/EmailService';
+import {
+  markOnboardingCompleted,
+  resolveOnboardingCompleted,
+} from '@/services/AccountStateService';
 
 export interface User {
   id: string;
@@ -31,11 +38,14 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  emailVerified: boolean;
+  verificationEmailStatus: 'unknown' | 'sent' | 'failed';
   hasSeenOnboarding: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  refreshEmailVerification: () => Promise<boolean>;
   updateUser: (updates: Partial<User>) => Promise<void>;
   markOnboardingSeen: () => Promise<void>;
 }
@@ -43,11 +53,14 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
+  emailVerified: false,
+  verificationEmailStatus: 'unknown',
   hasSeenOnboarding: false,
   signIn: async () => {},
   signUp: async () => {},
   signInWithGoogle: async () => {},
   signOut: async () => {},
+  refreshEmailVerification: async () => false,
   updateUser: async () => {},
   markOnboardingSeen: async () => {},
 });
@@ -63,16 +76,20 @@ export { firestoreErrorMessage };
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [verificationEmailStatus, setVerificationEmailStatus] = useState<'unknown' | 'sent' | 'failed'>('unknown');
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
+  const googleAuthInProgressRef = useRef(false);
+  const confirmedReturningUidRef = useRef<string | null>(null);
 
   useEffect(() => {
-    void Storage.get<boolean>(KEYS.ONBOARDING_DONE).then(done => {
-      if (done) setHasSeenOnboarding(true);
-    });
-
     return onAuthStateChanged(auth, async firebaseUser => {
       if (!firebaseUser) {
         setUser(null);
+        setEmailVerified(false);
+        setVerificationEmailStatus('unknown');
+        setHasSeenOnboarding(false);
+        confirmedReturningUidRef.current = null;
         setIsLoading(false);
         return;
       }
@@ -82,6 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'User',
         email: firebaseUser.email ?? '',
       };
+      setEmailVerified(firebaseUser.emailVerified);
       let cached = await Storage.getForUser<User>(KEYS.USER, firebaseUser.uid);
       if (!cached) {
         const legacy = await Storage.get<User>(KEYS.USER);
@@ -109,8 +127,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
+      const onboardingCompleted = await resolveOnboardingCompleted(firebaseUser.uid, {
+        allowLegacyMigration: Boolean(cached),
+      });
+      if (auth.currentUser?.uid !== firebaseUser.uid) return;
+      setHasSeenOnboarding(
+        confirmedReturningUidRef.current === firebaseUser.uid || onboardingCompleted,
+      );
       setUser(cached ?? fallback);
-      setIsLoading(false);
+      if (!googleAuthInProgressRef.current) setIsLoading(false);
 
       // Restore immediately from disk, then refresh and drain offline writes in
       // the background. Network latency must never expose the auth screens.
@@ -146,19 +171,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await ensureAuthEndpointReachable();
       const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      await updateProfile(credential.user, { displayName: name.trim() });
+      await updateProfile(credential.user, { displayName: name.trim() }).catch(() => undefined);
       const created: User = {
         id: credential.user.uid,
         name: name.trim(),
         email: email.trim(),
       };
-      await Storage.setForUser(KEYS.USER, credential.user.uid, created);
-      await queueCloudSet(
+      setEmailVerified(credential.user.emailVerified);
+      setUser(created);
+      void Storage.setForUser(KEYS.USER, credential.user.uid, created).catch(() => undefined);
+      void queueCloudSet(
         credential.user.uid,
         ['users', credential.user.uid],
         created as unknown as Record<string, unknown>,
-      );
-      setUser(created);
+      ).catch(() => undefined);
+      // Account creation is complete even if the transactional email provider
+      // is temporarily unavailable. The verification screen exposes a safe retry.
+      try {
+        await requestVerificationEmail();
+        setVerificationEmailStatus('sent');
+      } catch {
+        setVerificationEmailStatus('failed');
+      }
     } catch (error) {
       throw new Error(firestoreErrorMessage(error));
     }
@@ -167,8 +201,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     try {
       const googleIdentity = await requestGoogleIdentity();
+      googleAuthInProgressRef.current = true;
+      setIsLoading(true);
+      await ensureAuthEndpointReachable();
       const googleCredential = GoogleAuthProvider.credential(googleIdentity.idToken);
-      const credential = await signInWithCredential(auth, googleCredential);
+      const credential = await withAuthTimeout(
+        signInWithCredential(auth, googleCredential),
+      );
+      const isReturningAccount = getAdditionalUserInfo(credential)?.isNewUser === false;
       const resolved: User = {
         id: credential.user.uid,
         name: credential.user.displayName
@@ -181,7 +221,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Firebase authentication is already complete at this point. Make local
       // profile persistence best-effort so a cache/sync issue cannot report a
       // successful Google login as failed and force the user to tap twice.
+      if (isReturningAccount) {
+        // Selecting an existing account from either auth screen is a login, not
+        // a registration. Keep its workspace and never replay onboarding.
+        confirmedReturningUidRef.current = credential.user.uid;
+        setHasSeenOnboarding(true);
+        void markOnboardingCompleted(credential.user.uid).catch(() => undefined);
+      } else {
+        confirmedReturningUidRef.current = null;
+        const onboardingCompleted = await resolveOnboardingCompleted(credential.user.uid);
+        setHasSeenOnboarding(onboardingCompleted);
+      }
       setUser(resolved);
+      setEmailVerified(credential.user.emailVerified);
+      googleAuthInProgressRef.current = false;
+      setIsLoading(false);
       void Storage.setForUser(KEYS.USER, credential.user.uid, resolved).catch(() => undefined);
       void queueCloudSet(
         credential.user.uid,
@@ -189,6 +243,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resolved as unknown as Record<string, unknown>,
       ).catch(() => undefined);
     } catch (error) {
+      googleAuthInProgressRef.current = false;
+      setIsLoading(false);
       if (isGoogleAuthCancelled(error)) throw error;
       throw new Error(firestoreErrorMessage(error));
     }
@@ -198,6 +254,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await firebaseSignOut(auth);
     await clearGoogleSession();
     setUser(null);
+    setEmailVerified(false);
+    setVerificationEmailStatus('unknown');
+  };
+
+  const refreshEmailVerification = async (): Promise<boolean> => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return false;
+    await reload(firebaseUser);
+    await firebaseUser.getIdToken(true);
+    setEmailVerified(firebaseUser.emailVerified);
+    return firebaseUser.emailVerified;
   };
 
   const updateUser = async (updates: Partial<User>) => {
@@ -216,7 +283,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const markOnboardingSeen = async () => {
-    await Storage.set(KEYS.ONBOARDING_DONE, true);
+    if (!user) return;
+    await markOnboardingCompleted(user.id);
     setHasSeenOnboarding(true);
   };
 
@@ -224,11 +292,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider value={{
       user,
       isLoading,
+      emailVerified,
+      verificationEmailStatus,
       hasSeenOnboarding,
       signIn,
       signUp,
       signInWithGoogle,
       signOut,
+      refreshEmailVerification,
       updateUser,
       markOnboardingSeen,
     }}>

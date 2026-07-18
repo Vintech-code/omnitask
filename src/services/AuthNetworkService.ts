@@ -20,3 +20,19 @@ export async function ensureAuthEndpointReachable(timeoutMs = 6000): Promise<voi
     clearTimeout(timer);
   }
 }
+
+export async function withAuthTimeout<T>(request: Promise<T>, timeoutMs = 15000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(Object.assign(
+      new Error('Firebase authentication timed out.'),
+      { code: 'auth/timeout' },
+    )), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([request, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}

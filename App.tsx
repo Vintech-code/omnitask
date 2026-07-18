@@ -1,6 +1,7 @@
 import 'react-native-gesture-handler';
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Linking, View } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
 import { enableScreens } from 'react-native-screens';
 import { NavigationContainer } from '@react-navigation/native';
 
@@ -12,10 +13,18 @@ import { AlarmProvider } from './src/context/AlarmStore';
 import RootNavigator from './src/navigation/RootNavigator';
 import { flushPendingAlarmNavigation, navigationRef } from './src/navigation/navigationRef';
 import { handleNotificationProbeUrl } from './src/testing/NotificationDeviceProbe';
+import { AnimatedSplashScreen } from './src/components/AnimatedSplashScreen';
 
 enableScreens();
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 export default function App(): React.JSX.Element | null {
+  const [showAnimatedSplash, setShowAnimatedSplash] = useState(true);
+
+  const revealAnimatedSplash = useCallback(() => {
+    void SplashScreen.hideAsync().catch(() => undefined);
+  }, []);
+
   useEffect(() => {
     if (!__DEV__) return;
     const handleUrl = ({ url }: { url: string }) => {
@@ -29,7 +38,7 @@ export default function App(): React.JSX.Element | null {
   }, []);
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: '#F8F8F5' }} onLayout={revealAnimatedSplash}>
       <ThemeProvider>
         <AuthProvider>
           <TaskProvider>
@@ -43,6 +52,7 @@ export default function App(): React.JSX.Element | null {
           </TaskProvider>
         </AuthProvider>
       </ThemeProvider>
+      {showAnimatedSplash ? <AnimatedSplashScreen onFinish={() => setShowAnimatedSplash(false)} /> : null}
     </View>
   );
 }

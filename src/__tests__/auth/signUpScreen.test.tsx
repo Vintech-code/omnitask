@@ -33,7 +33,7 @@ describe('SignUpScreen', () => {
     await fireEvent.press(screen.getByTestId('google-sign-up'));
 
     await waitFor(() => expect(mockGoogleSignIn).toHaveBeenCalledTimes(1));
-    expect(navigation.replace).toHaveBeenCalledWith('Main');
+    expect(navigation.replace).not.toHaveBeenCalled();
   });
 
   it('creates an email account while preserving the password exactly', async () => {
@@ -52,6 +52,6 @@ describe('SignUpScreen', () => {
       'alex@example.com',
       ' secret password ',
     ));
-    expect(navigation.replace).toHaveBeenCalledWith('Onboarding');
+    expect(navigation.replace).not.toHaveBeenCalled();
   });
 });

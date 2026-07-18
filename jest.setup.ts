@@ -37,3 +37,18 @@ jest.mock('react-native-nitro-google-signin', () => {
     isSuccessResponse: (response: { type?: string; data?: unknown }) => response.type === 'success' && response.data != null,
   };
 });
+
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn(async () => true),
+    signIn: jest.fn(async () => ({ type: 'cancelled', data: null })),
+    signOut: jest.fn(async () => null),
+  },
+  isCancelledResponse: (response: { type?: string }) => response.type === 'cancelled',
+  statusCodes: {
+    SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+    PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+    IN_PROGRESS: 'IN_PROGRESS',
+  },
+}));
