@@ -1,17 +1,6 @@
 ﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-  Easing,
-  Alert,
-  ScrollView,
-  FlatList,
-  Modal,
-  Pressable,
-} from 'react-native';
+import { AppState, View, TouchableOpacity, Animated, Alert, ScrollView, FlatList, Modal, Pressable } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/ThemeContext';
@@ -21,7 +10,7 @@ import { BurgerMenu } from '@/components/BurgerMenu';
 import { Storage, KEYS } from '@/services/StorageService';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
-import { BRAND_BLUE as ACCENT } from '@/theme/colors';
+import Svg, { Circle } from 'react-native-svg';
 import { pom, sw, main } from './styles';
 import { AppBackground, ScreenSkeleton } from '@/components/ui';
 import { requestNotificationPermission, cancelNotification } from '@/services/NotificationService';
@@ -36,12 +25,6 @@ const MODE_DURATIONS: Record<PomMode, number> = {
   'Short Break': 5 * 60,
   'Long Break': 15 * 60,
 };
-const MODE_COLORS: Record<PomMode, string> = {
-  'Focus': '#4A90D9',
-  'Short Break': '#3DAE7C',
-  'Long Break': '#9B6DD4',
-};
-
 function pad(n: number) { return n.toString().padStart(2, '0'); }
 
 // ------------------------------------------------------------------------------
@@ -55,97 +38,40 @@ function useFabScale() {
 }
 
 // ------------------------------------------------------------------------------
-// Circular progress ring (SVG-free, using two rotated borders)
+// Circular progress ring
 // ------------------------------------------------------------------------------
 function ProgressRing({ pct, color, size, strokeWidth, trackColor }: { pct: number; color: string; size: number; strokeWidth: number; trackColor: string }) {
   const r = (size - strokeWidth) / 2;
   const circum = 2 * Math.PI * r;
-  const progress = useRef(new Animated.Value(pct)).current;
-
-  useEffect(() => {
-    Animated.timing(progress, {
-      toValue: pct,
-      duration: 600,
-      useNativeDriver: false,
-      easing: Easing.out(Easing.quad),
-    }).start();
-  }, [pct]);
-
-  const dashOffset = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [circum, 0],
-  });
-
-  // Fallback: use a solid arc via rotation trick with View borders
   const clampedPct = Math.max(0, Math.min(1, pct));
-  const deg = clampedPct * 360;
-  const half = size / 2;
-  const outerR = half;
-  const innerR = half - strokeWidth;
 
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      {/* Track */}
-      <View style={{
-        position: 'absolute', width: size, height: size, borderRadius: outerR,
-        borderWidth: strokeWidth, borderColor: trackColor,
-      }} />
-      {/* Progress arc using clip trick */}
-      {deg <= 180 ? (
-        <View style={{ position: 'absolute', width: size, height: size }}>
-          <View style={{
-            position: 'absolute', width: size, height: size,
-            borderRadius: outerR, borderWidth: strokeWidth,
-            borderColor: 'transparent', borderTopColor: color, borderRightColor: color,
-            transform: [{ rotate: `-90deg` }],
-            opacity: deg > 0 ? 1 : 0,
-          }} />
-          <View style={{
-            position: 'absolute', width: size, height: size,
-            borderRadius: outerR, borderWidth: strokeWidth,
-            borderColor: 'transparent', borderTopColor: color,
-            transform: [{ rotate: `${deg - 90}deg` }],
-            opacity: deg >= 90 ? 0 : 1,
-          }} />
-        </View>
-      ) : (
-        <View style={{ position: 'absolute', width: size, height: size }}>
-          <View style={{
-            position: 'absolute', width: size, height: size,
-            borderRadius: outerR, borderWidth: strokeWidth,
-            borderColor: color,
-            borderBottomColor: deg < 270 ? 'transparent' : color,
-            borderLeftColor: deg < 360 ? 'transparent' : color,
-            transform: [{ rotate: `-90deg` }],
-          }} />
-          <View style={{
-            position: 'absolute', width: size, height: size,
-            borderRadius: outerR, borderWidth: strokeWidth,
-            borderColor: 'transparent', borderTopColor: color, borderRightColor: color,
-            transform: [{ rotate: `${deg - 270}deg` }],
-            opacity: deg <= 180 ? 0 : 1,
-          }} />
-        </View>
-      )}
-    </View>
+    <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+      <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={trackColor} strokeWidth={strokeWidth} />
+      <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeDasharray={`${circum} ${circum}`} strokeDashoffset={circum * (1 - clampedPct)} />
+    </Svg>
   );
 }
 
 // ------------------------------------------------------------------------------
 // POMODORO TAB
 // ------------------------------------------------------------------------------
-function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] }) {
+function PomodoroTab({ theme, navigation, menuRequest }: { theme: ReturnType<typeof useTheme>['theme']; navigation: any; menuRequest: number }) {
   const { user } = useAuth();
   const [mode, setMode] = useState<PomMode>('Focus');
   const [running, setRunning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(MODE_DURATIONS['Focus']);
   const [sessions, setSessions] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const deadlineRef = useRef<number | null>(null);
+  const completionHandledRef = useRef(false);
+  const handledMenuRequestRef = useRef(0);
   const { scale: playScale, onPressIn: playIn, onPressOut: playOut } = useFabScale();
   const { notes } = useTaskStore();
   const [linkedNoteId, setLinkedNoteId] = useState<string | null>(null);
   const [notePickerVisible, setNotePickerVisible] = useState(false);
   const linkedNote = notes.find(n => n.id === linkedNoteId) ?? null;
+  const availableNotes = notes.filter(note => !note.archived);
   const POMODORO_NOTIF_ID = 'pomodoro_end';
 
   const clearPomodoroAlert = useCallback(async () => {
@@ -175,48 +101,38 @@ function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] })
     });
   }, []);
 
-  const firePomodoroAlertNow = useCallback(async (nextMode: PomMode) => {
-    const notifOk = await requestNotificationPermission();
-    if (!notifOk) return;
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Pomodoro complete',
-        body: nextMode === 'Focus' ? 'Time for a break.' : 'Ready to focus again?',
-        sound: true,
-      },
-      trigger: null,
-    });
-  }, []);
-
   // Load persisted count on mount
   useEffect(() => {
     if (!user) return;
+    setLinkedNoteId(null);
     void hydrateFocusSessions(user.id, setSessions);
     Storage.getForUser<string>(KEYS.LINKED_NOTE, user.id).then(id => { if (id) setLinkedNoteId(id); });
   }, [user?.id]);
 
-  const persistSessions = (n: number) => {
-    setSessions(n);
-    if (user) void saveFocusSessions(user.id, n);
-  };
-
   const switchMode = useCallback((m: PomMode) => {
     setRunning(false);
+    deadlineRef.current = null;
+    completionHandledRef.current = false;
     clearPomodoroAlert().catch(() => {});
     setMode(m);
     setTimeLeft(MODE_DURATIONS[m]);
   }, [clearPomodoroAlert]);
 
   const handleEnd = useCallback(() => {
+    if (completionHandledRef.current) return;
+    completionHandledRef.current = true;
     setRunning(false);
+    deadlineRef.current = null;
     clearPomodoroAlert().catch(() => {});
-    firePomodoroAlertNow(mode).catch(() => {});
     if (mode === 'Focus') {
-      const next = sessions + 1;
-      persistSessions(next);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setSessions(previous => {
+        const next = previous + 1;
+        if (user) void saveFocusSessions(user.id, next);
+        return next;
+      });
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
-        'Session complete! ??',
+        'Focus session complete',
         linkedNote ? `Working on: "${linkedNote.title || 'Untitled'}"` : undefined,
         [
           { text: 'Short Break', onPress: () => switchMode('Short Break') },
@@ -230,181 +146,171 @@ function PomodoroTab({ theme }: { theme: ReturnType<typeof useTheme>['theme'] })
         { text: 'Not yet', style: 'cancel', onPress: () => switchMode(mode) },
       ]);
     }
-  }, [mode, switchMode, clearPomodoroAlert, firePomodoroAlertNow]);
+  }, [clearPomodoroAlert, linkedNote, mode, switchMode, user]);
 
   useEffect(() => {
-    if (running) {
-      intervalRef.current = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            handleEnd();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    }
+    if (!running || !deadlineRef.current) return undefined;
+    const tick = () => {
+      const seconds = Math.max(0, Math.ceil((deadlineRef.current! - Date.now()) / 1000));
+      setTimeLeft(seconds);
+      if (seconds === 0) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        handleEnd();
+      }
+    };
+    tick();
+    intervalRef.current = setInterval(tick, 250);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [running, handleEnd]);
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active' && running && deadlineRef.current) {
+        const seconds = Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000));
+        setTimeLeft(seconds);
+        if (seconds === 0) handleEnd();
+      }
+    });
+    return () => subscription.remove();
+  }, [handleEnd, running]);
+
+  const resetTimer = useCallback(() => {
+    setRunning(false);
+    deadlineRef.current = null;
+    completionHandledRef.current = false;
+    setTimeLeft(MODE_DURATIONS[mode]);
+    void clearPomodoroAlert();
+  }, [clearPomodoroAlert, mode]);
+
+  const toggleTimer = () => {
+    if (running) {
+      const remaining = deadlineRef.current ? Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)) : timeLeft;
+      setTimeLeft(remaining);
+      setRunning(false);
+      deadlineRef.current = null;
+      void clearPomodoroAlert();
+      return;
+    }
+    const seconds = timeLeft > 0 ? timeLeft : MODE_DURATIONS[mode];
+    completionHandledRef.current = false;
+    setTimeLeft(seconds);
+    deadlineRef.current = Date.now() + seconds * 1000;
+    setRunning(true);
+    void schedulePomodoroAlert(seconds, mode);
+  };
+
+  const unlinkNote = () => {
+    setLinkedNoteId(null);
+    if (user) void Storage.removeForUser(KEYS.LINKED_NOTE, user.id);
+  };
+
+  const selectNote = (id: string) => {
+    setLinkedNoteId(id);
+    if (user) void Storage.setForUser(KEYS.LINKED_NOTE, user.id, id);
+    setNotePickerVisible(false);
+    void Haptics.selectionAsync();
+  };
+
+  useEffect(() => {
+    if (menuRequest === 0 || handledMenuRequestRef.current === menuRequest) return;
+    handledMenuRequestRef.current = menuRequest;
+    Alert.alert('Focus options', undefined, [
+      { text: 'Reset current timer', onPress: resetTimer },
+      { text: linkedNote ? 'Change linked note' : 'Link a note', onPress: () => setNotePickerVisible(true) },
+      { text: 'View focus statistics', onPress: () => navigation.navigate('Stats') },
+      ...(linkedNote ? [{ text: 'Unlink current note', onPress: unlinkNote }] : []),
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [linkedNote, menuRequest, navigation, resetTimer, user]);
+
   const total = MODE_DURATIONS[mode];
-  const pct = 1 - timeLeft / total;
-  const color = MODE_COLORS[mode];
+  const pct = timeLeft / total;
+  const color = mode === 'Focus' ? theme.accent.base : mode === 'Short Break' ? theme.semantic.success : theme.semantic.info;
   const mins = Math.floor(timeLeft / 60);
   const secs = timeLeft % 60;
   const dailyGoal = 8;
 
   return (
     <ScrollView contentContainerStyle={pom.scroll} showsVerticalScrollIndicator={false}>
-      {/* Mode pills */}
-      <View style={pom.modePills}>
-        {(['Focus', 'Short Break', 'Long Break'] as PomMode[]).map(m => (
-          <TouchableOpacity
-            key={m}
-            style={[pom.modePill, { backgroundColor: mode === m ? MODE_COLORS[m] : theme.segBg }]}
-            onPress={() => switchMode(m)}
-          >
-            <Text style={[pom.modePillText, { color: mode === m ? '#fff' : theme.textDim }]}>{m}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Main ring */}
-      <View style={pom.ringWrap}>
-        <ProgressRing pct={pct} color={color} size={240} strokeWidth={10} trackColor={theme.border} />
-        <View style={pom.ringCenter}>
-          <Text style={[pom.modeLabel, { color: theme.textDim }]}>{mode.toUpperCase()}</Text>
-          <Text style={[pom.digits, { color }]}>
-            {pad(mins)}:{pad(secs)}
-          </Text>
-          <Text style={[pom.runSub, { color: theme.textDim }]}>{running ? 'Running…' : 'Paused'}</Text>
+      <View style={[pom.timerCard, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}>
+        <View style={[pom.modePills, { backgroundColor: theme.glass.secondary }]}> 
+          {(['Focus', 'Short Break', 'Long Break'] as PomMode[]).map(m => {
+            const selected = mode === m;
+            const modeColor = m === 'Focus' ? theme.accent.base : m === 'Short Break' ? theme.semantic.success : theme.semantic.info;
+            return (
+              <TouchableOpacity key={m} accessibilityRole="button" accessibilityState={{ selected }} style={[pom.modePill, selected && { backgroundColor: theme.glass.solid }]} onPress={() => switchMode(m)}>
+                <Text style={[pom.modePillText, { color: selected ? modeColor : theme.content.muted }]}>{m === 'Short Break' ? 'Short' : m === 'Long Break' ? 'Long' : m}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-      </View>
 
-      {/* Controls */}
-      <View style={pom.controls}>
-        <TouchableOpacity
-          style={[pom.ctrlBtn, { borderColor: theme.border }]}
-          onPress={() => { setRunning(false); setTimeLeft(MODE_DURATIONS[mode]); clearPomodoroAlert().catch(() => {}); }}
-        >
-          <Ionicons name="refresh" size={22} color={theme.textDim} />
-        </TouchableOpacity>
-
-        <Animated.View style={{ transform: [{ scale: playScale }] }}>
-          <TouchableOpacity
-            style={[pom.playBtn, { backgroundColor: color }]}
-            onPressIn={playIn}
-            onPressOut={playOut}
-            onPress={() => {
-              setRunning(prev => {
-                const next = !prev;
-                if (next) {
-                  schedulePomodoroAlert(timeLeft, mode).catch(() => {});
-                } else {
-                  clearPomodoroAlert().catch(() => {});
-                }
-                return next;
-              });
-            }}
-            activeOpacity={1}
-          >
-            <Ionicons name={running ? 'pause' : 'play'} size={30} color="#fff" style={{ marginLeft: running ? 0 : 3 }} />
-          </TouchableOpacity>
-        </Animated.View>
-
-        <TouchableOpacity
-          style={[pom.ctrlBtn, { borderColor: theme.border }]}
-          onPress={() => {
-            setRunning(false);
-            if (mode === 'Focus') { setSessions(s => s + 1); switchMode('Short Break'); }
-            else switchMode('Focus');
-          }}
-        >
-          <Ionicons name="play-skip-forward" size={22} color={theme.textDim} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Stats strip */}
-      <View style={[pom.statsRow, { backgroundColor: theme.bg2, borderColor: theme.border }]}>
-        <View style={pom.statItem}>
-          <Text style={[pom.statVal, { color: theme.text }]}>{sessions}</Text>
-          <Text style={[pom.statLabel, { color: theme.textDim }]}>Completed</Text>
+        <View style={pom.ringWrap}>
+          <ProgressRing pct={pct} color={color} size={220} strokeWidth={8} trackColor={theme.divider} />
+          <View style={pom.ringCenter}>
+            <Text style={[pom.modeLabel, { color: theme.content.muted }]}>{mode}</Text>
+            <Text accessibilityLiveRegion="polite" style={[pom.digits, { color: theme.content.primary }]}>{pad(mins)}:{pad(secs)}</Text>
+            <View style={[pom.statusPill, { backgroundColor: running ? `${color}1F` : theme.glass.secondary }]}><View style={[pom.statusDot, { backgroundColor: running ? color : theme.content.muted }]} /><Text style={[pom.runSub, { color: running ? color : theme.content.secondary }]}>{running ? 'In progress' : 'Ready'}</Text></View>
+          </View>
         </View>
-        <View style={[pom.statDivider, { backgroundColor: theme.border }]} />
-        <View style={pom.statItem}>
-          <Text style={[pom.statVal, { color: theme.text }]}>{dailyGoal}</Text>
-          <Text style={[pom.statLabel, { color: theme.textDim }]}>Daily Goal</Text>
-        </View>
-        <View style={[pom.statDivider, { backgroundColor: theme.border }]} />
-        <View style={pom.statItem}>
-          <Text style={[pom.statVal, { color: theme.text }]}>{Math.round((sessions / dailyGoal) * 100)}%</Text>
-          <Text style={[pom.statLabel, { color: theme.textDim }]}>Progress</Text>
-        </View>
-      </View>
 
-      {/* Progress bar */}
-      <View style={[pom.progressTrack, { backgroundColor: theme.border }]}>
-        <View style={[pom.progressFill, { width: `${Math.min((sessions / dailyGoal) * 100, 100)}%` as any, backgroundColor: color }]} />
-      </View>
-
-      <View style={{ height: 40 }} />
-
-      {/* -- Linked note chip + link button -- */}
-      <View style={pom.linkRow}>
-        {linkedNote ? (
-          <View style={[pom.linkedChip, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <MaterialCommunityIcons name="notebook-outline" size={15} color={ACCENT} />
-            <Text style={[pom.linkedChipText, { color: theme.text }]} numberOfLines={1}>
-              {linkedNote.title || 'Untitled note'}
-            </Text>
-            <TouchableOpacity onPress={() => { setLinkedNoteId(null); if (user) Storage.setForUser(KEYS.LINKED_NOTE, user.id, ''); }}>
-              <Ionicons name="close-circle" size={16} color={theme.textDim} />
+        <View style={pom.controls}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reset timer" style={[pom.ctrlBtn, { backgroundColor: theme.glass.secondary }]} onPress={resetTimer}><Ionicons name="refresh" size={21} color={theme.content.secondary} /></TouchableOpacity>
+          <Animated.View style={{ transform: [{ scale: playScale }] }}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={running ? 'Pause timer' : 'Start timer'} style={[pom.playBtn, { backgroundColor: color }]} onPressIn={playIn} onPressOut={playOut} onPress={toggleTimer} activeOpacity={1}>
+              <Ionicons name={running ? 'pause' : 'play'} size={31} color="#fff" style={{ marginLeft: running ? 0 : 3 }} />
             </TouchableOpacity>
+          </Animated.View>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Skip to next timer" style={[pom.ctrlBtn, { backgroundColor: theme.glass.secondary }]} onPress={() => switchMode(mode === 'Focus' ? 'Short Break' : 'Focus')}><Ionicons name="play-skip-forward" size={21} color={theme.content.secondary} /></TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={[pom.statsRow, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}> 
+        <View style={pom.statItem}>
+          <Text style={[pom.statVal, { color: theme.content.primary }]}>{sessions}</Text>
+          <Text style={[pom.statLabel, { color: theme.content.muted }]}>Completed</Text>
+        </View>
+        <View style={[pom.statDivider, { backgroundColor: theme.divider }]} />
+        <View style={pom.statItem}>
+          <Text style={[pom.statVal, { color: theme.content.primary }]}>{dailyGoal}</Text>
+          <Text style={[pom.statLabel, { color: theme.content.muted }]}>Daily goal</Text>
+        </View>
+        <View style={[pom.statDivider, { backgroundColor: theme.divider }]} />
+        <View style={pom.statItem}>
+          <Text style={[pom.statVal, { color: theme.content.primary }]}>{Math.min(Math.round((sessions / dailyGoal) * 100), 100)}%</Text>
+          <Text style={[pom.statLabel, { color: theme.content.muted }]}>Progress</Text>
+        </View>
+      </View>
+
+      <View style={[pom.contextCard, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}> 
+        <View style={pom.contextHeader}><View style={[pom.contextIcon, { backgroundColor: theme.accent.soft }]}><MaterialCommunityIcons name="notebook-outline" size={22} color={theme.accent.base} /></View><View style={pom.contextHeaderCopy}><Text style={[pom.contextTitle, { color: theme.content.primary }]}>Focus note</Text><Text style={[pom.contextSubtitle, { color: theme.content.secondary }]}>Keep the session connected to what matters.</Text></View></View>
+        {linkedNote ? (
+          <View style={[pom.linkedNote, { backgroundColor: theme.glass.secondary }]}> 
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Open ${linkedNote.title || 'Untitled note'}`} style={pom.linkedMain} onPress={() => navigation.navigate('Tasks', { section: 'notes', noteId: linkedNote.id, noteRequest: Date.now() })}>
+              <View style={pom.linkedCopy}><Text style={[pom.linkedLabel, { color: theme.content.muted }]}>LINKED NOTE</Text><Text style={[pom.linkedTitle, { color: theme.content.primary }]} numberOfLines={1}>{linkedNote.title || 'Untitled note'}</Text><Text style={[pom.linkedMeta, { color: theme.content.secondary }]} numberOfLines={1}>{linkedNote.category || 'Personal'} · Tap to open</Text></View><Ionicons name="chevron-forward" size={20} color={theme.content.muted} />
+            </TouchableOpacity>
+            <View style={[pom.linkActions, { borderTopColor: theme.divider }]}><TouchableOpacity accessibilityRole="button" style={pom.linkAction} onPress={() => setNotePickerVisible(true)}><Ionicons name="swap-horizontal" size={17} color={theme.accent.base} /><Text style={[pom.linkActionText, { color: theme.accent.base }]}>Change</Text></TouchableOpacity><TouchableOpacity accessibilityRole="button" style={pom.linkAction} onPress={unlinkNote}><Ionicons name="unlink-outline" size={17} color={theme.content.secondary} /><Text style={[pom.linkActionText, { color: theme.content.secondary }]}>Unlink</Text></TouchableOpacity></View>
           </View>
         ) : (
-          <TouchableOpacity
-            style={[pom.linkBtn, { backgroundColor: theme.bg2, borderColor: theme.border }]}
-            onPress={() => setNotePickerVisible(true)}
-          >
-            <Ionicons name="link-outline" size={16} color={ACCENT} />
-            <Text style={[pom.linkBtnText, { color: ACCENT }]}>Link a Note</Text>
-          </TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Link a note to this focus session" style={[pom.linkBtn, { backgroundColor: theme.accent.soft }]} onPress={() => setNotePickerVisible(true)}><Ionicons name="link-outline" size={19} color={theme.accent.base} /><Text style={[pom.linkBtnText, { color: theme.accent.base }]}>Choose a note</Text></TouchableOpacity>
         )}
       </View>
 
-      {/* -- Note picker modal -- */}
       <Modal visible={notePickerVisible} transparent animationType="slide" onRequestClose={() => setNotePickerVisible(false)}>
         <Pressable style={pom.pickerOverlay} onPress={() => setNotePickerVisible(false)} />
-        <View style={[pom.pickerSheet, { backgroundColor: theme.card }]}>
-          <Text style={[pom.pickerTitle, { color: theme.text }]}>Link a Note</Text>
-          {notes.length === 0 && (
-            <Text style={{ color: theme.textDim, textAlign: 'center', paddingVertical: 20 }}>No notes yet</Text>
+        <View style={[pom.pickerSheet, { backgroundColor: theme.glass.solid }]}> 
+          <View style={[pom.pickerHandle, { backgroundColor: theme.divider }]} />
+          <View style={pom.pickerHeader}><View><Text style={[pom.pickerTitle, { color: theme.content.primary }]}>Link a note</Text><Text style={[pom.pickerSubtitle, { color: theme.content.secondary }]}>Choose one note for this focus session.</Text></View><TouchableOpacity accessibilityRole="button" accessibilityLabel="Close note picker" style={[pom.pickerClose, { backgroundColor: theme.glass.secondary }]} onPress={() => setNotePickerVisible(false)}><Ionicons name="close" size={20} color={theme.content.primary} /></TouchableOpacity></View>
+          {availableNotes.length === 0 ? <View style={pom.pickerEmpty}><Text style={[pom.pickerEmptyTitle, { color: theme.content.primary }]}>No active notes yet</Text><Text style={[pom.pickerEmptyText, { color: theme.content.secondary }]}>Create a note in Organize, then return to link it.</Text><TouchableOpacity style={[pom.pickerOpenNotes, { backgroundColor: theme.accent.base }]} onPress={() => { setNotePickerVisible(false); navigation.navigate('Tasks', { section: 'notes' }); }}><Text style={pom.pickerOpenNotesText}>Open notes</Text></TouchableOpacity></View> : (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {availableNotes.map(n => {
+                const selected = linkedNoteId === n.id;
+                return <TouchableOpacity accessibilityRole="radio" accessibilityState={{ selected }} key={n.id} style={[pom.pickerRow, { borderBottomColor: theme.divider }]} onPress={() => selectNote(n.id)}><View style={[pom.pickerNoteIcon, { backgroundColor: selected ? theme.accent.soft : theme.glass.secondary }]}><MaterialCommunityIcons name="notebook-outline" size={20} color={selected ? theme.accent.base : theme.content.secondary} /></View><View style={pom.pickerRowCopy}><Text style={[pom.pickerRowText, { color: theme.content.primary }]} numberOfLines={1}>{n.title || 'Untitled note'}</Text><Text style={[pom.pickerRowMeta, { color: theme.content.muted }]} numberOfLines={1}>{n.category || 'Personal'}</Text></View>{selected ? <Ionicons name="checkmark-circle" size={22} color={theme.accent.base} /> : <Ionicons name="chevron-forward" size={18} color={theme.content.muted} />}</TouchableOpacity>;
+              })}
+            </ScrollView>
           )}
-          <ScrollView>
-            {notes.map(n => (
-              <TouchableOpacity
-                key={n.id}
-                style={[pom.pickerRow, { borderBottomColor: theme.border }]}
-                onPress={() => {
-                  setLinkedNoteId(n.id);
-                  if (user) Storage.setForUser(KEYS.LINKED_NOTE, user.id, n.id);
-                  setNotePickerVisible(false);
-                }}
-              >
-                <MaterialCommunityIcons name="notebook-outline" size={18} color={ACCENT} style={{ marginRight: 10 }} />
-                <Text style={[pom.pickerRowText, { color: theme.text }]} numberOfLines={1}>
-                  {n.title || 'Untitled note'}
-                </Text>
-                {linkedNoteId === n.id && <Ionicons name="checkmark" size={18} color={ACCENT} style={{ marginLeft: 'auto' }} />}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
         </View>
       </Modal>
-
     </ScrollView>
   );
 }
@@ -534,6 +440,7 @@ function StopwatchTab({ theme, bottomClearance }: { theme: ReturnType<typeof use
 // ------------------------------------------------------------------------------
 export default function FocusScreen({ navigation }: any) {
   const [tab, setTab] = useState<Tab>('pomodoro');
+  const [menuRequest, setMenuRequest] = useState(0);
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { isLoading } = useTaskStore();
@@ -548,7 +455,19 @@ export default function FocusScreen({ navigation }: any) {
       <View style={[main.header, { borderBottomColor: 'transparent' }]}>
         <BurgerMenu navigation={navigation} />
         <Text style={[main.headerTitle, { color: theme.text }]}>{tab === 'pomodoro' ? 'Pomodoro' : 'Stopwatch'}</Text>
-        <TouchableOpacity onPress={() => Alert.alert('Settings', 'Timer settings coming soon.')}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel={tab === 'pomodoro' ? 'Open focus options' : 'Open stopwatch options'}
+          style={main.headerAction}
+          onPress={() => {
+            if (tab === 'pomodoro') setMenuRequest(value => value + 1);
+            else Alert.alert('Stopwatch options', undefined, [
+              { text: 'Switch to Pomodoro', onPress: () => setTab('pomodoro') },
+              { text: 'View focus statistics', onPress: () => navigation.navigate('Stats') },
+              { text: 'Cancel', style: 'cancel' },
+            ]);
+          }}
+        >
           <Ionicons name="ellipsis-vertical" size={20} color={theme.textDim} />
         </TouchableOpacity>
       </View>
@@ -562,7 +481,7 @@ export default function FocusScreen({ navigation }: any) {
           <MaterialCommunityIcons
             name="timer-outline"
             size={18}
-            color={tab === 'pomodoro' ? ACCENT : theme.textDim}
+            color={tab === 'pomodoro' ? theme.accent.base : theme.textDim}
           />
           <Text style={[main.tabText, { color: tab === 'pomodoro' ? theme.text : theme.textDim }]}>Pomodoro</Text>
         </TouchableOpacity>
@@ -573,7 +492,7 @@ export default function FocusScreen({ navigation }: any) {
           <Ionicons
             name="stopwatch-outline"
             size={18}
-            color={tab === 'stopwatch' ? ACCENT : theme.textDim}
+            color={tab === 'stopwatch' ? theme.accent.base : theme.textDim}
           />
           <Text style={[main.tabText, { color: tab === 'stopwatch' ? theme.text : theme.textDim }]}>Stopwatch</Text>
         </TouchableOpacity>
@@ -581,7 +500,7 @@ export default function FocusScreen({ navigation }: any) {
 
       {/* Content */}
       <View style={{ flex: 1 }}>
-        {tab === 'pomodoro' ? <PomodoroTab theme={theme} /> : <StopwatchTab theme={theme} bottomClearance={bottomNavigationClearance} />}
+        {tab === 'pomodoro' ? <PomodoroTab theme={theme} navigation={navigation} menuRequest={menuRequest} /> : <StopwatchTab theme={theme} bottomClearance={bottomNavigationClearance} />}
       </View>
     </SafeAreaView>
   );

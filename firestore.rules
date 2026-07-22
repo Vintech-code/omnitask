@@ -31,6 +31,87 @@ service cloud.firestore {
       }
     }
 
+    // Shared canvas metadata and object documents are readable only by members.
+    // Membership changes are performed by verified callable functions so an
+    // invited user cannot add arbitrary accounts from the mobile client.
+    match /sharedCanvasBoards/{boardId} {
+      function isCanvasMember() {
+        return hasVerifiedEmail()
+          && resource.data.active == true
+          && exists(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid));
+      }
+
+      allow read: if isCanvasMember();
+      allow create: if hasVerifiedEmail()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.active == true;
+      allow delete: if false;
+      allow update: if isCanvasMember()
+        && request.resource.data.ownerId == resource.data.ownerId
+        && (
+          request.resource.data.active == resource.data.active
+          || (request.auth.uid == resource.data.ownerId && request.resource.data.active == false)
+        );
+
+      match /objects/{objectId} {
+        function isNestedCanvasMember() {
+          return hasVerifiedEmail()
+            && get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data.active == true
+            && exists(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid));
+        }
+        allow read, create, update, delete: if isNestedCanvasMember();
+      }
+
+      match /members/{userId} {
+        function board() {
+          return get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data;
+        }
+        function memberCanJoin() {
+          return request.auth.uid == userId
+            && request.resource.data.uid == userId
+            && request.resource.data.inviteCode is string
+            && get(/databases/$(database)/documents/canvasCollaborationInvites/$(request.resource.data.inviteCode)).data.boardId == boardId
+            && get(/databases/$(database)/documents/canvasCollaborationInvites/$(request.resource.data.inviteCode)).data.expiresAt > request.time;
+        }
+        allow read: if hasVerifiedEmail()
+          && exists(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid));
+        allow create: if hasVerifiedEmail()
+          && board().active == true
+          && (
+            memberCanJoin()
+            || (request.auth.uid == userId && board().ownerId == userId && request.resource.data.owner == true)
+          );
+        allow update: if false;
+        allow delete: if hasVerifiedEmail()
+          && (request.auth.uid == userId || request.auth.uid == board().ownerId);
+      }
+
+      match /presence/{userId} {
+        function isPresenceMember() {
+          return hasVerifiedEmail()
+            && get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data.active == true
+            && exists(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid));
+        }
+        allow read: if isPresenceMember();
+        allow create, update: if isPresenceMember() && request.auth.uid == userId;
+        allow delete: if hasVerifiedEmail()
+          && (request.auth.uid == userId || request.auth.uid == get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data.ownerId);
+      }
+    }
+
+    match /canvasCollaborationInvites/{inviteId} {
+      // Invite IDs are 100+ bit capability codes. Signed-in users may fetch a
+      // known code, but cannot list or query invitations.
+      allow get: if hasVerifiedEmail();
+      allow list: if false;
+      allow create: if hasVerifiedEmail()
+        && request.resource.data.ownerId == request.auth.uid
+        && get(/databases/$(database)/documents/sharedCanvasBoards/$(request.resource.data.boardId)).data.ownerId == request.auth.uid
+        && get(/databases/$(database)/documents/sharedCanvasBoards/$(request.resource.data.boardId)).data.active == true;
+      allow update: if false;
+      allow delete: if hasVerifiedEmail() && resource.data.ownerId == request.auth.uid;
+    }
+
     // Deny any collection not explicitly covered above.
     match /{document=**} {
       allow read, write: if false;

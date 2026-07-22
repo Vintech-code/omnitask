@@ -18,7 +18,6 @@ import {
   configureAlarmNotifications,
   dismissAlarmNotification,
   getAlarmPayload,
-  requestNotificationPermission,
   snoozeAlarmNotification,
 } from '@/services/NotificationService';
 import { openRingingAlarm } from '@/navigation/navigationRef';
@@ -34,9 +33,9 @@ import OnboardingScreen   from '@/screens/OnboardingScreen';
 import CreateEventScreen  from '@/screens/CreateEventScreen';
 import EventDetailScreen  from '@/screens/EventDetailScreen';
 import ProfileScreen      from '@/screens/ProfileScreen';
-import SearchScreen       from '@/screens/SearchScreen';
 import StatsScreen        from '@/screens/StatsScreen';
 import RingingAlarmScreen from '@/screens/RingingAlarmScreen';
+import WeatherScreen      from '@/screens/WeatherScreen';
 import MainTabNavigator   from '@/navigation/MainTabNavigator';
 import { ScreenSkeleton } from '@/components/ui';
 
@@ -52,11 +51,10 @@ export default function RootNavigator() {
   eventsRef.current = events;
   const isExpoGo = isRunningInExpoGo();
 
-  // Request push-notification permission on first launch
+  // Register notification actions without consuming the onboarding permission
+  // prompt before the user explicitly chooses to enable notifications.
   useEffect(() => {
-    void configureAlarmNotifications()
-      .then(requestNotificationPermission)
-      .catch(() => undefined);
+    void configureAlarmNotifications().catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -130,8 +128,8 @@ export default function RootNavigator() {
             <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
             <Stack.Screen name="EventDetail" component={EventDetailScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
-            <Stack.Screen name="Search" component={SearchScreen} />
             <Stack.Screen name="Stats" component={StatsScreen} />
+            <Stack.Screen name="Weather" component={WeatherScreen} />
             <Stack.Screen name="RingingAlarm" component={RingingAlarmScreen} options={{ presentation: 'modal', gestureEnabled: false }} />
           </>
         )}

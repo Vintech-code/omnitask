@@ -9,17 +9,39 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import { AuthProvider } from './src/context/AuthContext';
 import { EventProvider } from './src/context/EventStore';
 import { TaskProvider } from './src/context/TaskStore';
+import { CanvasNoteProvider } from './src/context/CanvasNoteStore';
 import { AlarmProvider } from './src/context/AlarmStore';
 import RootNavigator from './src/navigation/RootNavigator';
 import { flushPendingAlarmNavigation, navigationRef } from './src/navigation/navigationRef';
 import { handleNotificationProbeUrl } from './src/testing/NotificationDeviceProbe';
 import { AnimatedSplashScreen } from './src/components/AnimatedSplashScreen';
+import {
+  Nunito_300Light,
+  Nunito_400Regular,
+  Nunito_500Medium,
+  Nunito_600SemiBold,
+  Nunito_600SemiBold_Italic,
+  Nunito_700Bold,
+  Nunito_800ExtraBold,
+  Nunito_900Black,
+  useFonts,
+} from '@expo-google-fonts/nunito';
 
 enableScreens();
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 export default function App(): React.JSX.Element | null {
   const [showAnimatedSplash, setShowAnimatedSplash] = useState(true);
+  const [fontsLoaded, fontError] = useFonts({
+    Nunito_300Light,
+    Nunito_400Regular,
+    Nunito_500Medium,
+    Nunito_600SemiBold,
+    Nunito_600SemiBold_Italic,
+    Nunito_700Bold,
+    Nunito_800ExtraBold,
+    Nunito_900Black,
+  });
 
   const revealAnimatedSplash = useCallback(() => {
     void SplashScreen.hideAsync().catch(() => undefined);
@@ -37,18 +59,22 @@ export default function App(): React.JSX.Element | null {
     return () => subscription.remove();
   }, []);
 
+  if (!fontsLoaded && !fontError) return null;
+
   return (
     <View style={{ flex: 1, backgroundColor: '#F8F8F5' }} onLayout={revealAnimatedSplash}>
       <ThemeProvider>
         <AuthProvider>
           <TaskProvider>
-            <AlarmProvider>
-              <EventProvider>
-                <NavigationContainer ref={navigationRef} onReady={flushPendingAlarmNavigation}>
-                  <RootNavigator />
-                </NavigationContainer>
-              </EventProvider>
-            </AlarmProvider>
+            <CanvasNoteProvider>
+              <AlarmProvider>
+                <EventProvider>
+                  <NavigationContainer ref={navigationRef} onReady={flushPendingAlarmNavigation}>
+                    <RootNavigator />
+                  </NavigationContainer>
+                </EventProvider>
+              </AlarmProvider>
+            </CanvasNoteProvider>
           </TaskProvider>
         </AuthProvider>
       </ThemeProvider>

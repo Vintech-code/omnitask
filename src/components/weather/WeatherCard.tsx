@@ -1,5 +1,7 @@
+import { fontFamily } from '@/theme/typography';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import { GlassCard } from '@/components/ui';
@@ -7,6 +9,7 @@ import { useTheme } from '@/context/ThemeContext';
 import type { CurrentWeather, HourlyWeather } from '@/types/weather';
 import type { CurrentWeatherStatus } from '@/hooks/useCurrentWeather';
 import { upcomingHourlyWeather, weatherConditionLabel, weatherIconName } from '@/utils/weather';
+import { weatherArtwork } from './weatherArtwork';
 
 interface WeatherCardProps {
   date: Date;
@@ -17,9 +20,12 @@ interface WeatherCardProps {
   error: string | null;
   onEnableLocation: () => void;
   onRetry: () => void;
+  onOpen?: () => void;
+  dataSource?: 'network' | 'cache' | null;
+  isStale?: boolean;
 }
 
-export function WeatherCard({ date, weather, hourly, location, status, error, onEnableLocation, onRetry }: WeatherCardProps) {
+export function WeatherCard({ date, weather, hourly, location, status, error, onEnableLocation, onRetry, onOpen, dataSource, isStale }: WeatherCardProps) {
   const { theme } = useTheme();
   const [hourlyExpanded, setHourlyExpanded] = useState(false);
   const loading = status === 'loading' || status === 'checking-permission';
@@ -34,21 +40,19 @@ export function WeatherCard({ date, weather, hourly, location, status, error, on
   return (
     <GlassCard style={styles.card} padding={18}>
       <View style={styles.header}>
-        <View>
-          <Text style={[styles.eyebrow, { color: theme.accent.base }]}>TODAY'S WEATHER</Text>
+        <View style={styles.headerCopy}>
           <Text style={[styles.date, { color: theme.content.primary }]}>{dateLabel}</Text>
           <View style={styles.locationRow}>
             <Ionicons name="location-outline" size={13} color={theme.content.muted} />
             <Text style={[styles.location, { color: theme.content.secondary }]} numberOfLines={1}>{location}</Text>
           </View>
         </View>
-        <View style={[styles.iconTile, { backgroundColor: theme.accent.soft }]}>
-          <Ionicons
-            name={(weather ? weatherIconName(weather.weatherCode, weather.isDay) : 'partly-sunny-outline') as keyof typeof Ionicons.glyphMap}
-            size={24}
-            color={theme.accent.base}
-          />
-        </View>
+        {onOpen ? (
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open full weather forecast" onPress={onOpen} style={styles.forecastLink} activeOpacity={0.65}>
+            <Text style={[styles.forecastLinkText, { color: theme.accent.base }]}>Full forecast</Text>
+            <Ionicons name="chevron-forward" size={15} color={theme.accent.base} />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       {loading ? (
@@ -79,10 +83,17 @@ export function WeatherCard({ date, weather, hourly, location, status, error, on
       ) : (
         <>
           <View style={styles.currentRow}>
+            <Image
+              accessibilityIgnoresInvertColors
+              accessibilityLabel={`${weatherConditionLabel(weather.weatherCode)} illustration`}
+              source={weatherArtwork(weather.weatherCode, weather.isDay)}
+              resizeMode="contain"
+              style={styles.weatherArtwork}
+            />
             <Text style={[styles.temperature, { color: theme.content.primary }]}>{Math.round(weather.temperatureC)}°</Text>
             <View style={styles.conditionCopy}>
               <Text style={[styles.condition, { color: theme.content.primary }]}>{weatherConditionLabel(weather.weatherCode)}</Text>
-              <Text style={[styles.updated, { color: theme.content.muted }]}>Updated {weather.time.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
+              <Text style={[styles.updated, { color: theme.content.muted }]}>{dataSource === 'cache' ? (isStale ? 'Offline forecast' : 'Saved forecast') : 'Updated'} · {weather.time.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
             </View>
           </View>
           <View style={[styles.details, { borderTopColor: theme.divider }]}>
@@ -162,38 +173,40 @@ export function WeatherCard({ date, weather, hourly, location, status, error, on
 const styles = StyleSheet.create({
   card: { marginBottom: 12 },
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  eyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 1.1 },
-  date: { marginTop: 3, fontSize: 17, lineHeight: 22, fontWeight: '800', letterSpacing: -0.2 },
+  headerCopy: { flex: 1, minWidth: 0, paddingRight: 8 },
+  date: { fontSize: 17, lineHeight: 22, fontFamily: fontFamily.extrabold, letterSpacing: -0.2 },
   locationRow: { marginTop: 6, maxWidth: 250, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  location: { flexShrink: 1, fontSize: 12, lineHeight: 16, fontWeight: '600' },
-  iconTile: { width: 48, height: 48, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  currentRow: { marginTop: 12, flexDirection: 'row', alignItems: 'center' },
-  temperature: { fontSize: 43, lineHeight: 50, fontWeight: '700', letterSpacing: -1.5, fontVariant: ['tabular-nums'] },
-  conditionCopy: { marginLeft: 13, flex: 1 },
-  condition: { fontSize: 16, lineHeight: 21, fontWeight: '700' },
+  location: { flexShrink: 1, fontSize: 12, lineHeight: 16, fontFamily: fontFamily.semibold },
+  forecastLink: { minHeight: 44, marginTop: -7, marginRight: -4, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center' },
+  forecastLinkText: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily.extrabold },
+  currentRow: { marginTop: 5, flexDirection: 'row', alignItems: 'center' },
+  weatherArtwork: { width: 58, height: 58, marginLeft: -5, marginRight: 3 },
+  temperature: { fontSize: 43, lineHeight: 50, fontFamily: fontFamily.bold, letterSpacing: -1.5, fontVariant: ['tabular-nums'] },
+  conditionCopy: { marginLeft: 10, flex: 1 },
+  condition: { fontSize: 16, lineHeight: 21, fontFamily: fontFamily.bold },
   updated: { marginTop: 2, fontSize: 11, lineHeight: 15 },
-  details: { marginTop: 15, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center' },
+  details: { marginTop: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center' },
   detail: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
   detailDivider: { width: StyleSheet.hairlineWidth, height: 22, marginHorizontal: 12 },
-  detailLabel: { fontSize: 11, fontWeight: '600' },
-  detailValue: { marginLeft: 'auto', fontSize: 12, fontWeight: '700' },
-  hourlyToggle: { minHeight: 58, marginTop: 14, paddingTop: 13, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center' },
+  detailLabel: { fontSize: 11, fontFamily: fontFamily.semibold },
+  detailValue: { marginLeft: 'auto', fontSize: 12, fontFamily: fontFamily.bold },
+  hourlyToggle: { minHeight: 48, marginTop: 9, paddingTop: 7, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center' },
   hourlyToggleIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   hourlyToggleCopy: { flex: 1, marginLeft: 10 },
-  hourlyToggleTitle: { fontSize: 13, lineHeight: 17, fontWeight: '700' },
+  hourlyToggleTitle: { fontSize: 13, lineHeight: 17, fontFamily: fontFamily.bold },
   hourlyToggleSub: { marginTop: 1, fontSize: 10, lineHeight: 14 },
   hourlyForecast: { marginTop: 10, paddingHorizontal: 5, paddingVertical: 11, borderRadius: 17, borderWidth: StyleSheet.hairlineWidth, flexDirection: 'row' },
   hourColumn: { flex: 1, minWidth: 0, alignItems: 'center' },
-  hourTime: { fontSize: 9, lineHeight: 13, fontWeight: '700' },
+  hourTime: { fontSize: 9, lineHeight: 13, fontFamily: fontFamily.bold },
   hourIcon: { width: 30, height: 30, marginTop: 5, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  hourTemp: { marginTop: 4, fontSize: 13, lineHeight: 17, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  hourTemp: { marginTop: 4, fontSize: 13, lineHeight: 17, fontFamily: fontFamily.bold, fontVariant: ['tabular-nums'] },
   hourRainRow: { marginTop: 2, flexDirection: 'row', alignItems: 'center', gap: 1 },
-  hourRain: { fontSize: 8, lineHeight: 11, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  hourRain: { fontSize: 8, lineHeight: 11, fontFamily: fontFamily.bold, fontVariant: ['tabular-nums'] },
   hourlyEmpty: { paddingVertical: 14, textAlign: 'center', fontSize: 11, lineHeight: 16 },
   stateRow: { minHeight: 90, paddingTop: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
   stateCopy: { flex: 1 },
-  stateTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  stateTitle: { fontSize: 15, lineHeight: 20, fontFamily: fontFamily.bold },
   stateText: { flexShrink: 1, fontSize: 12, lineHeight: 17 },
   action: { minWidth: 70, minHeight: 44, borderRadius: 22, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
-  actionText: { fontSize: 13, fontWeight: '700' },
+  actionText: { fontSize: 13, fontFamily: fontFamily.bold },
 });

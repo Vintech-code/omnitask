@@ -1,14 +1,7 @@
+import { fontFamily } from '@/theme/typography';
 import React, { useMemo, useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -396,32 +389,32 @@ export default function CalculatorScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
   header: { minHeight: 66, paddingHorizontal: 20, paddingVertical: 11, flexDirection: 'row', alignItems: 'center' },
-  title: { flex: 1, marginLeft: 14, fontSize: 26, fontWeight: '700', letterSpacing: -0.4 },
+  title: { flex: 1, marginLeft: 14, fontSize: 26, fontFamily: fontFamily.bold, letterSpacing: -0.4 },
   headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   content: { flex: 1, paddingHorizontal: 10 },
   displayArea: { flex: 1, minHeight: 92, paddingHorizontal: 12, justifyContent: 'flex-end', alignItems: 'flex-end' },
   displayAreaExpanded: { flex: 0.42, minHeight: 76 },
   expression: { maxWidth: '100%', fontSize: 16, lineHeight: 22, textAlign: 'right', marginBottom: 5 },
-  result: { width: '100%', fontSize: 54, lineHeight: 62, fontWeight: '500', textAlign: 'right' },
+  result: { width: '100%', fontSize: 54, lineHeight: 62, fontFamily: fontFamily.medium, textAlign: 'right' },
   expandButton: { width: 48, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
   keypadViewport: { flexShrink: 1 },
   keypad: { gap: 6 },
   row: { flexDirection: 'row', gap: 6 },
   key: { flex: 1, minWidth: 0, minHeight: 44, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  keyLabel: { fontWeight: '600' },
+  keyLabel: { fontFamily: fontFamily.semibold },
   modalRoot: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.38)' },
   historySheet: { maxHeight: '68%', minHeight: 330, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl, borderWidth: 1, paddingHorizontal: 20, paddingTop: 20 },
   historyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  historyTitle: { fontSize: 22, fontWeight: '700' },
+  historyTitle: { fontSize: 22, fontFamily: fontFamily.bold },
   historySubtitle: { fontSize: 13, marginTop: 2 },
   clearHistoryButton: { minWidth: 52, minHeight: 44, alignItems: 'flex-end', justifyContent: 'center' },
-  clearHistoryText: { fontSize: 14, fontWeight: '700' },
+  clearHistoryText: { fontSize: 14, fontFamily: fontFamily.bold },
   historyList: { flex: 1 },
   emptyHistory: { alignItems: 'center', justifyContent: 'center', paddingVertical: 52, gap: 10 },
-  emptyHistoryText: { fontSize: 14, fontWeight: '600' },
+  emptyHistoryText: { fontSize: 14, fontFamily: fontFamily.semibold },
   historyRow: { minHeight: 68, justifyContent: 'center', borderBottomWidth: 1 },
   historyExpression: { fontSize: 13, marginBottom: 4 },
-  historyResult: { fontSize: 20, fontWeight: '700', textAlign: 'right' },
+  historyResult: { fontSize: 20, fontFamily: fontFamily.bold, textAlign: 'right' },
   doneButton: { height: 50, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
-  doneButtonText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
+  doneButtonText: { color: '#FFF', fontSize: 15, fontFamily: fontFamily.bold },
 });

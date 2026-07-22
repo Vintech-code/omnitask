@@ -1,4 +1,5 @@
-﻿import { StyleSheet } from 'react-native';
+import { fontFamily } from '@/theme/typography';
+import { StyleSheet } from 'react-native';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 
 export const styles = StyleSheet.create({
@@ -9,7 +10,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 14,
     borderBottomWidth: 0,
   },
-  topBarTitle: { fontSize: 26, fontWeight: '700', flex: 1, textAlign: 'left', marginLeft: 14, letterSpacing: -0.4 },
+  topBarTitle: { fontSize: 26, fontFamily: fontFamily.bold, flex: 1, textAlign: 'left', marginLeft: 14, letterSpacing: -0.4 },
   iconBtn: { padding: 4 },
 
   scroll: { flex: 1 },
@@ -28,27 +29,27 @@ export const styles = StyleSheet.create({
   nextAlarmBody: { flex: 1 },
   nextAlarmLabel: {
     fontSize: 10,
-    fontWeight: '800', letterSpacing: 1.2, marginBottom: 4,
+    fontFamily: fontFamily.extrabold, letterSpacing: 1.2, marginBottom: 4,
   },
-  nextAlarmTime: { fontSize: 17, fontWeight: '800', marginBottom: 2 },
+  nextAlarmTime: { fontSize: 17, fontFamily: fontFamily.extrabold, marginBottom: 2 },
   nextAlarmSub: { fontSize: 12 },
 
   // Section header
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  sectionTitle: { fontSize: 11, fontWeight: '800', color: '#999', letterSpacing: 1.1 },
+  sectionTitle: { fontSize: 11, fontFamily: fontFamily.extrabold, color: '#999', letterSpacing: 1.1 },
   sectionBadge: {
     backgroundColor: '#E6F0FB', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2,
   },
-  sectionBadgeText: { fontSize: 11, color: BLUE, fontWeight: '700' },
+  sectionBadgeText: { fontSize: 11, color: BLUE, fontFamily: fontFamily.bold },
 
   // Empty state
   emptyState: { alignItems: 'center', paddingVertical: 40, gap: 12 },
-  emptyText: { fontSize: 15, color: '#bbb', fontWeight: '600' },
+  emptyText: { fontSize: 15, color: '#bbb', fontFamily: fontFamily.semibold },
   emptyBtn: {
     backgroundColor: BLUE, borderRadius: 10,
     paddingHorizontal: 24, paddingVertical: 11, marginTop: 2,
   },
-  emptyBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  emptyBtnText: { color: '#fff', fontSize: 14, fontFamily: fontFamily.bold },
 
   // Alarm list item
   alarmRow: {
@@ -58,8 +59,8 @@ export const styles = StyleSheet.create({
   },
   alarmLeft: { flex: 1 },
   alarmTimeRow: { flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', gap: 6 },
-  alarmTime: { fontSize: 40, fontWeight: '300', lineHeight: 44 },
-  alarmPeriod: { fontSize: 18, fontWeight: '400', marginBottom: 4 },
+  alarmTime: { fontSize: 40, fontFamily: fontFamily.light, lineHeight: 44 },
+  alarmPeriod: { fontSize: 18, fontFamily: fontFamily.regular, marginBottom: 4 },
   alarmLabel: { fontSize: 15, marginBottom: 4, flexShrink: 1 },
   alarmSub: { fontSize: 12, marginTop: 4 },
   alarmRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -76,7 +77,7 @@ export const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(74,144,217,0.15)', alignItems: 'center', justifyContent: 'center',
   },
-  sleepTipTitle: { fontSize: 14, fontWeight: '800', marginBottom: 4 },
+  sleepTipTitle: { fontSize: 14, fontFamily: fontFamily.extrabold, marginBottom: 4 },
   sleepTipText: { fontSize: 12, lineHeight: 19 },
 
   // Edit modal
@@ -87,9 +88,9 @@ export const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   editHeaderBtn: { width: 40, alignItems: 'center' },
-  editHeaderTitle: { fontSize: 17, fontWeight: '700' },
+  editHeaderTitle: { fontSize: 17, fontFamily: fontFamily.bold },
   editHeaderDoneBtn: { minWidth: 48, minHeight: 44, alignItems: 'flex-end', justifyContent: 'center' },
-  editHeaderDoneText: { fontSize: 15, fontWeight: '700' },
+  editHeaderDoneText: { fontSize: 15, fontFamily: fontFamily.bold },
 
   // Wheel picker
   pickerContainer: {
@@ -106,7 +107,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 14,
   },
-  settingLabel: { fontSize: 15, fontWeight: '500' },
+  settingLabel: { fontSize: 15, fontFamily: fontFamily.medium },
   settingValue: { fontSize: 14 },
   settingDivider: { height: 1, marginHorizontal: 16 },
 
@@ -116,7 +117,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#2A2A2A', borderTopLeftRadius: 20, borderTopRightRadius: 20,
     paddingTop: 20, paddingBottom: 8, paddingHorizontal: 20,
   },
-  subTitle: { fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 12 },
+  subTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: '#fff', marginBottom: 12 },
   checkRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)',
@@ -139,11 +140,11 @@ export const styles = StyleSheet.create({
   subActionBtn: { flex: 1, paddingVertical: 14, alignItems: 'center' },
   subActionDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 8 },
   subActionCancel: { fontSize: 16, color: '#888' },
-  subActionDone: { fontSize: 16, color: BLUE, fontWeight: '700' },
+  subActionDone: { fontSize: 16, color: BLUE, fontFamily: fontFamily.bold },
 
   // Sound modal
   soundSection: {
-    fontSize: 13, fontWeight: '700', color: '#999',
+    fontSize: 13, fontFamily: fontFamily.bold, color: '#999',
     letterSpacing: 0.5, marginHorizontal: 20, marginTop: 24, marginBottom: 10,
   },
   soundScroll: { paddingBottom: 32 },
@@ -157,7 +158,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
   soundHelpCopy: { flex: 1 },
-  soundHelpTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700', marginBottom: 2 },
+  soundHelpTitle: { fontSize: 15, lineHeight: 20, fontFamily: fontFamily.bold, marginBottom: 2 },
   soundHelpText: { fontSize: 14, lineHeight: 19 },
   soundPanel: {
     marginHorizontal: 20, borderRadius: 20, borderWidth: 1, overflow: 'hidden',
@@ -175,14 +176,14 @@ export const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
   },
   soundLabelWrap: { flex: 1, minWidth: 0, paddingRight: 10 },
-  soundRowTitle: { fontSize: 16, lineHeight: 21, fontWeight: '600' },
+  soundRowTitle: { fontSize: 16, lineHeight: 21, fontFamily: fontFamily.semibold },
   soundRowMeta: { fontSize: 13, lineHeight: 18, marginTop: 2 },
   soundActions: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 0 },
   previewBtn: {
     minWidth: 82, height: 40, borderRadius: 20,
     paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
   },
-  previewBtnText: { fontSize: 13, fontWeight: '700' },
+  previewBtnText: { fontSize: 13, fontFamily: fontFamily.bold },
   soundDivider: { height: 1, marginLeft: 16 },
   soundEmptyText: { fontSize: 14, lineHeight: 20, paddingHorizontal: 16, paddingBottom: 16 },
 

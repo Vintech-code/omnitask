@@ -1,5 +1,7 @@
+import { fontFamily } from '@/theme/typography';
 import React, { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -107,16 +109,16 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
   header: { height: 58, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   back: { width: 44, height: 44, justifyContent: 'center' },
-  headerTitle: { fontSize: 17, fontWeight: '800' },
+  headerTitle: { fontSize: 17, fontFamily: fontFamily.extrabold },
   content: { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center', justifyContent: 'center', paddingHorizontal: 20, paddingBottom: 52 },
   card: { width: '100%', padding: 20, borderRadius: 24, borderWidth: 1 },
   iconCircle: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
-  title: { fontSize: 25, lineHeight: 31, fontWeight: '900', marginBottom: 8 },
+  title: { fontSize: 25, lineHeight: 31, fontFamily: fontFamily.black, marginBottom: 8 },
   copy: { fontSize: 14, lineHeight: 21, marginBottom: 22 },
   primary: { width: '100%', height: 52, borderRadius: 999, alignItems: 'center', justifyContent: 'center', marginTop: 18 },
-  primaryText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+  primaryText: { color: '#FFF', fontSize: 16, fontFamily: fontFamily.extrabold },
   secondary: { minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  secondaryText: { fontSize: 14, fontWeight: '800' },
+  secondaryText: { fontSize: 14, fontFamily: fontFamily.extrabold },
   notice: { flexDirection: 'row', gap: 8, borderRadius: 12, padding: 11, marginTop: 14 },
   noticeText: { flex: 1, fontSize: 13, lineHeight: 18 },
   disabled: { opacity: 0.55 },

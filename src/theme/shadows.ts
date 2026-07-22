@@ -16,6 +16,23 @@ export const glassShadow: ViewStyle = Platform.select({
   },
 }) as ViewStyle;
 
+/** Small conventional control shadow. Use only with an opaque button surface. */
+export const buttonShadow: ViewStyle = Platform.select({
+  ios: {
+    shadowColor: '#1E1E1E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.11,
+    shadowRadius: 5,
+  },
+  android: { elevation: 2 },
+  default: {
+    shadowColor: '#1E1E1E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.11,
+    shadowRadius: 5,
+  },
+}) as ViewStyle;
+
 export const floatingShadow: ViewStyle = Platform.select({
   ios: {
     shadowColor: '#1E1E1E',

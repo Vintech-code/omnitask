@@ -1,3 +1,4 @@
+import { fontFamily } from '@/theme/typography';
 import { StyleSheet } from 'react-native';
 
 export const s = StyleSheet.create({
@@ -20,8 +21,8 @@ export const s = StyleSheet.create({
     justifyContent: 'center',
   },
   topHeading: { flex: 1 },
-  topEyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 1.2 },
-  topTitle: { fontSize: 20, lineHeight: 26, fontWeight: '800' },
+  topEyebrow: { fontSize: 10, lineHeight: 14, fontFamily: fontFamily.extrabold, letterSpacing: 1.2 },
+  topTitle: { fontSize: 20, lineHeight: 26, fontFamily: fontFamily.extrabold },
   scroll: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 48 },
   hero: {
     borderRadius: 28,
@@ -37,9 +38,9 @@ export const s = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
   },
-  badgeText: { fontSize: 12, fontWeight: '700' },
+  badgeText: { fontSize: 12, fontFamily: fontFamily.bold },
   capitalize: { textTransform: 'capitalize' },
-  heroTitle: { fontSize: 30, lineHeight: 37, fontWeight: '800', marginTop: 18, marginBottom: 20 },
+  heroTitle: { fontSize: 30, lineHeight: 37, fontFamily: fontFamily.extrabold, marginTop: 18, marginBottom: 20 },
   scheduleLine: {
     paddingTop: 17,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -49,9 +50,9 @@ export const s = StyleSheet.create({
   },
   scheduleIcon: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   scheduleCopy: { flex: 1 },
-  scheduleDate: { fontSize: 15, lineHeight: 21, fontWeight: '700' },
-  scheduleMeta: { marginTop: 2, fontSize: 13, lineHeight: 19, fontWeight: '500' },
-  sectionTitle: { marginTop: 26, marginBottom: 9, marginLeft: 4, fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
+  scheduleDate: { fontSize: 15, lineHeight: 21, fontFamily: fontFamily.bold },
+  scheduleMeta: { marginTop: 2, fontSize: 13, lineHeight: 19, fontFamily: fontFamily.medium },
+  sectionTitle: { marginTop: 26, marginBottom: 9, marginLeft: 4, fontSize: 11, fontFamily: fontFamily.extrabold, letterSpacing: 1.1 },
   group: {
     borderRadius: 24,
     borderWidth: StyleSheet.hairlineWidth,
@@ -61,8 +62,8 @@ export const s = StyleSheet.create({
   notesRow: { alignItems: 'flex-start' },
   rowIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   rowCopy: { flex: 1 },
-  rowLabel: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
-  rowDescription: { marginTop: 3, fontSize: 12, lineHeight: 17, fontWeight: '500' },
+  rowLabel: { fontSize: 15, lineHeight: 20, fontFamily: fontFamily.bold },
+  rowDescription: { marginTop: 3, fontSize: 12, lineHeight: 17, fontFamily: fontFamily.medium },
   notesText: { marginTop: 5, fontSize: 14, lineHeight: 21 },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 70 },
   trailingAction: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -76,8 +77,8 @@ export const s = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  deleteText: { fontSize: 15, fontWeight: '700' },
+  deleteText: { fontSize: 15, fontFamily: fontFamily.bold },
   missingBack: { padding: 16 },
   missingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  missingTitle: { fontSize: 16, fontWeight: '600' },
+  missingTitle: { fontSize: 16, fontFamily: fontFamily.semibold },
 });

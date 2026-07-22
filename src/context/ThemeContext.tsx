@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Appearance } from 'react-native';
 import { Storage, KEYS } from '../services/StorageService';
+import { OMNITASK_PALETTE } from '@/theme/colors';
 
 export interface Theme {
   dark: boolean;
@@ -41,8 +42,8 @@ export interface Theme {
 
 const createTheme = (dark: boolean): Theme => {
   const background = dark
-    ? { base: '#121311', top: '#1A1B19', bottom: '#0E0F0E', ambientLavender: '#454858', ambientBlue: '#304A55' }
-    : { base: '#ECEDEB', top: '#F3F3F1', bottom: '#E1E3E6', ambientLavender: '#B9BDCF', ambientBlue: '#B6CFDC' };
+    ? { base: OMNITASK_PALETTE.smokedCharcoal, top: OMNITASK_PALETTE.darkGradientTop, bottom: OMNITASK_PALETTE.darkGradientEnd, ambientLavender: OMNITASK_PALETTE.darkGradientTop, ambientBlue: OMNITASK_PALETTE.slateCyan }
+    : { base: OMNITASK_PALETTE.pearl, top: OMNITASK_PALETTE.warmIvory, bottom: OMNITASK_PALETTE.lightGradientEnd, ambientLavender: OMNITASK_PALETTE.pearl, ambientBlue: OMNITASK_PALETTE.mistBlueGray };
   const glass = dark
     ? { primary: 'rgba(38,39,37,0.68)', secondary: 'rgba(49,50,47,0.48)', solid: 'rgba(34,35,33,0.92)', border: 'rgba(255,255,255,0.13)', highlight: 'rgba(255,255,255,0.15)' }
     : { primary: 'rgba(255,255,255,0.58)', secondary: 'rgba(255,255,255,0.38)', solid: 'rgba(255,255,255,0.86)', border: 'rgba(255,255,255,0.76)', highlight: 'rgba(255,255,255,0.92)' };
@@ -50,11 +51,11 @@ const createTheme = (dark: boolean): Theme => {
     ? { primary: '#F7F7F3', secondary: '#B8B9B4', muted: '#81827E' }
     : { primary: '#171717', secondary: '#666765', muted: '#92938F' };
   const accent = dark
-    ? { base: '#FF861A', pressed: '#F17608', soft: 'rgba(255,134,26,0.17)', glow: 'rgba(255,134,26,0.30)' }
-    : { base: '#FF7A00', pressed: '#E66E00', soft: 'rgba(255,122,0,0.13)', glow: 'rgba(255,160,55,0.30)' };
+    ? { base: OMNITASK_PALETTE.emberOrange, pressed: '#E66E00', soft: 'rgba(255,122,0,0.17)', glow: 'rgba(255,122,0,0.28)' }
+    : { base: OMNITASK_PALETTE.emberOrange, pressed: '#E66E00', soft: 'rgba(255,122,0,0.13)', glow: 'rgba(255,160,55,0.30)' };
   const semantic = dark
-    ? { success: '#8ACB42', warning: '#F0AE3D', danger: '#F0706A', info: '#7DB1CF' }
-    : { success: '#74B82A', warning: '#E7A126', danger: '#E45B55', info: '#6E9FBD' };
+    ? { success: '#8ACB42', warning: '#F0AE3D', danger: '#F0706A', info: OMNITASK_PALETTE.slateCyan }
+    : { success: '#74B82A', warning: '#E7A126', danger: '#E45B55', info: OMNITASK_PALETTE.slateCyan };
   const divider = dark ? 'rgba(255,255,255,0.10)' : 'rgba(23,23,23,0.09)';
 
   return {
@@ -67,7 +68,7 @@ const createTheme = (dark: boolean): Theme => {
     divider,
     icon: dark ? '#F1F1ED' : '#191A19',
     bg: background.base,
-    bg2: dark ? '#1A1B19' : '#ECEDEB',
+    bg2: dark ? OMNITASK_PALETTE.darkGradientTop : OMNITASK_PALETTE.pearl,
     card: glass.solid,
     border: glass.border,
     text: content.primary,

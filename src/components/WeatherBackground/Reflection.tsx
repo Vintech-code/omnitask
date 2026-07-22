@@ -1,0 +1,6 @@
+import React from 'react';
+import { LinearGradient, Path, Rect, Skia, vec } from '@shopify/react-native-skia';
+import { useDerivedValue } from 'react-native-reanimated';
+import type { SceneProps } from './types';
+export const Reflection = React.memo(({ width, height, clock, palette }: SceneProps) => { const waterY = height * .62; const wave = useDerivedValue(() => Math.sin(clock.value / 2200) * 5); const mountain = React.useMemo(() => { const p = Skia.Path.Make(); p.moveTo(0, waterY); p.lineTo(width * .22, waterY + height * .13); p.lineTo(width * .5, waterY + height * .035); p.lineTo(width * .76, waterY + height * .16); p.lineTo(width, waterY + height * .06); p.lineTo(width, waterY); p.close(); return p; }, [height, waterY, width]); return <><Rect x={0} y={waterY} width={width} height={height - waterY}><LinearGradient start={vec(0, waterY)} end={vec(0, height)} colors={[palette.water, '#18272D']} /></Rect><Path path={mountain} color={palette.mountainFront} opacity={.25} transform={useDerivedValue(() => [{ translateY: wave.value }])} />{[0, 1, 2, 3, 4].map(i => <Rect key={i} x={width * (.08 + i * .17)} y={waterY + 32 + i * 15} width={width * .22} height={1} color="#C8D9DB" opacity={.14} />)}</>; });
+

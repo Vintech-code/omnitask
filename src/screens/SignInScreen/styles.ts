@@ -1,4 +1,5 @@
-﻿import { StyleSheet } from 'react-native';
+import { fontFamily } from '@/theme/typography';
+import { StyleSheet } from 'react-native';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 
 export const s = StyleSheet.create({
@@ -12,15 +13,15 @@ export const s = StyleSheet.create({
     borderBottomWidth: 0,
   },
   back: { width: 40, alignItems: 'flex-start' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A' },
+  headerTitle: { fontSize: 18, fontFamily: fontFamily.bold, color: '#1A1A1A' },
   scroll: { paddingHorizontal: 24, paddingTop: 28, paddingBottom: 50, maxWidth: 480, width: '100%', alignSelf: 'center' },
 
-  title: { fontSize: 26, fontWeight: '800', color: '#111', marginBottom: 8 },
+  title: { fontSize: 26, fontFamily: fontFamily.extrabold, color: '#111', marginBottom: 8 },
   sub: { fontSize: 14, color: '#888', lineHeight: 21, marginBottom: 28 },
 
   fields: { gap: 14, marginBottom: 18 },
   forgotButton: { minHeight: 32, marginTop: -6, alignSelf: 'flex-end', justifyContent: 'center' },
-  forgot: { fontSize: 13, color: BLUE, fontWeight: '600' },
+  forgot: { fontSize: 13, color: BLUE, fontFamily: fontFamily.semibold },
 
   rememberRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
   checkbox: {
@@ -46,7 +47,7 @@ export const s = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 24,
   },
-  btnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  btnText: { color: '#fff', fontSize: 17, fontFamily: fontFamily.bold },
   btnDisabled: { opacity: 0.82 },
   loadingContent: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   connectionNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, borderWidth: 1, padding: 12, marginTop: -12, marginBottom: 20 },
@@ -56,11 +57,11 @@ export const s = StyleSheet.create({
 
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#E5E7EB' },
-  dividerText: { marginHorizontal: 10, fontSize: 11, color: '#AAA', fontWeight: '600', letterSpacing: 0.8 },
+  dividerText: { marginHorizontal: 10, fontSize: 11, color: '#AAA', fontFamily: fontFamily.semibold, letterSpacing: 0.8 },
 
   googleButtonWrap: { width: '100%', marginBottom: 28 },
 
   footerRow: { flexDirection: 'row', justifyContent: 'center' },
   gray: { color: '#999', fontSize: 14 },
-  link: { color: BLUE, fontWeight: '700', fontSize: 14 },
+  link: { color: BLUE, fontFamily: fontFamily.bold, fontSize: 14 },
 });

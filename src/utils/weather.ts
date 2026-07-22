@@ -62,13 +62,14 @@ export function assessWeatherWarning(weather: Pick<HourlyWeather, 'weatherCode' 
   };
 }
 
-export function nearestHourlyWeather(hourly: HourlyWeather[], target: Date): HourlyWeather | null {
+export function nearestHourlyWeather(hourly: HourlyWeather[], target: Date, maximumDifferenceMs = Number.POSITIVE_INFINITY): HourlyWeather | null {
   if (!hourly.length || Number.isNaN(target.getTime())) return null;
-  return hourly.reduce((nearest, candidate) => (
-    Math.abs(candidate.time.getTime() - target.getTime()) < Math.abs(nearest.time.getTime() - target.getTime())
+  const nearest = hourly.reduce((closest, candidate) => (
+    Math.abs(candidate.time.getTime() - target.getTime()) < Math.abs(closest.time.getTime() - target.getTime())
       ? candidate
-      : nearest
+      : closest
   ));
+  return Math.abs(nearest.time.getTime() - target.getTime()) <= maximumDifferenceMs ? nearest : null;
 }
 
 export function upcomingHourlyWeather(hourly: HourlyWeather[], now: Date, limit = 6): HourlyWeather[] {

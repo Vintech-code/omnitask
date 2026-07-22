@@ -1,7 +1,7 @@
-﻿import React, { useEffect, useState } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-} from 'react-native';
+import { fontFamily } from '@/theme/typography';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/context/ThemeContext';
@@ -63,7 +63,7 @@ function RingBadge({ pct, color, size = 64 }: { pct: number; color: string; size
           }} />
         </View>
       )}
-      <Text style={{ fontSize: 13, fontWeight: '800', color }}>{Math.round(pct * 100)}%</Text>
+      <Text style={{ fontSize: 13, fontFamily: fontFamily.extrabold, color }}>{Math.round(pct * 100)}%</Text>
     </View>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, Text, Vibration, View } from 'react-native';
+import { Pressable, Vibration, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';

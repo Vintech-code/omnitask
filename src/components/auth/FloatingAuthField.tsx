@@ -1,5 +1,7 @@
+import { fontFamily } from '@/theme/typography';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, KeyboardTypeOptions, StyleSheet, TextInput, TextInputProps, TouchableOpacity } from 'react-native';
+import { Animated, KeyboardTypeOptions, StyleSheet, TextInputProps, TouchableOpacity } from 'react-native';
+import { AppTextInput as TextInput } from '@/components/ui/AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '@/context/ThemeContext';
@@ -24,7 +26,7 @@ export function FloatingAuthField({ testID, label, placeholder, icon, value, onC
   const [focused, setFocused] = useState(false);
   const [visible, setVisible] = useState(false);
   const progress = useRef(new Animated.Value(value ? 1 : 0)).current;
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
   useEffect(() => {
     Animated.timing(progress, { toValue: focused || value.length > 0 ? 1 : 0, duration: 150, useNativeDriver: false }).start();
@@ -79,7 +81,7 @@ export function FloatingAuthField({ testID, label, placeholder, icon, value, onC
 const styles = StyleSheet.create({
   field: { width: '100%', height: 56, borderWidth: 1, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14 },
   fieldFocused: { borderWidth: 2, paddingHorizontal: 13 },
-  label: { position: 'absolute', left: 43, zIndex: 2, paddingHorizontal: 4, fontWeight: '600' },
+  label: { position: 'absolute', left: 43, zIndex: 2, paddingHorizontal: 4, fontFamily: fontFamily.semibold },
   leadingIcon: { width: 24, marginRight: 7 },
   input: { flex: 1, height: '100%', paddingTop: 8, paddingRight: 32, fontSize: 16, color: '#171717' },
   visibilityButton: { position: 'absolute', right: 10, width: 40, height: 44, alignItems: 'center', justifyContent: 'center' },

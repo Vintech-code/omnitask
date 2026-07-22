@@ -59,6 +59,14 @@
       "expo-audio",
       "expo-asset",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow OmniTask to attach photos to your canvas boards.",
+          "cameraPermission": "Allow OmniTask to take photos for your canvas boards.",
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "Allow OmniTask to use your location when choosing a place for an event."
@@ -70,7 +78,8 @@
           "color": "#FF7A00"
         }
       ],
-      "./plugins/withAlarmNotificationSounds"
+        "./plugins/withAlarmNotificationSounds",
+        "./plugins/withOmniTaskHandwriting"
     ]
   }
 }

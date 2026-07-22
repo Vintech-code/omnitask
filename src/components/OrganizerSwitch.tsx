@@ -1,10 +1,12 @@
+import { fontFamily } from '@/theme/typography';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '@/context/ThemeContext';
 
-export type OrganizerSection = 'notes' | 'events';
+export type OrganizerSection = 'notes' | 'canvas' | 'events';
 
 interface OrganizerSwitchProps {
   value: OrganizerSection;
@@ -14,9 +16,10 @@ interface OrganizerSwitchProps {
 const OPTIONS: Array<{
   value: OrganizerSection;
   label: string;
-  icon: 'document-text-outline' | 'calendar-outline';
+  icon: 'document-text-outline' | 'expand-outline' | 'calendar-outline';
 }> = [
   { value: 'notes', label: 'Notes', icon: 'document-text-outline' },
+  { value: 'canvas', label: 'Canvas', icon: 'expand-outline' },
   { value: 'events', label: 'Events', icon: 'calendar-outline' },
 ];
 
@@ -86,5 +89,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 7,
   },
-  label: { fontSize: 13, fontWeight: '700' },
+  label: { fontSize: 13, fontFamily: fontFamily.bold },
 });

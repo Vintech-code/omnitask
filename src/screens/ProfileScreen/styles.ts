@@ -1,4 +1,5 @@
-﻿import { StyleSheet } from 'react-native';
+import { fontFamily } from '@/theme/typography';
+import { StyleSheet } from 'react-native';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -11,22 +12,22 @@ export const epStyles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 18, paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  cancel: { fontSize: 15, fontWeight: '500', minWidth: 56 },
-  title: { fontSize: 16, fontWeight: '700' },
-  done: { fontSize: 15, fontWeight: '700', minWidth: 56, textAlign: 'right' },
+  cancel: { fontSize: 15, fontFamily: fontFamily.medium, minWidth: 56 },
+  title: { fontSize: 16, fontFamily: fontFamily.bold },
+  done: { fontSize: 15, fontFamily: fontFamily.bold, minWidth: 56, textAlign: 'right' },
   body: { padding: 20, paddingBottom: 40 },
-  label: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
+  label: { fontSize: 12, fontFamily: fontFamily.bold, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 },
   input: {
     borderWidth: 1, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 13,
-    fontSize: 16, fontWeight: '500', marginBottom: 10,
+    fontSize: 16, fontFamily: fontFamily.medium, marginBottom: 10,
   },
   hint: { fontSize: 12, lineHeight: 17 },
   langRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  langText: { fontSize: 16, fontWeight: '500' },
+  langText: { fontSize: 16, fontFamily: fontFamily.medium },
 });
 
 export const makeStyles = (t: ReturnType<typeof useTheme>['theme']) =>
@@ -38,7 +39,7 @@ export const makeStyles = (t: ReturnType<typeof useTheme>['theme']) =>
       backgroundColor: 'transparent', borderBottomWidth: 0,
     },
     backBtn: { padding: 4 },
-    headerTitle: { flex: 1, fontSize: 26, fontWeight: '700', color: t.text, textAlign: 'left', marginLeft: 12, letterSpacing: -0.4 },
+    headerTitle: { flex: 1, fontSize: 26, fontFamily: fontFamily.bold, color: t.text, textAlign: 'left', marginLeft: 12, letterSpacing: -0.4 },
 
     avatarCard: {
       flexDirection: 'row', alignItems: 'center',
@@ -51,21 +52,21 @@ export const makeStyles = (t: ReturnType<typeof useTheme>['theme']) =>
       backgroundColor: BLUE, alignItems: 'center', justifyContent: 'center',
       overflow: 'hidden', position: 'relative',
     },
-    avatarInitials: { fontSize: 24, fontWeight: '800', color: '#fff' },
+    avatarInitials: { fontSize: 24, fontFamily: fontFamily.extrabold, color: '#fff' },
     avatarPhoto: { width: 68, height: 68, borderRadius: 34 },
     cameraOverlay: {
       position: 'absolute', bottom: 0, left: 0, right: 0,
       height: 22, backgroundColor: 'rgba(0,0,0,0.40)',
       alignItems: 'center', justifyContent: 'center',
     },
-    profileName: { fontSize: 19, fontWeight: '800', color: t.text, marginBottom: 3 },
+    profileName: { fontSize: 19, fontFamily: fontFamily.extrabold, color: t.text, marginBottom: 3 },
     profileEmail: { fontSize: 13, color: t.textDim, marginBottom: 10 },
     editBtn: {
       alignSelf: 'flex-start',
       borderWidth: 1.5, borderColor: BLUE,
       borderRadius: 20, paddingHorizontal: 16, paddingVertical: 5,
     },
-    editBtnText: { fontSize: 13, color: BLUE, fontWeight: '700' },
+    editBtnText: { fontSize: 13, color: BLUE, fontFamily: fontFamily.bold },
 
     section: {
       marginHorizontal: 20, marginBottom: 8,
@@ -86,7 +87,7 @@ export const makeStyles = (t: ReturnType<typeof useTheme>['theme']) =>
       marginRight: 13,
     },
     rowIconDanger: { backgroundColor: '#FDECEA' },
-    rowLabel: { fontSize: 15, fontWeight: '500', color: t.text },
+    rowLabel: { fontSize: 15, fontFamily: fontFamily.medium, color: t.text },
     rowLabelDanger: { color: '#E05252' },
 
     version: {

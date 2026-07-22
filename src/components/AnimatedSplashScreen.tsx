@@ -1,5 +1,7 @@
+import { fontFamily } from '@/theme/typography';
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
 
 type Props = { onFinish: () => void };
@@ -63,6 +65,6 @@ const styles = StyleSheet.create({
   logo: { width: 124, height: 124 },
   orbit: { position: 'absolute', width: 148, height: 148, borderRadius: 74, borderWidth: 1, borderColor: 'rgba(255,122,0,0.18)' },
   orbitDot: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF7A00', top: 11, right: 18 },
-  title: { textAlign: 'center', color: '#171717', fontSize: 30, lineHeight: 36, fontWeight: '900', letterSpacing: -0.6 },
-  subtitle: { marginTop: 5, textAlign: 'center', color: '#747671', fontSize: 13, lineHeight: 18, fontWeight: '600', letterSpacing: 0.2 },
+  title: { textAlign: 'center', color: '#171717', fontSize: 30, lineHeight: 36, fontFamily: fontFamily.black, letterSpacing: -0.6 },
+  subtitle: { marginTop: 5, textAlign: 'center', color: '#747671', fontSize: 13, lineHeight: 18, fontFamily: fontFamily.semibold, letterSpacing: 0.2 },
 });

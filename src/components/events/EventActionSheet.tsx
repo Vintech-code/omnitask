@@ -1,5 +1,7 @@
+import { fontFamily } from '@/theme/typography';
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -122,15 +124,15 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 18 },
-  title: { fontSize: 21, lineHeight: 27, fontWeight: '700' },
+  title: { fontSize: 21, lineHeight: 27, fontFamily: fontFamily.bold },
   message: { fontSize: 14, lineHeight: 20, marginTop: 5 },
   actionGroup: { borderRadius: radii.lg, borderWidth: 1, overflow: 'hidden', marginTop: 18 },
   action: { minHeight: 68, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center' },
   disabled: { opacity: 0.42 },
   iconWrap: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   actionCopy: { flex: 1, paddingVertical: 10 },
-  actionLabel: { fontSize: 15, fontWeight: '700' },
+  actionLabel: { fontSize: 15, fontFamily: fontFamily.bold },
   actionDescription: { fontSize: 12, lineHeight: 17, marginTop: 2 },
   closeButton: { minHeight: 50, borderRadius: radii.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
-  closeLabel: { fontSize: 15, fontWeight: '700' },
+  closeLabel: { fontSize: 15, fontFamily: fontFamily.bold },
 });

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Linking, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, ScrollView, Switch, TouchableOpacity, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';

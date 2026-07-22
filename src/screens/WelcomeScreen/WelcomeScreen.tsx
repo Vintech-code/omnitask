@@ -1,14 +1,6 @@
 ﻿import React, { useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  Alert,
-  Image,
-  Dimensions,
-} from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated, Alert, Image, Dimensions } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import LottieView from 'lottie-react-native';

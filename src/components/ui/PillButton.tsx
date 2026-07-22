@@ -1,8 +1,10 @@
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { StyleProp, StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
+import { StyleProp, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { useTheme } from '@/context/ThemeContext';
-import { radii } from '@/theme';
+import { buttonShadow, radii } from '@/theme';
+import { fontFamily } from '@/theme/typography';
 
 interface Props {
   label: string;
@@ -18,6 +20,11 @@ export function PillButton({ label, onPress, icon, variant = 'primary', disabled
   const primary = variant === 'primary';
   const tonal = variant === 'tonal';
   const color = primary ? '#FFFDF8' : tonal ? theme.accent.base : theme.content.primary;
+  const backgroundColor = primary
+    ? theme.accent.base
+    : tonal
+      ? theme.dark ? '#3D2A19' : '#FFF0E1'
+      : theme.dark ? '#2B2C29' : '#F8F5F0';
   return (
     <TouchableOpacity
       accessibilityRole="button"
@@ -26,9 +33,9 @@ export function PillButton({ label, onPress, icon, variant = 'primary', disabled
       onPress={onPress}
       style={[
         styles.button,
+        buttonShadow,
         {
-          backgroundColor: primary ? theme.accent.base : tonal ? theme.accent.soft : theme.glass.secondary,
-          borderColor: primary ? theme.accent.base : theme.glass.border,
+          backgroundColor,
           opacity: disabled ? 0.45 : 1,
         },
         style,
@@ -45,11 +52,10 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 20,
     borderRadius: radii.pill,
-    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  label: { fontSize: 15, lineHeight: 20, fontWeight: '600' },
+  label: { fontSize: 15, lineHeight: 20, fontFamily: fontFamily.bold },
 });

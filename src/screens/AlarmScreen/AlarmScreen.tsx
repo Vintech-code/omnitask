@@ -1,18 +1,7 @@
-﻿import React, { useState, useMemo, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Switch,
-  StyleSheet,
-  Alert,
-  Modal,
-  TextInput,
-  Pressable,
-  Animated,
-  ActivityIndicator,
-} from 'react-native';
+import { fontFamily } from '@/theme/typography';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { View, ScrollView, TouchableOpacity, Switch, StyleSheet, Alert, Modal, Pressable, Animated, ActivityIndicator } from 'react-native';
+import { AppText as Text, AppTextInput as TextInput } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/context/ThemeContext';
@@ -140,7 +129,7 @@ function WheelCol({ items, selectedIndex, onSelect, width = 80 }: WheelColProps)
               <Text
                 style={{
                   fontSize: isSelected ? 38 : isAdjacent ? 30 : 24,
-                  fontWeight: isSelected ? '700' : '400',
+                  fontFamily: isSelected ? fontFamily.bold : fontFamily.regular,
                   color: isSelected ? theme.text : isAdjacent ? theme.textSub : theme.textDim,
                 }}
               >

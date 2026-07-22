@@ -26,9 +26,10 @@ module.exports = () => {
       ...(hasGoogleServices ? { googleServicesFile } : {}),
     },
     plugins: [
-  ...(base.expo.plugins || []),
-  '@react-native-google-signin/google-signin',
-],
+      ...(base.expo.plugins || []),
+      '@react-native-google-signin/google-signin',
+      'expo-video',
+    ],
     extra: {
       ...(base.expo.extra || {}),
       googleAuthenticationConfigured: hasGoogleServices,

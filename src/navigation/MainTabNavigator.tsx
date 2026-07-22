@@ -11,6 +11,7 @@ import CalculatorScreen from '@/screens/CalculatorScreen';
 import TasksScreen from '@/screens/TasksScreen';
 import { useTheme } from '@/context/ThemeContext';
 import { floatingShadow, radii } from '@/theme';
+import { fontFamily } from '@/theme/typography';
 
 const Tab = createBottomTabNavigator();
 
@@ -40,8 +41,8 @@ export default function MainTabNavigator() {
           floatingShadow,
           {
             bottom,
-            backgroundColor: theme.dark ? 'rgba(32,33,31,0.78)' : 'rgba(255,255,255,0.76)',
-            borderColor: theme.glass.border,
+            backgroundColor: 'transparent',
+            borderColor: theme.dark ? 'rgba(255,255,255,0.19)' : 'rgba(255,255,255,0.88)',
           },
         ],
         tabBarBackground: () => (
@@ -50,9 +51,18 @@ export default function MainTabNavigator() {
             style={[
               StyleSheet.absoluteFill,
               styles.tabBarFill,
-              { backgroundColor: theme.dark ? 'rgba(35,36,34,0.94)' : 'rgba(250,250,248,0.90)' },
+              { backgroundColor: theme.dark ? 'rgba(35,36,34,0.86)' : 'rgba(250,250,248,0.72)' },
             ]}
-          />
+          >
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                styles.glassTint,
+                { backgroundColor: theme.dark ? 'rgba(110,159,189,0.035)' : 'rgba(255,255,255,0.20)' },
+              ]}
+            />
+            <View style={[styles.glassHighlight, { backgroundColor: theme.glass.highlight }]} />
+          </View>
         ),
         tabBarItemStyle: styles.tabItem,
         tabBarLabelStyle: styles.label,
@@ -107,7 +117,7 @@ export default function MainTabNavigator() {
         name="Tasks"
         component={TasksScreen}
         options={{
-          tabBarLabel: 'Tasks',
+          tabBarLabel: 'Organize',
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused}>
               <MaterialCommunityIcons name={focused ? 'note-text' : 'note-text-outline'} size={22} color={focused ? '#FFF' : theme.icon} />
@@ -132,7 +142,16 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 4,
   },
-  tabBarFill: { borderRadius: radii.pill },
+  tabBarFill: { borderRadius: radii.pill, overflow: 'hidden' },
+  glassTint: { borderRadius: radii.pill },
+  glassHighlight: {
+    position: 'absolute',
+    top: 1,
+    left: 24,
+    right: 24,
+    height: 1,
+    opacity: 0.8,
+  },
   tabItem: { height: 58 },
   iconWrap: {
     width: 36,
@@ -142,5 +161,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: -2,
   },
-  label: { fontSize: 10, fontWeight: '600', marginTop: -1 },
+  label: { fontSize: 10, fontFamily: fontFamily.semibold, marginTop: -1 },
 });

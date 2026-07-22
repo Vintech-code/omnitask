@@ -3,11 +3,24 @@
  * Use these instead of hardcoded hex strings in screens/components.
  */
 
+export const OMNITASK_PALETTE = {
+  pearl: '#F3F3F1',
+  warmIvory: '#F6F3EC',
+  mistBlueGray: '#DCE5E8',
+  lightGradientEnd: '#E8EDF0',
+  slateCyan: '#6E9FBD',
+  emberOrange: '#FF7A00',
+  smokedCharcoal: '#121311',
+  darkGradientTop: '#1A1B19',
+  darkGradientEnd: '#111615',
+  deepSlate: '#1E2E38',
+} as const;
+
 // ── Brand ────────────────────────────────────────────────────────────────────
 /** Legacy token name retained during migration; the redesigned primary accent is warm orange. */
-export const BRAND_BLUE     = '#FF7A00';
+export const BRAND_BLUE     = OMNITASK_PALETTE.emberOrange;
 export const BRAND_GREEN    = '#3DAE7C';
-export const BRAND_ORANGE   = '#FF7A00';
+export const BRAND_ORANGE   = OMNITASK_PALETTE.emberOrange;
 export const BRAND_RED      = '#E05252';
 export const BRAND_PURPLE   = '#9B6DD4';
 

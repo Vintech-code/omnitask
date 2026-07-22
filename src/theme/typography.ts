@@ -22,6 +22,18 @@ export const fontWeight = {
   black:     '900' as const,
 };
 
+/** Loaded Nunito faces. Use a face directly instead of combining a custom font with fontWeight. */
+export const fontFamily = {
+  light: 'Nunito_300Light',
+  regular: 'Nunito_400Regular',
+  medium: 'Nunito_500Medium',
+  semibold: 'Nunito_600SemiBold',
+  semiboldItalic: 'Nunito_600SemiBold_Italic',
+  bold: 'Nunito_700Bold',
+  extrabold: 'Nunito_800ExtraBold',
+  black: 'Nunito_900Black',
+} as const;
+
 /** Font families available in the note editor. */
 export const FONT_FAMILIES: { label: string; value: string | undefined }[] = [
   { label: 'Default',   value: undefined },

@@ -1,5 +1,7 @@
+import { fontFamily } from '@/theme/typography';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { AppText as Text, AppTextInput as TextInput } from '@/components/ui/AppText';
 import MapView, { MapPressEvent, Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -247,27 +249,27 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
   header: { height: 62, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerAction: { minWidth: 64, minHeight: 44, justifyContent: 'center' },
-  cancel: { fontSize: 15, fontWeight: '600' },
-  done: { fontSize: 15, fontWeight: '700', textAlign: 'right' },
-  title: { fontSize: 18, fontWeight: '700' },
+  cancel: { fontSize: 15, fontFamily: fontFamily.semibold },
+  done: { fontSize: 15, fontFamily: fontFamily.bold, textAlign: 'right' },
+  title: { fontSize: 18, fontFamily: fontFamily.bold },
   mapFrame: { flex: 1, marginHorizontal: 16, borderRadius: radii.xl, borderWidth: 1, overflow: 'hidden' },
   mapUnavailable: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   mapUnavailableIcon: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  mapUnavailableTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center', marginBottom: 7 },
+  mapUnavailableTitle: { fontSize: 17, fontFamily: fontFamily.extrabold, textAlign: 'center', marginBottom: 7 },
   mapUnavailableText: { maxWidth: 310, fontSize: 13, lineHeight: 19, textAlign: 'center' },
   mapLoading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  mapLoadingTitle: { fontSize: 16, fontWeight: '800', textAlign: 'center', marginTop: 12 },
+  mapLoadingTitle: { fontSize: 16, fontFamily: fontFamily.extrabold, textAlign: 'center', marginTop: 12 },
   mapLoadingText: { maxWidth: 290, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 6 },
   retryButton: { minHeight: 44, borderRadius: radii.pill, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 14 },
-  retryText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  retryText: { color: '#fff', fontSize: 13, fontFamily: fontFamily.extrabold },
   currentButton: { position: 'absolute', right: 12, top: 12, minHeight: 44, borderRadius: radii.pill, borderWidth: 1, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  currentLabel: { fontSize: 13, fontWeight: '700' },
+  currentLabel: { fontSize: 13, fontFamily: fontFamily.bold },
   form: { padding: 16 },
-  fieldLabel: { fontSize: 13, fontWeight: '600', marginBottom: 7 },
+  fieldLabel: { fontSize: 13, fontFamily: fontFamily.semibold, marginBottom: 7 },
   input: { minHeight: 52, borderRadius: radii.md, borderWidth: 1, paddingHorizontal: 14, fontSize: 15 },
   status: { borderRadius: radii.md, padding: 12, marginTop: 10, flexDirection: 'row', gap: 8 },
   statusText: { flex: 1, fontSize: 12, lineHeight: 17 },
   hint: { fontSize: 12, marginTop: 9 },
   clearButton: { alignSelf: 'flex-start', minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  clearText: { fontSize: 13, fontWeight: '700' },
+  clearText: { fontSize: 13, fontFamily: fontFamily.bold },
 });

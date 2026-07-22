@@ -1,12 +1,7 @@
-﻿import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Switch,
-  RefreshControl,
-} from 'react-native';
+import { fontFamily } from '@/theme/typography';
+import React, { useState } from 'react';
+import { View, ScrollView, TouchableOpacity, Switch, RefreshControl } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useEvents, AppEvent } from '@/context/EventStore';
@@ -415,7 +410,7 @@ function CalendarView({ events, theme, isDark, calDate, setCalDate, selectedDay,
                 calS.dayNum,
                 { color: theme.text },
                 isToday && calS.todayNum,
-                isSelected && { color: BLUE, fontWeight: '800' },
+                isSelected && { color: BLUE, fontFamily: fontFamily.extrabold },
               ]}>{day}</Text>
               {hasDots && (
                 <View style={calS.dotsRow}>

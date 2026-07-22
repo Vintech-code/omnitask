@@ -1,12 +1,7 @@
+import { fontFamily } from '@/theme/typography';
 import React from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 
 type Props = {
   loading?: boolean;
@@ -82,6 +77,6 @@ const styles = StyleSheet.create({
   // and crop it here so only the standard multicolor G appears in our pill.
   logoArtwork: { position: 'absolute', width: 56, height: 56, left: -14, top: -14 },
   trailingSpace: { width: 28, height: 28 },
-  text: { color: '#1F1F1F', fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  text: { color: '#1F1F1F', fontSize: 15, lineHeight: 20, fontFamily: fontFamily.bold },
   disabled: { opacity: 0.62 },
 });

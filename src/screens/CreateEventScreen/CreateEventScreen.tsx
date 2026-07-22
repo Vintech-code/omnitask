@@ -1,15 +1,7 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Switch,
-  Modal,
-  Pressable,
-} from 'react-native';
+import { fontFamily } from '@/theme/typography';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Switch, Modal, Pressable } from 'react-native';
+import { AppText as Text, AppTextInput as TextInput } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useEvents, AppEvent } from '@/context/EventStore';
@@ -100,7 +92,7 @@ function WheelCol({ items, selectedIndex, onSelect, width = 80, wheelKey }: Whee
             >
               <Text style={{
                 fontSize: isSel ? 32 : isAdj ? 24 : 18,
-                fontWeight: isSel ? '700' : '400',
+                fontFamily: isSel ? fontFamily.bold : fontFamily.regular,
                 color: isSel ? theme.text : isAdj ? theme.textSub : theme.border,
               }}>{item}</Text>
             </TouchableOpacity>
@@ -624,7 +616,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
                 const isSel = day === calSel;
                 return (
                   <TouchableOpacity testID={`calendar-day-${day}`} key={ci} style={[s.calCell, isToday && s.calToday, isSel && s.calSel]} onPress={() => setCalSel(day)}>
-                    <Text style={[s.calCellTxt, { color: theme.text }, isToday && !isSel && { color: BLUE, fontWeight: '700' }, isSel && { color: '#fff', fontWeight: '700' }]}>{day}</Text>
+                    <Text style={[s.calCellTxt, { color: theme.text }, isToday && !isSel && { color: BLUE, fontFamily: fontFamily.bold }, isSel && { color: '#fff', fontFamily: fontFamily.bold }]}>{day}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -673,7 +665,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
                 style={[s.catRow, { borderBottomColor: theme.border }]}
                 onPress={() => { setTimeZone(zone); setTimeZoneModal(false); }}
               >
-                <Text style={[s.catTxt, { color: zone === timeZone ? BLUE : theme.text }, zone === timeZone && { fontWeight: '700' }]}>{zone}</Text>
+                <Text style={[s.catTxt, { color: zone === timeZone ? BLUE : theme.text }, zone === timeZone && { fontFamily: fontFamily.bold }]}>{zone}</Text>
                 {zone === timeZone ? <Ionicons name="checkmark" size={18} color={BLUE} /> : null}
               </TouchableOpacity>
             ))}
@@ -696,7 +688,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
           <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
             {categories.map(c => (
               <TouchableOpacity key={c} style={[s.catRow, { borderBottomColor: theme.border }]} onPress={() => { setCategory(c); setCategoryModal(false); }}>
-                <Text style={[s.catTxt, { color: c === category ? BLUE : theme.text }, c === category && { fontWeight: '700' }]}>{c}</Text>
+                <Text style={[s.catTxt, { color: c === category ? BLUE : theme.text }, c === category && { fontFamily: fontFamily.bold }]}>{c}</Text>
                 {c === category && <Ionicons name="checkmark" size={18} color={BLUE} />}
               </TouchableOpacity>
             ))}
@@ -711,7 +703,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
                   autoFocus maxLength={30}
                 />
                 <TouchableOpacity style={s.catAddBtn} onPress={addCustomCategory}>
-                  <Text style={{ fontSize: 13, color: '#fff', fontWeight: '700' }}>Add</Text>
+                  <Text style={{ fontSize: 13, color: '#fff', fontFamily: fontFamily.bold }}>Add</Text>
                 </TouchableOpacity>
               </View>
             ) : (

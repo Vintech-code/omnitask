@@ -88,11 +88,11 @@ The redesign must not move or hide an action in a way that changes its meaning. 
 
 | Token | Value | Usage |
 | --- | --- | --- |
-| `color.bg.base` | `#ECEDEB` | App background |
-| `color.bg.top` | `#F3F3F1` | Top of atmospheric background gradient |
-| `color.bg.bottom` | `#E1E3E6` | Bottom of atmospheric background gradient |
-| `color.bg.lavender` | `#B9BDCF` | Large diffuse ambient field |
-| `color.bg.blue` | `#B6CFDC` | Small cool ambient field |
+| `color.bg.base` | `#F3F3F1` | Pearl app background |
+| `color.bg.top` | `#F6F3EC` | Warm ivory top of atmospheric gradient |
+| `color.bg.bottom` | `#E8EDF0` | Bottom of atmospheric gradient |
+| `color.bg.lavender` | `#F3F3F1` | Pearl diffuse ambient field |
+| `color.bg.blue` | `#DCE5E8` | Mist blue-gray ambient field |
 | `color.glass.primary` | `rgba(255,255,255,0.58)` | Main glass cards and tab bar |
 | `color.glass.secondary` | `rgba(255,255,255,0.38)` | Chips and secondary controls |
 | `color.glass.solid` | `rgba(255,255,255,0.86)` | Inputs and high-legibility surfaces |
@@ -118,11 +118,11 @@ Dark mode should feel like smoked glass, not a pure-black recolor.
 
 | Token | Value | Usage |
 | --- | --- | --- |
-| `color.bg.base` | `#111210` | App background |
-| `color.bg.top` | `#191A18` | Top gradient |
-| `color.bg.bottom` | `#0D0E0D` | Bottom gradient |
-| `color.bg.lavender` | `#343646` | Ambient shape |
-| `color.bg.blue` | `#263A42` | Ambient shape |
+| `color.bg.base` | `#121311` | Smoked charcoal app background |
+| `color.bg.top` | `#1A1B19` | Top gradient |
+| `color.bg.bottom` | `#111615` | Bottom gradient |
+| `color.bg.lavender` | `#1A1B19` | Smoked ambient field |
+| `color.bg.blue` | `#6E9FBD` | Low-opacity slate-cyan ambient field |
 | `color.glass.primary` | `rgba(38,39,37,0.68)` | Main card |
 | `color.glass.secondary` | `rgba(49,50,47,0.48)` | Secondary control |
 | `color.glass.solid` | `rgba(34,35,33,0.92)` | Blur fallback |
@@ -133,9 +133,9 @@ Dark mode should feel like smoked glass, not a pure-black recolor.
 | `color.text.secondary` | `#B8B9B4` | Supporting text |
 | `color.text.muted` | `#81827E` | Metadata |
 | `color.icon` | `#F1F1ED` | Default icon |
-| `color.accent` | `#FF861A` | Primary action and selection |
+| `color.accent` | `#FF7A00` | Primary action and selection |
 | `color.accent.pressed` | `#F17608` | Pressed state |
-| `color.accent.soft` | `rgba(255,134,26,0.17)` | Selected background |
+| `color.accent.soft` | `rgba(255,122,0,0.17)` | Selected background |
 
 Semantic colors keep their meaning in dark mode and may be raised slightly in luminance to meet contrast requirements.
 
@@ -143,16 +143,15 @@ Semantic colors keep their meaning in dark mode and may be raised slightly in lu
 
 Each main screen uses the same quiet atmospheric canvas:
 
-- A pearl vertical gradient from `bg.top` to `bg.bottom`.
-- Two or three very large gradient fields placed partly outside the viewport.
-- Fields use lavender-gray and pale blue with transparent edges so they read as diffuse glass reflections without runtime blur.
-- Fields are decorative, ignore pointer events, and never reduce text contrast.
-- Keep field positions stable between screens so navigation feels cohesive.
-- Do not use noisy textures, vivid mesh gradients, or animated fields.
+- A pearl gradient from `#F6F3EC` to `#E8EDF0` in light mode.
+- Large fixed pearl and mist blue-gray fields sit behind the content.
+- Weather content does not recolor or darken the shared application background.
+- Decorative layers ignore pointer events and remain outside screen update paths.
+- Translucent glass surfaces and floating navigation layer above the atmospheric canvas.
 
 ## 5. Typography
 
-Use the system sans-serif initially for performance and native familiarity. On iOS this resolves to SF Pro; on Android it resolves to Roboto. A future brand font may replace it only if it has comparable readability.
+Use the system sans-serif for standard content. Dashboard greeting typography uses bundled Nunito for a friendly rounded brand expression with consistent Android and iOS rendering.
 
 | Style | Size / line height | Weight | Usage |
 | --- | --- | --- | --- |
@@ -485,7 +484,7 @@ Use the reference profile screen most directly:
 - Cards may fade and translate upward by no more than 8 px on initial load.
 - Use existing haptics for meaningful selection/completion, not every tap.
 - Honor reduced-motion settings: remove scale and translation while retaining opacity/state changes.
-- Do not animate background blobs or blur intensity continuously.
+- Do not animate background fields or blur intensity continuously.
 
 ## 12. Accessibility and resilience
 

@@ -121,7 +121,33 @@ export function eventOccursOnDate(event: AppEvent, date: Date): boolean {
   const targetKey = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
   const startKey = Date.UTC(start.year, start.month, start.day);
   const endKey = Date.UTC(end.year, end.month, end.day);
-  return targetKey >= startKey && targetKey <= endKey;
+  if (targetKey < startKey) return false;
+
+  const recurrence = event.recurrence ?? 'none';
+  if (recurrence === 'none') return targetKey <= endKey;
+  if (recurrence === 'daily') return true;
+
+  const elapsedDays = Math.round((targetKey - startKey) / 86_400_000);
+  if (recurrence === 'weekly') return elapsedDays % 7 === 0;
+  return date.getDate() === start.day;
+}
+
+export function eventOccurrenceStartOnDate(event: AppEvent, date: Date): Date | null {
+  if (!eventOccursOnDate(event, date)) return null;
+  const start = parseEventDateParts(event.startDate);
+  if (!start) return null;
+  const recurrence = event.recurrence ?? 'none';
+  const isOriginalStart = start.year === date.getFullYear()
+    && start.month === date.getMonth()
+    && start.day === date.getDate();
+  if (recurrence === 'none' && isOriginalStart) return eventStart(event);
+
+  const dateLabel = `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+  return parseEventDateTime(
+    dateLabel,
+    event.allDay || recurrence === 'none' ? '12:00 AM' : event.startTime,
+    event.timeZone ?? systemTimeZone(),
+  );
 }
 
 export function formatEventSchedule(event: AppEvent): string {

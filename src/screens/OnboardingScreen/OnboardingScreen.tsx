@@ -1,21 +1,18 @@
 ﻿import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  Dimensions,
-  Platform,
-} from 'react-native';
+import { View, Image, ActivityIndicator, Alert, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import LottieView from 'lottie-react-native';
 import * as Haptics from 'expo-haptics';
+import type { StackScreenProps } from '@react-navigation/stack';
 import { useAuth } from '@/context/AuthContext';
-import { requestNotificationPermission } from '@/services/NotificationService';
-import { BRAND_BLUE as BLUE } from '@/theme/colors';
+import { useTheme } from '@/context/ThemeContext';
+import {
+  openNotificationSettings,
+  requestNotificationPermissionState,
+} from '@/services/NotificationService';
+import type { RootStackParamList } from '@/types/navigation';
 import { s } from './styles';
 import { AppBackground } from '@/components/ui';
 
@@ -24,25 +21,16 @@ const { width: W } = Dimensions.get('window');
 // ─── Step data ───────────────────────────────────────────────────────────────
 const STEPS = [
   {
-    icon: null, // uses logo image
     title: 'Welcome to OmniTask',
     subtitle: 'Your all-in-one productivity companion.\nEverything you need, in one place.',
-    bg: '#EBF4FF',
-    accent: BLUE,
   },
   {
-    icon: null, // uses a feature grid
     title: 'Everything You Need',
     subtitle: 'Built with four powerful tools to help you stay focused and on top of every task.',
-    bg: '#F0FDF4',
-    accent: '#3DAE7C',
   },
   {
-    icon: 'notifications-outline',
     title: 'Never Miss a Thing',
     subtitle: 'Allow notifications so OmniTask can remind you of alarms, events, and deadlines on time.',
-    bg: '#FFF8F0',
-    accent: '#F59E0B',
   },
 ];
 
@@ -54,10 +42,15 @@ const FEATURES = [
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
-export default function OnboardingScreen({ navigation }: any) {
+type Props = StackScreenProps<RootStackParamList, 'Onboarding'>;
+
+export default function OnboardingScreen({ navigation }: Props) {
   const { markOnboardingSeen } = useAuth();
+  const { theme } = useTheme();
   const [step, setStep] = useState(0);
   const [notifGranted, setNotifGranted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notificationFeedback, setNotificationFeedback] = useState<string | null>(null);
 
   // Slide animation
   const slideX = useRef(new Animated.Value(0)).current;
@@ -80,25 +73,84 @@ export default function OnboardingScreen({ navigation }: any) {
     });
   };
 
+  const finishOnboarding = async () => {
+    await markOnboardingSeen();
+    navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+  };
+
   const handleNext = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (step === 2) {
-      // Final step — request permission, then enter app
-      if (!notifGranted) {
-        const granted = await requestNotificationPermission();
-        setNotifGranted(granted);
-      }
-      await markOnboardingSeen();
-      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
-    } else {
+    if (isSubmitting) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    if (step < 2) {
       animateToStep(step + 1);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setNotificationFeedback(null);
+
+    try {
+      if (!notifGranted) {
+        const permission = await requestNotificationPermissionState();
+        if (!permission.granted) {
+          setNotificationFeedback(permission.canAskAgain
+            ? 'Notifications were not enabled. Try again, or choose Maybe later to continue without reminders.'
+            : 'Notifications are off. Open your device settings to enable reminders, or choose Maybe later.');
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
+          if (!permission.canAskAgain) {
+            Alert.alert(
+              'Notifications are off',
+              'Enable notifications for OmniTask in device settings, then return and tap the button again.',
+              [
+                { text: 'Not now', style: 'cancel' },
+                {
+                  text: 'Open settings',
+                  onPress: () => {
+                    void openNotificationSettings().catch(() => {
+                      setNotificationFeedback('Unable to open settings. Open OmniTask in your device settings to allow notifications.');
+                    });
+                  },
+                },
+              ],
+            );
+          }
+          return;
+        }
+        setNotifGranted(true);
+      }
+
+      await finishOnboarding();
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      setNotificationFeedback(
+        error instanceof Error
+          ? error.message
+          : 'Unable to enable notifications right now. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleSkip = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await markOnboardingSeen();
-    navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+    if (isSubmitting) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsSubmitting(true);
+    setNotificationFeedback(null);
+
+    try {
+      await finishOnboarding();
+    } catch (error) {
+      setNotificationFeedback(
+        error instanceof Error
+          ? error.message
+          : 'Unable to finish onboarding right now. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const current = STEPS[step];
@@ -108,8 +160,13 @@ export default function OnboardingScreen({ navigation }: any) {
       <AppBackground />
       {/* Skip button */}
       {step < 2 && (
-        <TouchableOpacity style={s.skip} onPress={handleSkip}>
-          <Text style={[s.skipText, { color: current.accent }]}>Skip</Text>
+        <TouchableOpacity
+          accessibilityRole="button"
+          disabled={isSubmitting}
+          style={s.skip}
+          onPress={handleSkip}
+        >
+          <Text style={[s.skipText, { color: theme.accent.base }]}>Skip</Text>
         </TouchableOpacity>
       )}
 
@@ -119,7 +176,7 @@ export default function OnboardingScreen({ navigation }: any) {
         {/* ── Step 1: Logo ── */}
         {step === 0 && (
           <View style={s.illustrationBox}>
-            <View style={[s.logoBg, { backgroundColor: 'rgba(255,255,255,0.76)' }]}>
+            <View style={[s.logoBg, { backgroundColor: theme.glass.primary }]}>
               <Image
                 source={require('../../../assets/omnitasklogo.png')}
                 style={{ width: 90, height: 90 }}
@@ -133,7 +190,10 @@ export default function OnboardingScreen({ navigation }: any) {
         {step === 1 && (
           <View style={s.featureGrid}>
             {FEATURES.map(f => (
-              <View key={f.label} style={[s.featureCard, { backgroundColor: 'rgba(255,255,255,0.72)' }]}>
+              <View
+                key={f.label}
+                style={[s.featureCard, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}
+              >
                 <View style={[s.featureIconBox, { backgroundColor: f.bg }]}>
                   <LottieView
                     source={f.anim}
@@ -142,8 +202,8 @@ export default function OnboardingScreen({ navigation }: any) {
                     style={s.featureLottie}
                   />
                 </View>
-                <Text style={[s.featureLabel, { color: '#222' }]}>{f.label}</Text>
-                <Text style={[s.featureDesc, { color: '#666' }]}>{f.desc}</Text>
+                <Text style={[s.featureLabel, { color: theme.content.primary }]}>{f.label}</Text>
+                <Text style={[s.featureDesc, { color: theme.content.secondary }]}>{f.desc}</Text>
               </View>
             ))}
           </View>
@@ -161,8 +221,19 @@ export default function OnboardingScreen({ navigation }: any) {
           </View>
         )}
 
-        <Text style={[s.title, { color: '#111' }]}>{current.title}</Text>
-        <Text style={[s.subtitle, { color: '#555' }]}>{current.subtitle}</Text>
+        <Text style={[s.title, { color: theme.content.primary }]}>{current.title}</Text>
+        <Text style={[s.subtitle, { color: theme.content.secondary }]}>{current.subtitle}</Text>
+        {step === 2 && notificationFeedback && (
+          <View
+            accessibilityLiveRegion="polite"
+            style={[s.feedback, { backgroundColor: theme.accent.soft, borderColor: theme.glass.border }]}
+          >
+            <Ionicons name="information-circle-outline" size={19} color={theme.accent.base} />
+            <Text style={[s.feedbackText, { color: theme.content.secondary }]}>
+              {notificationFeedback}
+            </Text>
+          </View>
+        )}
       </Animated.View>
 
       {/* ── Dots ── */}
@@ -172,7 +243,7 @@ export default function OnboardingScreen({ navigation }: any) {
             key={i}
             style={[
               s.dot,
-              { backgroundColor: i === step ? current.accent : '#ccc' },
+              { backgroundColor: i === step ? theme.accent.base : theme.divider },
               i === step && s.dotActive,
             ]}
           />
@@ -182,21 +253,35 @@ export default function OnboardingScreen({ navigation }: any) {
       {/* ── CTA button ── */}
       <View style={s.footer}>
         <TouchableOpacity
-          style={[s.btn, { backgroundColor: current.accent }]}
+          accessibilityRole="button"
+          accessibilityLabel={step === 2 ? 'Enable notifications' : undefined}
+          accessibilityState={{ busy: isSubmitting, disabled: isSubmitting }}
+          testID="onboarding-primary-action"
+          disabled={isSubmitting}
+          style={[s.btn, { backgroundColor: theme.accent.base }, isSubmitting && s.btnDisabled]}
           onPress={handleNext}
           activeOpacity={0.85}
         >
+          {isSubmitting && <ActivityIndicator size="small" color="#FFFDF8" />}
           <Text style={s.btnText}>
-            {step === 0 ? 'Get Started'
+            {isSubmitting ? (step === 2 ? 'Enabling…' : 'Please wait…')
+             : step === 0 ? 'Get Started'
              : step === 1 ? 'Next'
-             : 'Enable Notifications'}
+             : notifGranted ? 'Continue' : 'Enable Notifications'}
           </Text>
-          <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />
+          {!isSubmitting && (
+            <Ionicons name="arrow-forward" size={18} color="#FFFDF8" style={s.btnIcon} />
+          )}
         </TouchableOpacity>
 
         {step === 2 && (
-          <TouchableOpacity style={s.skipNotif} onPress={handleSkip}>
-            <Text style={[s.skipNotifText, { color: current.accent }]}>Maybe Later</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            disabled={isSubmitting}
+            style={s.skipNotif}
+            onPress={handleSkip}
+          >
+            <Text style={[s.skipNotifText, { color: theme.accent.base }]}>Maybe Later</Text>
           </TouchableOpacity>
         )}
       </View>

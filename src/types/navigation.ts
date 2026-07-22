@@ -13,7 +13,7 @@ export type RootStackParamList = {
   CreateEvent: { event?: AppEvent } | undefined;
   EventDetail: { event: AppEvent };
   Profile:     undefined;
-  Search:      undefined;
   Stats:       undefined;
+  Weather:     undefined;
   RingingAlarm: AlarmRingPayload;
 };

@@ -41,6 +41,12 @@ interface AlarmNotificationInput {
   scheduledFor?: number;
 }
 
+export interface NotificationPermissionState {
+  status: Notifications.PermissionStatus;
+  granted: boolean;
+  canAskAgain: boolean;
+}
+
 function to24Hour(hour: number, period: 'AM' | 'PM') {
   if (period === 'AM') return hour === 12 ? 0 : hour;
   return hour === 12 ? 12 : hour + 12;
@@ -81,13 +87,33 @@ async function ensureAlarmChannel(sound: string, vibrate: boolean) {
   return channelId;
 }
 
-export async function requestNotificationPermission(): Promise<boolean> {
+function toPermissionState(
+  permission: Notifications.NotificationPermissionsStatus,
+): NotificationPermissionState {
+  return {
+    status: permission.status,
+    granted: permission.granted,
+    canAskAgain: permission.canAskAgain,
+  };
+}
+
+export async function requestNotificationPermissionState(): Promise<NotificationPermissionState> {
   await configureAlarmNotifications();
   await ensureAlarmChannel('Default alarm sound', true);
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  if (existing === 'granted') return true;
-  const { status } = await Notifications.requestPermissionsAsync();
-  return status === 'granted';
+  const existing = await Notifications.getPermissionsAsync();
+  if (existing.granted || !existing.canAskAgain) {
+    return toPermissionState(existing);
+  }
+
+  return toPermissionState(await Notifications.requestPermissionsAsync());
+}
+
+export async function requestNotificationPermission(): Promise<boolean> {
+  return (await requestNotificationPermissionState()).granted;
+}
+
+export async function openNotificationSettings(): Promise<void> {
+  await Linking.openSettings();
 }
 
 export async function configureAlarmNotifications(): Promise<void> {

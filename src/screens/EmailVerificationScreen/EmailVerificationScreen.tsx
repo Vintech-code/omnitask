@@ -1,5 +1,7 @@
+import { fontFamily } from '@/theme/typography';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { AppText as Text } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -117,16 +119,16 @@ const styles = StyleSheet.create({
   card: { width: '100%', padding: 22, borderWidth: 1, borderRadius: 26, alignItems: 'center' },
   logo: { width: 62, height: 62, marginBottom: 14 },
   mailCircle: { width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  title: { fontSize: 27, lineHeight: 33, fontWeight: '900', textAlign: 'center', marginBottom: 8 },
+  title: { fontSize: 27, lineHeight: 33, fontFamily: fontFamily.black, textAlign: 'center', marginBottom: 8 },
   copy: { fontSize: 14, lineHeight: 21, textAlign: 'center', marginBottom: 18 },
   emailPill: { width: '100%', height: 48, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 9 },
-  email: { flex: 1, fontSize: 14, fontWeight: '700' },
+  email: { flex: 1, fontSize: 14, fontFamily: fontFamily.bold },
   message: { marginTop: 14, fontSize: 13, lineHeight: 18, textAlign: 'center' },
   primary: { width: '100%', height: 52, marginTop: 20, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  primaryText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+  primaryText: { color: '#FFF', fontSize: 16, fontFamily: fontFamily.extrabold },
   outline: { width: '100%', height: 52, marginTop: 12, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  outlineText: { fontSize: 14, fontWeight: '800' },
+  outlineText: { fontSize: 14, fontFamily: fontFamily.extrabold },
   logout: { minWidth: 120, minHeight: 44, marginTop: 8, alignItems: 'center', justifyContent: 'center' },
-  logoutText: { fontSize: 14, fontWeight: '700' },
+  logoutText: { fontSize: 14, fontFamily: fontFamily.bold },
   disabled: { opacity: 0.55 },
 });

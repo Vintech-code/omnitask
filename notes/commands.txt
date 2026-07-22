@@ -1,0 +1,9 @@
+Set-Location C:\MyProjects\omnitask
+
+$env:GOOGLE_APPLICATION_CREDENTIALS = (Resolve-Path -LiteralPath ".\firebase-reset\service-account.json").Path
+
+Test-Path -LiteralPath $env:GOOGLE_APPLICATION_CREDENTIALS
+
+# delete all data in firebase 
+node .\firebase-reset\reset-firebase.js --confirm
+

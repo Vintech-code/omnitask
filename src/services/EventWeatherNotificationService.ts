@@ -113,7 +113,7 @@ export async function syncEventWeatherWarnings(
         { latitude: event.latitude, longitude: event.longitude },
         { forecastDays: 16 },
       );
-      const hourly = nearestHourlyWeather(forecast.hourly, start);
+      const hourly = nearestHourlyWeather(forecast.hourly, start, 90 * 60_000);
       if (!hourly || Math.abs(hourly.time.getTime() - start.getTime()) > 90 * 60_000) continue;
 
       const assessment = assessWeatherWarning(hourly);

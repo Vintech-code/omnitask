@@ -34,6 +34,15 @@ yarn-error.*
 google-services.json
 GoogleService-Info.plist
 
+# Firebase Admin credentials (local-only, never commit)
+/firebase-reset/*.json
+/firebase-reset/credentials/
+**/*firebase-adminsdk*.json
+**/*service-account*.json
+**/*serviceAccount*.json
+**/serviceAccountKey.json
+**/application_default_credentials.json
+
 # typescript
 *.tsbuildinfo
 

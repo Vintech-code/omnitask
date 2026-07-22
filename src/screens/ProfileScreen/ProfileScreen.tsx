@@ -1,30 +1,14 @@
 ﻿import React, { useRef, useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Switch,
-  Animated,
-  ScrollView,
-  Alert,
-  Image,
-  Modal,
-  TextInput,
-  Pressable,
-  KeyboardAvoidingView,
-  Platform,
-  Linking,
-} from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Switch, Animated, ScrollView, Alert, Image, Modal, Pressable, KeyboardAvoidingView, Platform, Linking } from 'react-native';
+import { AppText as Text, AppTextInput as TextInput } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
-import { Storage, KEYS } from '@/services/StorageService';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { epStyles, makeStyles } from './styles';
-import { AppBackground, ScreenSkeleton } from '@/components/ui';
+import { AppBackground } from '@/components/ui';
 
 
 interface MenuRow {
@@ -38,25 +22,16 @@ interface MenuRow {
 
 export default function ProfileScreen({ navigation }: any) {
   const { theme, isDark, toggleTheme, useSystemTheme, setUseSystemTheme } = useTheme();
-  const { user, signOut, updateUser } = useAuth();
+  const { user, signOut, updateUser, profilePhoto, updateProfilePhoto } = useAuth();
   const s = makeStyles(theme);
 
   const [editModal, setEditModal] = useState(false);
   const [editName, setEditName] = useState(user?.name ?? '');
   const [saving, setSaving] = useState(false);
-  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
-  const [profileLoading, setProfileLoading] = useState(true);
   const [langModal, setLangModal] = useState(false);
   const [selectedLang, setSelectedLang] = useState('English');
   const [privacyModal, setPrivacyModal] = useState(false);
   const [helpModal, setHelpModal] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-    Storage.getForUser<string>(KEYS.PROFILE_PHOTO, user.id)
-      .then(p => { if (p) setProfilePhoto(p); })
-      .finally(() => setProfileLoading(false));
-  }, [user?.id]);
 
   const pickPhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -72,8 +47,7 @@ export default function ProfileScreen({ navigation }: any) {
     });
     if (!result.canceled && result.assets[0]?.uri) {
       const uri = result.assets[0].uri;
-      setProfilePhoto(uri);
-      if (user) await Storage.setForUser(KEYS.PROFILE_PHOTO, user.id, uri);
+      await updateProfilePhoto(uri);
     }
   };
 
@@ -181,8 +155,6 @@ export default function ProfileScreen({ navigation }: any) {
         ]),
     },
   ];
-
-  if (profileLoading) return <ScreenSkeleton variant="profile" />;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>

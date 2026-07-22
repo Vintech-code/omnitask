@@ -2,7 +2,15 @@ import { useCallback, useEffect, useState } from 'react';
 import * as Location from 'expo-location';
 
 import { getWeatherForecast } from '@/services/WeatherService';
+import { KEYS, Storage } from '@/services/StorageService';
 import type { CurrentWeather, HourlyWeather } from '@/types/weather';
+import { storedWeatherLocationLabel, weatherLocationLabel } from '@/utils/weatherLocation';
+
+interface StoredWeatherLocation {
+  latitude: number;
+  longitude: number;
+  label: string;
+}
 
 export type CurrentWeatherStatus = 'checking-permission' | 'permission-required' | 'loading' | 'ready' | 'error';
 
@@ -12,13 +20,8 @@ interface CurrentWeatherState {
   locationLabel: string;
   status: CurrentWeatherStatus;
   error: string | null;
-}
-
-function locationName(address?: Location.LocationGeocodedAddress): string {
-  if (!address) return 'Current location';
-  const values = [address.name, address.city || address.subregion, address.region]
-    .filter((value): value is string => Boolean(value?.trim()));
-  return [...new Set(values)].slice(0, 2).join(', ') || 'Current location';
+  dataSource: 'network' | 'cache' | null;
+  isStale: boolean;
 }
 
 export function useCurrentWeather() {
@@ -28,6 +31,8 @@ export function useCurrentWeather() {
     locationLabel: 'Current location',
     status: 'checking-permission',
     error: null,
+    dataSource: null,
+    isStale: false,
   });
 
   const load = useCallback(async (requestPermission = false, forceRefresh = false) => {
@@ -42,21 +47,28 @@ export function useCurrentWeather() {
       }
 
       setState(previous => ({ ...previous, status: 'loading', error: null }));
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const coordinates = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      };
+      const savedLocation = await Storage.get<StoredWeatherLocation>(KEYS.WEATHER_LOCATION);
+      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(() => null);
+      const coordinates = position
+        ? { latitude: position.coords.latitude, longitude: position.coords.longitude }
+        : savedLocation
+          ? { latitude: savedLocation.latitude, longitude: savedLocation.longitude }
+          : null;
+      if (!coordinates) throw new Error('Your location is unavailable. Turn on location services and try again.');
       const [forecast, addresses] = await Promise.all([
         getWeatherForecast(coordinates, { forecastDays: 2, forceRefresh }),
-        Location.reverseGeocodeAsync(coordinates).catch(() => []),
+        position ? Location.reverseGeocodeAsync(coordinates).catch(() => []) : Promise.resolve([]),
       ]);
+      const label = addresses[0] ? weatherLocationLabel(addresses[0]) : storedWeatherLocationLabel(savedLocation?.label);
+      await Storage.set<StoredWeatherLocation>(KEYS.WEATHER_LOCATION, { ...coordinates, label });
       setState({
         weather: forecast.current,
         hourly: forecast.hourly,
-        locationLabel: locationName(addresses[0]),
+        locationLabel: label,
         status: 'ready',
         error: null,
+        dataSource: forecast.source ?? 'network',
+        isStale: forecast.isStale ?? false,
       });
     } catch (error) {
       setState(previous => ({

@@ -37,6 +37,7 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
+  profilePhoto: string | null;
   isLoading: boolean;
   emailVerified: boolean;
   verificationEmailStatus: 'unknown' | 'sent' | 'failed';
@@ -47,11 +48,13 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshEmailVerification: () => Promise<boolean>;
   updateUser: (updates: Partial<User>) => Promise<void>;
+  updateProfilePhoto: (uri: string) => Promise<void>;
   markOnboardingSeen: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  profilePhoto: null,
   isLoading: true,
   emailVerified: false,
   verificationEmailStatus: 'unknown',
@@ -62,6 +65,7 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
   refreshEmailVerification: async () => false,
   updateUser: async () => {},
+  updateProfilePhoto: async () => {},
   markOnboardingSeen: async () => {},
 });
 
@@ -75,6 +79,7 @@ export { firestoreErrorMessage };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [emailVerified, setEmailVerified] = useState(false);
   const [verificationEmailStatus, setVerificationEmailStatus] = useState<'unknown' | 'sent' | 'failed'>('unknown');
@@ -86,6 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return onAuthStateChanged(auth, async firebaseUser => {
       if (!firebaseUser) {
         setUser(null);
+        setProfilePhoto(null);
         setEmailVerified(false);
         setVerificationEmailStatus('unknown');
         setHasSeenOnboarding(false);
@@ -127,10 +133,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      const onboardingCompleted = await resolveOnboardingCompleted(firebaseUser.uid, {
-        allowLegacyMigration: Boolean(cached),
-      });
+      const [onboardingCompleted, storedProfilePhoto] = await Promise.all([
+        resolveOnboardingCompleted(firebaseUser.uid, { allowLegacyMigration: Boolean(cached) }),
+        Storage.getForUser<string>(KEYS.PROFILE_PHOTO, firebaseUser.uid),
+      ]);
       if (auth.currentUser?.uid !== firebaseUser.uid) return;
+      setProfilePhoto(storedProfilePhoto);
       setHasSeenOnboarding(
         confirmedReturningUidRef.current === firebaseUser.uid || onboardingCompleted,
       );
@@ -254,6 +262,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await firebaseSignOut(auth);
     await clearGoogleSession();
     setUser(null);
+    setProfilePhoto(null);
     setEmailVerified(false);
     setVerificationEmailStatus('unknown');
   };
@@ -282,6 +291,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updated);
   };
 
+  const updateProfilePhoto = async (uri: string) => {
+    if (!user) return;
+    setProfilePhoto(uri);
+    await Storage.setForUser(KEYS.PROFILE_PHOTO, user.id, uri);
+  };
+
   const markOnboardingSeen = async () => {
     if (!user) return;
     await markOnboardingCompleted(user.id);
@@ -291,6 +306,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <AuthContext.Provider value={{
       user,
+      profilePhoto,
       isLoading,
       emailVerified,
       verificationEmailStatus,
@@ -301,6 +317,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       signOut,
       refreshEmailVerification,
       updateUser,
+      updateProfilePhoto,
       markOnboardingSeen,
     }}>
       {children}

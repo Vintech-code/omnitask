@@ -1,5 +1,6 @@
 import {
   eventOccursOnDate,
+  eventOccurrenceStartOnDate,
   formatEventSchedule,
   nextUpcomingEvent,
   parseEventDateTime,
@@ -40,6 +41,17 @@ describe('event date and timezone behavior', () => {
     expect(eventOccursOnDate(event(), new Date(2026, 6, 18))).toBe(true);
     expect(eventOccursOnDate(event(), new Date(2026, 6, 19))).toBe(true);
     expect(eventOccursOnDate(event(), new Date(2026, 6, 20))).toBe(false);
+  });
+
+  it('reflects recurring events on their current occurrence date', () => {
+    const weekly = event({ startDate: 'Jul 1, 2026', endDate: 'Jul 1, 2026', recurrence: 'weekly' });
+    const daily = event({ startDate: 'Jul 20, 2026', endDate: 'Jul 20, 2026', recurrence: 'daily' });
+    const monthly = event({ startDate: 'Jun 22, 2026', endDate: 'Jun 22, 2026', recurrence: 'monthly' });
+
+    expect(eventOccursOnDate(weekly, new Date(2026, 6, 22))).toBe(true);
+    expect(eventOccursOnDate(daily, new Date(2026, 6, 22))).toBe(true);
+    expect(eventOccursOnDate(monthly, new Date(2026, 6, 22))).toBe(true);
+    expect(eventOccurrenceStartOnDate(weekly, new Date(2026, 6, 22))?.toISOString()).toBe('2026-07-22T00:00:00.000Z');
   });
 
   it('formats all-day ranges without misleading midnight times', () => {

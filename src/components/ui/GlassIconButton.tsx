@@ -2,7 +2,7 @@ import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleProp, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { useTheme } from '@/context/ThemeContext';
-import { radii } from '@/theme';
+import { buttonShadow, radii } from '@/theme';
 
 interface Props {
   name: keyof typeof Ionicons.glyphMap;
@@ -22,7 +22,12 @@ export function GlassIconButton({ name, onPress, accessibilityLabel, active, sty
       onPress={onPress}
       style={[
         styles.button,
-        { backgroundColor: active ? theme.accent.soft : theme.glass.secondary, borderColor: theme.glass.border },
+        buttonShadow,
+        {
+          backgroundColor: active
+            ? theme.dark ? '#3D2A19' : '#FFF0E1'
+            : theme.dark ? '#2B2C29' : '#F8F5F0',
+        },
         style,
       ]}
     >
@@ -36,7 +41,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: radii.pill,
-    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

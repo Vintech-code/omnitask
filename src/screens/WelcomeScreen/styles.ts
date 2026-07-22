@@ -1,4 +1,5 @@
-﻿import { StyleSheet } from 'react-native';
+import { fontFamily } from '@/theme/typography';
+import { StyleSheet } from 'react-native';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 const { height: SCREEN_H } = (require('react-native').Dimensions).get('window');
 
@@ -21,7 +22,7 @@ export const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 32,
-    fontWeight: '900',
+    fontFamily: fontFamily.black,
     color: '#111',
     letterSpacing: -0.5,
     marginBottom: 4,
@@ -29,7 +30,7 @@ export const styles = StyleSheet.create({
   tagline: {
     fontSize: 15,
     color: '#888',
-    fontWeight: '500',
+    fontFamily: fontFamily.medium,
   },
 
   /* Balancing animation */
@@ -62,7 +63,7 @@ export const styles = StyleSheet.create({
   btnPrimaryText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: fontFamily.extrabold,
     letterSpacing: 0.2,
   },
   btnSecondary: {
@@ -77,7 +78,7 @@ export const styles = StyleSheet.create({
   },
   btnSecondaryText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     color: '#444',
   },
 
@@ -92,7 +93,7 @@ export const styles = StyleSheet.create({
     marginHorizontal: 12,
     fontSize: 11,
     color: '#AAA',
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     letterSpacing: 1,
   },
 

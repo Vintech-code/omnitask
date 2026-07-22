@@ -1,3 +1,4 @@
+import { fontFamily } from '@/theme/typography';
 import { StyleSheet } from 'react-native';
 
 const styles = StyleSheet.create({
@@ -24,7 +25,7 @@ const styles = StyleSheet.create({
   eyebrow: {
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
     letterSpacing: 2.2,
   },
   center: {
@@ -36,14 +37,14 @@ const styles = StyleSheet.create({
   time: {
     fontSize: 58,
     lineHeight: 68,
-    fontWeight: '300',
+    fontFamily: fontFamily.light,
     letterSpacing: -2,
   },
   label: {
     marginTop: 12,
     fontSize: 22,
     lineHeight: 28,
-    fontWeight: '600',
+    fontFamily: fontFamily.semibold,
     textAlign: 'center',
   },
   controls: {
@@ -61,7 +62,7 @@ const styles = StyleSheet.create({
   snoozeText: {
     fontSize: 16,
     lineHeight: 22,
-    fontWeight: '700',
+    fontFamily: fontFamily.bold,
   },
   stopButton: {
     height: 64,
@@ -76,7 +77,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 17,
     lineHeight: 23,
-    fontWeight: '800',
+    fontFamily: fontFamily.extrabold,
   },
 });
 
