@@ -1,8 +1,9 @@
 import React from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
 const mockNavigate = jest.fn();
 const mockUpdateNote = jest.fn();
+const mockToggleTheme = jest.fn();
 
 const mockEvent = {
   id: 'event-1',
@@ -58,16 +59,19 @@ jest.mock('@/context/ThemeContext', () => ({
   useTheme: () => ({
     theme: {
       dark: false,
-      background: { base: '#F3F3F1' },
+      background: { base: '#EDEDEF' },
       glass: {
         primary: 'rgba(255,255,255,.58)', secondary: 'rgba(255,255,255,.38)',
         solid: 'rgba(255,255,255,.86)', border: '#FFF', highlight: '#FFF',
       },
       content: { primary: '#171717', secondary: '#666', muted: '#92938F' },
-      accent: { base: '#FF7A00', soft: 'rgba(255,122,0,.13)' },
-      semantic: { success: '#74B82A', warning: '#E7A126', danger: '#E45B55', info: '#6E9FBD' },
+      accent: { base: '#12B9A9', soft: 'rgba(196,224,225,.72)' },
+      iconTile: { coral: '#F26841', cyan: '#34C7D9', teal: '#12B9A9', blue: '#20A6EB', foreground: '#EDEDEF' },
+      semantic: { success: '#12B9A9', warning: '#F26841', danger: '#D84F37', info: '#20A6EB' },
       divider: 'rgba(23,23,23,.09)',
     },
+    isDark: false,
+    toggleTheme: mockToggleTheme,
   }),
 }));
 
@@ -130,13 +134,14 @@ describe('DashboardScreen', () => {
     expect(screen.getByText('Morning meeting')).toBeTruthy();
     expect(screen.getByText('Focus session')).toBeTruthy();
     expect(screen.getByText('25:00')).toBeTruthy();
-    expect(screen.getByText('DAY LENS')).toBeTruthy();
+    expect(screen.getByText('Day Lens')).toBeTruthy();
     expect(screen.getByText('Open checklist items')).toBeTruthy();
     expect(screen.getByText('Unfinished items from your Notes')).toBeTruthy();
     expect(screen.getByText('Finish dashboard design')).toBeTruthy();
     expect(screen.queryByText('Quick actions')).toBeNull();
     expect(screen.queryByText('Hourly forecast')).toBeNull();
-    expect(screen.getByText("Today's insight")).toBeTruthy();
+    expect(screen.queryByText("Today's insight")).toBeNull();
+    expect(screen.getByLabelText('Switch to dark mode')).toBeTruthy();
   });
 
   it('keeps dashboard actions functional and completes real checklist items', async () => {
@@ -153,5 +158,11 @@ describe('DashboardScreen', () => {
 
     await fireEvent.press(screen.getByText('New checklist'));
     expect(mockNavigate).toHaveBeenCalledWith('Tasks', expect.objectContaining({ section: 'notes', createType: 'checklist' }));
+
+    await act(async () => {
+      await fireEvent.press(screen.getByLabelText('Switch to dark mode'));
+      await jest.advanceTimersByTimeAsync(120);
+    });
+    expect(mockToggleTheme).toHaveBeenCalledTimes(1);
   });
 });

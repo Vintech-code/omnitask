@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Linking, Platform } from 'react-native';
 import { getAlarmSound } from './AlarmSounds';
+import { OMNITASK_PALETTE } from '@/theme/colors';
 
 const ALARM_PREFIX = 'alarm_';
 export const ALARM_CATEGORY_ID = 'omnitask_alarm';
@@ -79,7 +80,7 @@ async function ensureAlarmChannel(sound: string, vibrate: boolean) {
     enableVibrate: vibrate,
     vibrationPattern: vibrate ? [0, 400, 200, 400, 200, 700] : null,
     enableLights: true,
-    lightColor: '#FF7A00',
+    lightColor: OMNITASK_PALETTE.actionBlue,
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     bypassDnd: false,
     showBadge: true,

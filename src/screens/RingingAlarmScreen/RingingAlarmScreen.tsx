@@ -88,8 +88,8 @@ export default function RingingAlarmScreen({ navigation, route }: Props) {
       <AppBackground />
       <SafeAreaView style={styles.safe}>
         <View style={styles.heading}>
-          <View style={[styles.icon, { backgroundColor: theme.accent.soft }]}>
-            <Ionicons name="alarm" size={28} color={theme.accent.base} />
+          <View style={[styles.icon, { backgroundColor: theme.iconTile.coral }]}>
+            <Ionicons name="alarm" size={28} color={theme.iconTile.foreground} />
           </View>
           <Text style={[styles.eyebrow, { color: theme.content.secondary }]}>ALARM</Text>
         </View>

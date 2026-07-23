@@ -1,6 +1,8 @@
 ﻿import React, { useState, useRef } from 'react';
-import { View, Image, ActivityIndicator, Alert, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { View, Image, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import { AppText as Text } from '@/components/ui/AppText';
+import { OmniLoader } from '@/components/ui/OmniLoader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import LottieView from 'lottie-react-native';
@@ -262,7 +264,7 @@ export default function OnboardingScreen({ navigation }: Props) {
           onPress={handleNext}
           activeOpacity={0.85}
         >
-          {isSubmitting && <ActivityIndicator size="small" color="#FFFDF8" />}
+          {isSubmitting && <OmniLoader size="small" onPrimary accessibilityLabel="Saving onboarding" />}
           <Text style={s.btnText}>
             {isSubmitting ? (step === 2 ? 'Enabling…' : 'Please wait…')
              : step === 0 ? 'Get Started'

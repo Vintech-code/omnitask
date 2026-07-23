@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, ScrollView, TouchableOpacity, View } from 'react-native';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { AppText as Text } from '@/components/ui/AppText';
+import { OmniLoader } from '@/components/ui/OmniLoader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -157,7 +158,7 @@ export default function SignUpScreen({ navigation }: any) {
           >
             {loading ? (
               <View style={s.loadingRow}>
-                <ActivityIndicator color="#fff" />
+                <OmniLoader size="small" onPrimary accessibilityLabel="Creating account" />
                 <Text style={s.btnText}>Creating account...</Text>
               </View>
             ) : (

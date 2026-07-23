@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import {
   collection, onSnapshot, QuerySnapshot,
 } from 'firebase/firestore';

@@ -1,6 +1,8 @@
 ﻿import React, { useState } from 'react';
-import { View, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, ScrollView } from 'react-native';
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import { AppText as Text } from '@/components/ui/AppText';
+import { OmniLoader } from '@/components/ui/OmniLoader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
@@ -115,7 +117,7 @@ export default function SignInScreen({ navigation }: any) {
         {/* Sign In button */}
         <TouchableOpacity testID="sign-in-submit" style={[s.btnPrimary, { backgroundColor: theme.accent.base }, loading && s.btnDisabled]} onPress={handleSignIn} activeOpacity={0.85} disabled={loading}>
           {loading
-            ? <View style={s.loadingContent}><ActivityIndicator color="#fff" /><Text style={s.btnText}>Signing in...</Text></View>
+            ? <View style={s.loadingContent}><OmniLoader size="small" onPrimary accessibilityLabel="Signing in" /><Text style={s.btnText}>Signing in...</Text></View>
             : <>
                 <Text style={s.btnText}>Sign In</Text>
                 <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />

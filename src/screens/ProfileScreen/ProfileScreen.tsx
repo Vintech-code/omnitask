@@ -1,356 +1,310 @@
-﻿import React, { useRef, useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Switch, Animated, ScrollView, Alert, Image, Modal, Pressable, KeyboardAvoidingView, Platform, Linking } from 'react-native';
-import { AppText as Text, AppTextInput as TextInput } from '@/components/ui/AppText';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Image,
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useTheme } from '@/context/ThemeContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
+import { AppText as Text, AppTextInput as TextInput } from '@/components/ui/AppText';
+import { AppBackground, OmniLoader } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
-import { BRAND_BLUE as BLUE } from '@/theme/colors';
-import { epStyles, makeStyles } from './styles';
-import { AppBackground } from '@/components/ui';
+import { useTheme } from '@/context/ThemeContext';
+import { makeStyles } from './styles';
 
+type ProfileNavigation = {
+  goBack: () => void;
+  reset: (state: { index: number; routes: Array<{ name: string }> }) => void;
+};
 
-interface MenuRow {
-  icon: string;
-  lib: 'ion' | 'mc';
+interface ActionRowProps {
+  icon: keyof typeof Ionicons.glyphMap;
   label: string;
-  action: () => void;
-  right?: React.ReactElement;
-  danger?: boolean;
+  detail: string;
+  color: string;
+  onPress: () => void;
 }
 
-export default function ProfileScreen({ navigation }: any) {
-  const { theme, isDark, toggleTheme, useSystemTheme, setUseSystemTheme } = useTheme();
-  const { user, signOut, updateUser, profilePhoto, updateProfilePhoto } = useAuth();
+function ActionRow({ icon, label, detail, color, onPress }: ActionRowProps) {
+  const { theme } = useTheme();
   const s = makeStyles(theme);
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={`${label}. ${detail}`}
+      activeOpacity={0.72}
+      onPress={onPress}
+      style={s.actionRow}
+    >
+      <View style={[s.actionIcon, { backgroundColor: color }]}>
+        <Ionicons name={icon} size={20} color={theme.iconTile.foreground} />
+      </View>
+      <View style={s.actionCopy}>
+        <Text style={s.actionLabel}>{label}</Text>
+        <Text style={s.actionDetail}>{detail}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={theme.content.muted} />
+    </TouchableOpacity>
+  );
+}
 
+export default function ProfileScreen({ navigation }: { navigation: ProfileNavigation }) {
+  const { theme } = useTheme();
+  const { user, emailVerified, signOut, updateUser, profilePhoto, updateProfilePhoto } = useAuth();
+  const s = makeStyles(theme);
+  const entrance = useRef(new Animated.Value(0)).current;
   const [editModal, setEditModal] = useState(false);
   const [editName, setEditName] = useState(user?.name ?? '');
   const [saving, setSaving] = useState(false);
-  const [langModal, setLangModal] = useState(false);
-  const [selectedLang, setSelectedLang] = useState('English');
-  const [privacyModal, setPrivacyModal] = useState(false);
-  const [helpModal, setHelpModal] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    Animated.timing(entrance, {
+      toValue: 1,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [entrance]);
 
   const pickPhoto = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow access to your photo library.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
-    if (!result.canceled && result.assets[0]?.uri) {
-      const uri = result.assets[0].uri;
-      await updateProfilePhoto(uri);
+    if (photoBusy) return;
+    setPhotoBusy(true);
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Photo access needed', 'Allow photo access in Settings to choose a profile picture.', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+        ]);
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
+      if (!result.canceled && result.assets[0]?.uri) {
+        await updateProfilePhoto(result.assets[0].uri);
+      }
+    } catch (error) {
+      Alert.alert('Could not update photo', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setPhotoBusy(false);
     }
   };
 
-  const handleSaveProfile = async () => {
+  const openEditor = () => {
+    setEditName(user?.name ?? '');
+    setEditModal(true);
+  };
+
+  const saveProfile = async () => {
     const name = editName.trim();
-    if (!name) { Alert.alert('Name required', 'Please enter your name.'); return; }
+    if (!name || saving) {
+      if (!name) Alert.alert('Name required', 'Enter the name you want OmniTask to display.');
+      return;
+    }
     setSaving(true);
     try {
       await updateUser({ name });
       setEditModal(false);
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Could not save changes.');
+    } catch (error) {
+      Alert.alert('Could not save profile', error instanceof Error ? error.message : 'Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
-  const initials = user?.name
-    ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-    : 'OT';
-
-  const rows: MenuRow[] = [
-    {
-      icon: 'person-circle-outline', lib: 'ion',
-      label: 'Edit Profile',
-      action: () => { setEditName(user?.name ?? ''); setEditModal(true); },
-    },
-    {
-      icon: 'notifications-outline', lib: 'ion',
-      label: 'Notifications',
-      action: () => Linking.openSettings(),
-    },
-    {
-      icon: 'camera-outline', lib: 'ion',
-      label: 'Change Profile Photo',
-      action: pickPhoto,
-    },
-    {
-      icon: 'moon-outline', lib: 'ion',
-      label: 'Dark Mode',
-      action: () => { if (!useSystemTheme) toggleTheme(); },
-      right: (
-        <Switch
-          value={isDark}
-          onValueChange={() => { if (!useSystemTheme) toggleTheme(); }}
-          trackColor={{ false: '#ccc', true: BLUE }}
-          thumbColor="#fff"
-          disabled={useSystemTheme}
-        />
-      ),
-    },
-    {
-      icon: 'phone-portrait-outline', lib: 'ion',
-      label: 'Follow System Theme',
-      action: () => setUseSystemTheme(!useSystemTheme),
-      right: (
-        <Switch
-          value={useSystemTheme}
-          onValueChange={setUseSystemTheme}
-          trackColor={{ false: '#ccc', true: BLUE }}
-          thumbColor="#fff"
-        />
-      ),
-    },
-    {
-      icon: 'language-outline', lib: 'ion',
-      label: 'Language',
-      action: () => setLangModal(true),
-    },
-    {
-      icon: 'lock-closed-outline', lib: 'ion',
-      label: 'Privacy & Security',
-      action: () => setPrivacyModal(true),
-    },
-    {
-      icon: 'cloud-outline', lib: 'ion',
-      label: 'Backup & Sync',
-      action: () => Alert.alert('Backup & Sync', 'Your data is automatically synced to Firebase in real time. All notes, events, and alarms are backed up to the cloud.'),
-    },
-    {
-      icon: 'help-circle-outline', lib: 'ion',
-      label: 'Help & Support',
-      action: () => setHelpModal(true),
-    },
-    {
-      icon: 'information-circle-outline', lib: 'ion',
-      label: 'About OmniTask',
-      action: () => Alert.alert(
-        'OmniTask v1.0.0',
-        'Built with React Native & Expo\n\nDeveloped for productivity lovers who want a unified tasks, events & alarms experience.\n\n© 2025 OmniTask. All rights reserved.',
-        [{ text: 'Close', style: 'cancel' }]
-      ),
-    },
-    {
-      icon: 'log-out-outline', lib: 'ion',
-      label: 'Sign Out',
-      danger: true,
-      action: () =>
-        Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign Out', style: 'destructive', onPress: async () => {
+  const confirmSignOut = () => {
+    Alert.alert('Sign out?', 'Your synced data stays attached to this account.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: async () => {
+          if (signingOut) return;
+          setSigningOut(true);
+          try {
             await signOut();
             navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
-          }},
-        ]),
-    },
-  ];
+          } catch (error) {
+            Alert.alert('Could not sign out', error instanceof Error ? error.message : 'Please try again.');
+          } finally {
+            setSigningOut(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const initials = user?.name
+    ? user.name.split(/\s+/).map(word => word[0]).join('').toUpperCase().slice(0, 2)
+    : 'OT';
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <AppBackground />
-      {/* ── Header ── */}
       <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={theme.iconColor} />
+        <TouchableOpacity accessibilityLabel="Go back" onPress={navigation.goBack} style={s.headerButton}>
+          <Ionicons name="arrow-back" size={22} color={theme.icon} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Profile</Text>
-        <View style={{ width: 38 }} />
+        <View style={s.headerCopy}>
+          <Text style={s.headerTitle}>Profile</Text>
+          <Text style={s.headerSubtitle}>Your OmniTask identity</Text>
+        </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-        {/* ── Avatar Card ── */}
-        <View style={s.avatarCard}>
-          <TouchableOpacity onPress={pickPhoto} style={s.avatarCircle}>
-            {profilePhoto
-              ? <Image source={{ uri: profilePhoto }} style={s.avatarPhoto} />
-              : <Text style={s.avatarInitials}>{initials}</Text>
-            }
-            <View style={s.cameraOverlay}>
-              <Ionicons name="camera" size={14} color="#fff" />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>
+        <Animated.View
+          style={[
+            s.hero,
+            {
+              opacity: entrance,
+              transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={theme.dark
+              ? ['rgba(42,62,63,0.98)', 'rgba(21,56,58,0.94)', 'rgba(16,26,27,0.98)']
+              : ['rgba(255,255,255,0.98)', 'rgba(196,224,225,0.86)', 'rgba(121,198,202,0.68)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={s.heroGradient}
+          />
+          <View pointerEvents="none" style={s.heroRailWide} />
+          <View pointerEvents="none" style={s.heroRailFine} />
+
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Change profile photo"
+            disabled={photoBusy}
+            activeOpacity={0.78}
+            onPress={() => void pickPhoto()}
+            style={s.avatar}
+          >
+            {profilePhoto ? (
+              <Image source={{ uri: profilePhoto }} style={s.avatarPhoto} />
+            ) : (
+              <LinearGradient
+                colors={[theme.iconTile.blue, theme.iconTile.teal]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={s.avatarFallback}
+              >
+                <Text style={s.avatarInitials}>{initials}</Text>
+              </LinearGradient>
+            )}
+            <View style={s.photoAction}>
+              {photoBusy ? <OmniLoader size="small" onPrimary accessibilityLabel="Updating profile photo" /> : <Ionicons name="camera" size={15} color={theme.iconTile.foreground} />}
             </View>
           </TouchableOpacity>
-          <View style={{ flex: 1, marginLeft: 16 }}>
-            <Text style={s.profileName}>{user?.name ?? 'Guest'}</Text>
-            <Text style={s.profileEmail}>{user?.email ?? ''}</Text>
-            <TouchableOpacity
-              style={s.editBtn}
-              onPress={() => { setEditName(user?.name ?? ''); setEditModal(true); }}
-            >
-              <Text style={s.editBtnText}>Edit</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
-        {/* ── Settings rows ── */}
-        <View style={s.section}>
-          {rows.map((row, i) => (
-            <TouchableOpacity
-              key={row.label}
-              style={[
-                s.row,
-                i === 0 && s.rowFirst,
-                i === rows.length - 1 && s.rowLast,
-              ]}
-              onPress={row.action}
-              activeOpacity={row.right ? 1 : 0.7}
-            >
-              <View style={[s.rowIcon, row.danger && s.rowIconDanger]}>
-                {row.lib === 'ion'
-                  ? <Ionicons name={row.icon as any} size={20} color={row.danger ? '#E05252' : BLUE} />
-                  : <MaterialCommunityIcons name={row.icon as any} size={20} color={row.danger ? '#E05252' : BLUE} />}
+          <View style={s.identity}>
+            <Text style={s.name} numberOfLines={1}>{user?.name || 'OmniTask user'}</Text>
+            <Text style={s.email} numberOfLines={1}>{user?.email || ''}</Text>
+            <View style={s.statusRow}>
+              <View style={s.statusPill}>
+                <View style={[s.statusDot, { backgroundColor: emailVerified ? theme.semantic.success : theme.semantic.warning }]} />
+                <Text style={s.statusText}>{emailVerified ? 'Verified account' : 'Signed in'}</Text>
               </View>
-              <Text style={[s.rowLabel, row.danger && s.rowLabelDanger]}>{row.label}</Text>
-              {row.right
-                ? <View style={{ marginLeft: 'auto' }}>{row.right}</View>
-                : !row.danger && (
-                    <Ionicons
-                      name="chevron-forward"
-                      size={16}
-                      color={theme.textDim}
-                      style={{ marginLeft: 'auto' }}
-                    />
-                  )}
-            </TouchableOpacity>
-          ))}
-        </View>
+              <View style={s.statusPill}>
+                <View style={[s.statusDot, { backgroundColor: theme.iconTile.blue }]} />
+                <Text style={s.statusText}>Offline-ready</Text>
+              </View>
+            </View>
+          </View>
 
-        <Text style={s.version}>OmniTask v1.0.0</Text>
-        <View style={{ height: 40 }} />
+          <TouchableOpacity accessibilityRole="button" onPress={openEditor} style={s.editButton}>
+            <Text style={s.editButtonText}>Edit profile</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        <Animated.View style={[s.section, { opacity: entrance }]}>
+          <View style={s.sectionHeader}>
+            <Text style={s.sectionTitle}>Account controls</Text>
+            <Text style={s.sectionDescription}>Only settings with an active action are shown here.</Text>
+          </View>
+          <View style={s.actionGroup}>
+            <ActionRow
+              icon="person-outline"
+              label="Display name"
+              detail="Update how your name appears"
+              color={theme.iconTile.teal}
+              onPress={openEditor}
+            />
+            <View style={s.divider} />
+            <ActionRow
+              icon="notifications-outline"
+              label="Notification settings"
+              detail="Manage Android permissions and alerts"
+              color={theme.iconTile.blue}
+              onPress={() => void Linking.openSettings()}
+            />
+          </View>
+        </Animated.View>
+
+        <TouchableOpacity
+          accessibilityRole="button"
+          disabled={signingOut}
+          activeOpacity={0.74}
+          onPress={confirmSignOut}
+          style={s.signOutButton}
+        >
+          {signingOut ? <OmniLoader size="small" accessibilityLabel="Signing out" /> : null}
+          <Text style={s.signOutText}>{signingOut ? 'Signing out…' : 'Sign out'}</Text>
+        </TouchableOpacity>
+        <Text style={s.version}>OmniTask 1.0.0</Text>
       </ScrollView>
 
-      {/* ── Edit Profile Modal ── */}
-      <Modal visible={editModal} animationType="slide" transparent onRequestClose={() => setEditModal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={epStyles.overlay} onPress={() => setEditModal(false)} />
-          <View style={[epStyles.sheet, { backgroundColor: theme.bg }]}>
-            <View style={[epStyles.handle, { backgroundColor: theme.border }]} />
-            <View style={[epStyles.head, { borderBottomColor: theme.border }]}>
-              <TouchableOpacity onPress={() => setEditModal(false)}>
-                <Text style={[epStyles.cancel, { color: theme.textDim }]}>Cancel</Text>
+      <Modal visible={editModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => !saving && setEditModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.modalLayer}>
+          <Pressable
+            accessibilityLabel="Close edit profile"
+            disabled={saving}
+            onPress={() => setEditModal(false)}
+            style={s.modalBackdrop}
+          />
+          <View style={s.dialog}>
+            <Text style={s.dialogTitle}>Edit profile</Text>
+            <Text style={s.dialogCopy}>This name appears in your greeting and shared workspace presence.</Text>
+            <Text style={s.inputLabel}>Display name</Text>
+            <TextInput
+              autoFocus
+              editable={!saving}
+              maxLength={50}
+              returnKeyType="done"
+              value={editName}
+              onChangeText={setEditName}
+              onSubmitEditing={() => void saveProfile()}
+              placeholder="Your name"
+              placeholderTextColor={theme.content.muted}
+              style={s.input}
+            />
+            <View style={s.dialogActions}>
+              <TouchableOpacity disabled={saving} onPress={() => setEditModal(false)} style={s.cancelButton}>
+                <Text style={s.cancelText}>Cancel</Text>
               </TouchableOpacity>
-              <Text style={[epStyles.title, { color: theme.text }]}>Edit Profile</Text>
-              <TouchableOpacity onPress={handleSaveProfile} disabled={saving}>
-                <Text style={[epStyles.done, { color: saving ? theme.textDim : BLUE }]}>{saving ? 'Saving…' : 'Save'}</Text>
+              <TouchableOpacity disabled={saving || !editName.trim()} onPress={() => void saveProfile()} style={[s.saveButton, (saving || !editName.trim()) && s.disabled]}>
+                {saving ? <OmniLoader size="small" onPrimary accessibilityLabel="Saving profile" /> : null}
+                <Text style={s.saveText}>{saving ? 'Saving…' : 'Save changes'}</Text>
               </TouchableOpacity>
-            </View>
-            <View style={epStyles.body}>
-              <Text style={[epStyles.label, { color: theme.textDim }]}>Display Name</Text>
-              <TextInput
-                style={[epStyles.input, { backgroundColor: theme.bg2, borderColor: theme.border, color: theme.text }]}
-                value={editName}
-                onChangeText={setEditName}
-                placeholder="Your name"
-                placeholderTextColor={theme.textDim}
-                autoFocus
-                maxLength={50}
-                returnKeyType="done"
-                onSubmitEditing={handleSaveProfile}
-              />
-              <Text style={[epStyles.hint, { color: theme.textDim }]}>This name is shown across your profile and greetings.</Text>
             </View>
           </View>
         </KeyboardAvoidingView>
-      </Modal>
-
-      {/* ── Language Modal ── */}
-      <Modal visible={langModal} animationType="slide" transparent onRequestClose={() => setLangModal(false)}>
-        <Pressable style={epStyles.overlay} onPress={() => setLangModal(false)} />
-        <View style={[epStyles.sheet, { backgroundColor: theme.bg }]}>
-          <View style={[epStyles.handle, { backgroundColor: theme.border }]} />
-          <View style={[epStyles.head, { borderBottomColor: theme.border }]}>
-            <View style={{ width: 56 }} />
-            <Text style={[epStyles.title, { color: theme.text }]}>Language</Text>
-            <TouchableOpacity onPress={() => setLangModal(false)}>
-              <Text style={[epStyles.done, { color: BLUE }]}>Done</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={{ paddingHorizontal: 16, paddingTop: 8 }}>
-            {['English', 'Spanish', 'French', 'German', 'Arabic'].map(lang => (
-              <TouchableOpacity
-                key={lang}
-                style={[epStyles.langRow, { borderBottomColor: theme.border }]}
-                onPress={() => setSelectedLang(lang)}
-              >
-                <Text style={[epStyles.langText, { color: theme.text }]}>{lang}</Text>
-                {selectedLang === lang && <Ionicons name="checkmark" size={20} color={BLUE} />}
-              </TouchableOpacity>
-            ))}
-            <View style={{ height: 40 }} />
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* ── Privacy & Security Modal ── */}
-      <Modal visible={privacyModal} animationType="slide" transparent onRequestClose={() => setPrivacyModal(false)}>
-        <Pressable style={epStyles.overlay} onPress={() => setPrivacyModal(false)} />
-        <View style={[epStyles.sheet, epStyles.tallSheet, { backgroundColor: theme.bg }]}>
-          <View style={[epStyles.handle, { backgroundColor: theme.border }]} />
-          <View style={[epStyles.head, { borderBottomColor: theme.border }]}>
-            <View style={{ width: 56 }} />
-            <Text style={[epStyles.title, { color: theme.text }]}>Privacy & Security</Text>
-            <TouchableOpacity onPress={() => setPrivacyModal(false)}>
-              <Text style={[epStyles.done, { color: BLUE }]}>Close</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={epStyles.body}>
-            {[
-              { heading: 'Data Storage', body: 'Your notes, tasks, events, and alarms are stored securely on Firebase Firestore with encryption at rest.' },
-              { heading: 'No Data Selling', body: 'OmniTask never sells your personal data to third parties. Your information is yours.' },
-              { heading: 'Authentication', body: 'Passwords are hashed and managed by Firebase Authentication. We never store plain-text passwords.' },
-              { heading: 'Data Deletion', body: 'You can permanently delete your account and all associated data from within the app at any time.' },
-              { heading: 'Permissions', body: 'OmniTask requests only the permissions it needs: camera/photos for profile pictures, and notifications for reminders.' },
-            ].map(item => (
-              <View key={item.heading} style={{ marginBottom: 20 }}>
-                <Text style={[epStyles.label, { color: BLUE }]}>{item.heading}</Text>
-                <Text style={[epStyles.hint, { color: theme.textSub, fontSize: 14, lineHeight: 21 }]}>{item.body}</Text>
-              </View>
-            ))}
-            <View style={{ height: 40 }} />
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* ── Help & Support Modal ── */}
-      <Modal visible={helpModal} animationType="slide" transparent onRequestClose={() => setHelpModal(false)}>
-        <Pressable style={epStyles.overlay} onPress={() => setHelpModal(false)} />
-        <View style={[epStyles.sheet, epStyles.tallSheet, { backgroundColor: theme.bg }]}>
-          <View style={[epStyles.handle, { backgroundColor: theme.border }]} />
-          <View style={[epStyles.head, { borderBottomColor: theme.border }]}>
-            <View style={{ width: 56 }} />
-            <Text style={[epStyles.title, { color: theme.text }]}>Help & Support</Text>
-            <TouchableOpacity onPress={() => setHelpModal(false)}>
-              <Text style={[epStyles.done, { color: BLUE }]}>Close</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={epStyles.body}>
-            {[
-              { q: 'What is OmniTask?', a: 'OmniTask is an all-in-one productivity app combining To-Do lists, Calendar Events, and Alarms in one place.' },
-              { q: 'How do I create a task?', a: 'Tap the + button on the Tasks tab. Fill in a title and optional body, then tap Save.' },
-              { q: 'How do I set an alarm?', a: 'Go to the Alarms tab and tap the + button. Set your time, repeat options, and label.' },
-              { q: 'Can I add recurring events?', a: 'Yes! When creating an event, tap the recurrence option and choose Daily, Weekly, or Monthly.' },
-              { q: 'How do I change my profile photo?', a: 'Tap your avatar on the Profile screen or use "Change Profile Photo" in the settings list.' },
-              { q: 'My data is not syncing.', a: 'Ensure you have an active internet connection. Data syncs with Firebase in real time when online.' },
-              { q: 'How do I delete my account?', a: 'Contact support at support@omnitask.app and we will permanently delete your account and data within 48 hours.' },
-            ].map(item => (
-              <View key={item.q} style={{ marginBottom: 20 }}>
-                <Text style={[epStyles.label, { color: BLUE }]}>{item.q}</Text>
-                <Text style={[epStyles.hint, { color: theme.textSub, fontSize: 14, lineHeight: 21 }]}>{item.a}</Text>
-              </View>
-            ))}
-            <View style={{ height: 40 }} />
-          </ScrollView>
-        </View>
       </Modal>
     </SafeAreaView>
   );

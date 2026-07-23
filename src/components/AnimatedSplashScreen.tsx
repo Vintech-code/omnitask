@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
 import { AppText as Text } from '@/components/ui/AppText';
 import { LinearGradient } from 'expo-linear-gradient';
+import { OMNITASK_PALETTE } from '@/theme/colors';
 
 type Props = { onFinish: () => void };
 
@@ -37,7 +38,7 @@ export function AnimatedSplashScreen({ onFinish }: Props) {
   return (
     <Animated.View pointerEvents="auto" style={[styles.container, { opacity: screenOpacity }]}>
       <LinearGradient
-        colors={['#F8F8F5', '#F3F4F2', '#EEF2F4']}
+        colors={[OMNITASK_PALETTE.frostWhite, OMNITASK_PALETTE.pearlIce, OMNITASK_PALETTE.lightGradientEnd]}
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.brand}>
@@ -63,8 +64,8 @@ const styles = StyleSheet.create({
   brand: { alignItems: 'center', marginTop: -24 },
   logoStage: { width: 154, height: 154, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
   logo: { width: 124, height: 124 },
-  orbit: { position: 'absolute', width: 148, height: 148, borderRadius: 74, borderWidth: 1, borderColor: 'rgba(255,122,0,0.18)' },
-  orbitDot: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF7A00', top: 11, right: 18 },
+  orbit: { position: 'absolute', width: 148, height: 148, borderRadius: 74, borderWidth: 1, borderColor: 'rgba(47,111,145,0.20)' },
+  orbitDot: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: OMNITASK_PALETTE.actionBlue, top: 11, right: 18 },
   title: { textAlign: 'center', color: '#171717', fontSize: 30, lineHeight: 36, fontFamily: fontFamily.black, letterSpacing: -0.6 },
   subtitle: { marginTop: 5, textAlign: 'center', color: '#747671', fontSize: 13, lineHeight: 18, fontFamily: fontFamily.semibold, letterSpacing: 0.2 },
 });

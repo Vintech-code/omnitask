@@ -8,7 +8,7 @@
     "icon": "./assets/omnitasklogo.png",
     "userInterfaceStyle": "automatic",
     "androidStatusBar": {
-      "backgroundColor": "#F3F3F1",
+      "backgroundColor": "#EDEDEF",
       "barStyle": "dark-content",
       "translucent": false
     },
@@ -29,7 +29,7 @@
         "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#F3F3F1",
+        "backgroundColor": "#EDEDEF",
         "foregroundImage": "./assets/omnitasklogo.png"
       },
       "package": "com.vincentements_007.omnitask"
@@ -46,12 +46,12 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F3F3F1",
+          "backgroundColor": "#EDEDEF",
           "image": "./assets/omnitasklogo.png",
           "imageWidth": 180,
           "resizeMode": "contain",
           "dark": {
-            "backgroundColor": "#F8F8F5",
+            "backgroundColor": "#101A1B",
             "image": "./assets/omnitasklogo.png"
           }
         }
@@ -75,7 +75,7 @@
       [
         "expo-notifications",
         {
-          "color": "#FF7A00"
+          "color": "#12B9A9"
         }
       ],
         "./plugins/withAlarmNotificationSounds",

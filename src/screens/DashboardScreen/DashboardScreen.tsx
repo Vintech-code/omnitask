@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, RefreshControl, ScrollView, type StyleProp, TouchableOpacity, useWindowDimensions, View, type ViewStyle } from 'react-native';
+import { Animated, Image, RefreshControl, ScrollView, StyleSheet, type StyleProp, TouchableOpacity, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { AppText as Text } from '@/components/ui/AppText';
+import { OmniLoader } from '@/components/ui/OmniLoader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,7 +18,6 @@ import { useCurrentWeather } from '@/hooks/useCurrentWeather';
 import { useDayLens } from '@/hooks/useDayLens';
 import { hydrateFocusSessions } from '@/services/FocusStatsService';
 import type { Note } from '@/types/note';
-import type { DayLensInsight } from '@/types/weather';
 import { eventOccurrenceStartOnDate, eventStart } from '@/utils/eventDate';
 import { weatherConditionLabel } from '@/utils/weather';
 import { weatherArtwork } from '@/components/weather/weatherArtwork';
@@ -81,28 +81,26 @@ function taskMeta(note: Note) {
 function DashboardGlyph({
   name,
   color,
-  tint,
   size = 23,
   style,
 }: {
   name: keyof typeof Ionicons.glyphMap;
   color: string;
-  tint: string;
   size?: number;
   style?: StyleProp<ViewStyle>;
 }) {
   const { theme } = useTheme();
   const backgroundColor = color === theme.semantic.success
-    ? theme.dark ? '#26371F' : '#EAF5DE'
+    ? theme.iconTile.cyan
     : color === theme.semantic.danger
-      ? theme.dark ? '#422624' : '#FCE8E6'
+      ? theme.iconTile.coral
       : color === theme.semantic.warning
-        ? theme.dark ? '#40331D' : '#FBF0D7'
+        ? theme.iconTile.coral
         : color === theme.semantic.info
-          ? theme.dark ? '#22333C' : '#E6F0F4'
+          ? theme.iconTile.blue
           : color === theme.accent.base
-            ? theme.dark ? '#3D2A19' : '#FFF0E1'
-            : theme.dark ? '#2B2C29' : '#F2F1ED';
+            ? theme.iconTile.teal
+            : theme.iconTile.blue;
   return (
     <View
       style={[
@@ -111,8 +109,111 @@ function DashboardGlyph({
         style,
       ]}
     >
-      <Ionicons name={name} size={size} color={color} />
+      <Ionicons name={name} size={size} color={theme.iconTile.foreground} />
     </View>
+  );
+}
+
+function WeatherCardBackdrop({ weatherCode, dark }: { weatherCode?: number; dark: boolean }) {
+  let colors: [string, string, string];
+  let frontColor: string;
+
+  if (dark) {
+    colors = ['rgba(42,62,63,0.98)', 'rgba(21,56,58,0.92)', 'rgba(16,26,27,0.98)'];
+    frontColor = 'rgba(237,237,239,0.08)';
+  } else if (weatherCode !== undefined && (weatherCode >= 51 && weatherCode <= 82)) {
+    colors = ['rgba(255,255,255,0.98)', 'rgba(121,198,202,0.84)', 'rgba(32,166,235,0.34)'];
+    frontColor = 'rgba(237,237,239,0.28)';
+  } else if (weatherCode !== undefined && weatherCode >= 95) {
+    colors = ['rgba(255,255,255,0.98)', 'rgba(196,224,225,0.86)', 'rgba(51,175,173,0.54)'];
+    frontColor = 'rgba(23,26,26,0.07)';
+  } else if (weatherCode !== undefined && weatherCode <= 1) {
+    colors = ['rgba(255,255,255,0.98)', 'rgba(252,229,222,0.78)', 'rgba(52,199,217,0.28)'];
+    frontColor = 'rgba(242,104,65,0.10)';
+  } else {
+    colors = ['rgba(255,255,255,0.98)', 'rgba(196,224,225,0.90)', 'rgba(121,198,202,0.58)'];
+    frontColor = 'rgba(237,237,239,0.26)';
+  }
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <LinearGradient
+        colors={colors}
+        locations={[0, 0.58, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[styles.weatherFrontBandWide, { backgroundColor: frontColor }]} />
+      <View style={[styles.weatherFrontBandNarrow, { backgroundColor: frontColor }]} />
+      <View style={[styles.weatherContour, styles.weatherContourTop, { borderColor: frontColor }]} />
+      <View style={[styles.weatherContour, styles.weatherContourBottom, { borderColor: frontColor }]} />
+    </View>
+  );
+}
+
+function ThemeModeButton({
+  isDark,
+  disabled,
+  onPress,
+}: {
+  isDark: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const { theme } = useTheme();
+  const progress = React.useRef(new Animated.Value(isDark ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: isDark ? 1 : 0,
+      duration: 240,
+      useNativeDriver: true,
+    }).start();
+  }, [isDark, progress]);
+
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      activeOpacity={0.78}
+      onPress={onPress}
+      style={[
+        styles.themeModeButton,
+        { backgroundColor: theme.dark ? 'rgba(237,237,239,0.11)' : 'rgba(255,255,255,0.78)' },
+      ]}
+    >
+      <Animated.View
+        style={[
+          styles.themeModeIcon,
+          {
+            opacity: progress.interpolate({ inputRange: [0, 0.45, 1], outputRange: [1, 0, 0] }),
+            transform: [
+              { rotate: progress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '90deg'] }) },
+              { scale: progress.interpolate({ inputRange: [0, 0.55, 1], outputRange: [1, 0.72, 0.72] }) },
+            ],
+          },
+        ]}
+      >
+        <Ionicons name="sunny" size={22} color={theme.iconTile.coral} />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.themeModeIcon,
+          {
+            opacity: progress.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, 0, 1] }),
+            transform: [
+              { rotate: progress.interpolate({ inputRange: [0, 1], outputRange: ['-90deg', '0deg'] }) },
+              { scale: progress.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0.72, 0.72, 1] }) },
+            ],
+          },
+        ]}
+      >
+        <Ionicons name="moon" size={20} color={theme.iconTile.cyan} />
+      </Animated.View>
+    </TouchableOpacity>
   );
 }
 
@@ -153,7 +254,7 @@ function SectionHeading({
 export default function DashboardScreen({ navigation }: { navigation: DashboardNavigation }) {
   const { width } = useWindowDimensions();
   const { events, isLoading: eventsLoading } = useEvents();
-  const { theme } = useTheme();
+  const { theme, isDark, toggleTheme } = useTheme();
   const { user, profilePhoto } = useAuth();
   const { alarms, isLoading: alarmsLoading } = useAlarmStore();
   const { notes, updateNote, isLoading: notesLoading } = useTaskStore();
@@ -163,6 +264,9 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(new Date());
   const [dayLensRefresh, setDayLensRefresh] = useState(0);
+  const [themeSwitching, setThemeSwitching] = useState(false);
+  const [themeTransitionColor, setThemeTransitionColor] = useState('#101A1B');
+  const themeTransition = React.useRef(new Animated.Value(0)).current;
 
   const firstName = user?.name?.trim().split(/\s+/)[0] || 'there';
   const initial = firstName.charAt(0).toUpperCase();
@@ -193,16 +297,6 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
     .slice(0, 4), [notes]);
 
   const nextAlarm = useMemo(() => nextAlarmFrom(alarms, now), [alarms, now]);
-  const selectedInsight = useMemo(() => {
-    const values = upcomingEvents
-      .map(event => ({ event, insight: dayLens.insights[event.id] }))
-      .filter((value): value is { event: typeof upcomingEvents[number]; insight: DayLensInsight } => Boolean(value.insight));
-    return values.find(value => value.insight.level === 'severe')
-      ?? values.find(value => value.insight.level === 'advisory')
-      ?? values[0]
-      ?? null;
-  }, [dayLens.insights, upcomingEvents]);
-
   useEffect(() => {
     if (user) void hydrateFocusSessions(user.id, setSessions);
   }, [user?.id]);
@@ -234,6 +328,23 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
   const createChecklist = () => navigation.navigate('Tasks', { section: 'notes', createType: 'checklist', createRequest: Date.now() });
   const openEvents = () => navigation.navigate('Tasks', { section: 'events' });
   const scheduleTitle = "Today's schedule";
+  const switchTheme = () => {
+    if (themeSwitching) return;
+    setThemeSwitching(true);
+    setThemeTransitionColor(isDark ? '#EDEDEF' : '#101A1B');
+    Animated.timing(themeTransition, {
+      toValue: 0.22,
+      duration: 110,
+      useNativeDriver: true,
+    }).start(() => {
+      toggleTheme();
+      Animated.timing(themeTransition, {
+        toValue: 0,
+        duration: 260,
+        useNativeDriver: true,
+      }).start(() => setThemeSwitching(false));
+    });
+  };
 
   if (eventsLoading || alarmsLoading || notesLoading) {
     return <ScreenSkeleton variant="dashboard" />;
@@ -261,6 +372,7 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
             <Text style={[styles.encouragement, { color: theme.content.secondary }]}>Make today count. You’ve got this!</Text>
           </View>
           <View style={styles.headerActions}>
+            <ThemeModeButton isDark={isDark} disabled={themeSwitching} onPress={switchTheme} />
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Open profile"
@@ -273,7 +385,7 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
                 <>
                   <LinearGradient
                     colors={theme.dark
-                      ? ['rgba(255,255,255,0.14)', 'rgba(255,122,0,0.24)']
+                      ? ['rgba(255,255,255,0.14)', 'rgba(143,212,245,0.22)']
                       : ['rgba(255,255,255,0.92)', 'rgba(255,211,168,0.82)']}
                     start={{ x: 0.15, y: 0.08 }}
                     end={{ x: 0.85, y: 1 }}
@@ -287,21 +399,22 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
         </View>
 
         <View style={styles.dateLine}>
-          <DashboardGlyph name="calendar-outline" color={theme.accent.base} tint={theme.accent.soft} size={18} style={styles.dateIcon} />
+          <DashboardGlyph name="calendar-outline" color={theme.accent.base} size={18} style={styles.dateIcon} />
           <Text style={[styles.fullDate, { color: theme.content.primary }]}>
             {now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
           </Text>
         </View>
 
         <GlassCard style={styles.weatherCard} padding={0}>
+          <WeatherCardBackdrop weatherCode={currentWeather.weather?.weatherCode} dark={theme.dark} />
           {currentWeather.status === 'loading' || currentWeather.status === 'checking-permission' ? (
             <View style={styles.weatherState}>
-              <ActivityIndicator color={theme.accent.base} />
+              <OmniLoader accessibilityLabel="Loading dashboard weather" />
               <Text style={[styles.weatherStateText, { color: theme.content.secondary }]}>Checking your local forecast…</Text>
             </View>
           ) : currentWeather.status === 'permission-required' ? (
             <View style={styles.weatherState}>
-              <DashboardGlyph name="location-outline" color={theme.accent.base} tint={theme.accent.soft} size={21} style={styles.weatherStateIcon} />
+              <DashboardGlyph name="location-outline" color={theme.accent.base} size={21} style={styles.weatherStateIcon} />
               <View style={styles.weatherStateCopy}>
                 <Text style={[styles.weatherStateTitle, { color: theme.content.primary }]}>Local weather is off</Text>
                 <Text style={[styles.weatherStateText, { color: theme.content.secondary }]}>Enable location for your forecast.</Text>
@@ -343,7 +456,7 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
                   </View>
                 </>
               ) : null}
-              <DashboardGlyph name="chevron-forward" color={theme.content.primary} tint={theme.glass.secondary} size={16} style={styles.weatherChevron} />
+              <Ionicons name="chevron-forward" size={21} color={theme.content.primary} style={styles.weatherChevron} />
             </TouchableOpacity>
           ) : (
             <View style={styles.weatherState}>
@@ -356,13 +469,6 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
           )}
         </GlassCard>
 
-        <DayLensStrip
-          events={upcomingEvents}
-          insights={dayLens.insights}
-          isLoading={dayLens.isLoading}
-          onOpenEvent={event => navigation.navigate('EventDetail', { event })}
-        />
-
         <View style={styles.overviewRow}>
           <GlassCard style={styles.overviewCard} padding={0}>
             <TouchableOpacity
@@ -372,7 +478,7 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
               onPress={() => navigation.navigate('Alarm')}
               style={styles.overviewItem}
             >
-              <DashboardGlyph name="alarm-outline" color={theme.accent.base} tint={theme.accent.soft} size={24} style={styles.overviewIcon} />
+              <DashboardGlyph name="alarm-outline" color={theme.accent.base} size={24} style={styles.overviewIcon} />
               <View style={styles.overviewCopy}>
                 <Text style={[styles.overviewLabel, { color: theme.content.secondary }]}>Next alarm</Text>
                 <Text style={[styles.overviewValue, { color: theme.content.primary }]} numberOfLines={1} adjustsFontSizeToFit>
@@ -392,7 +498,7 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
               onPress={() => navigation.navigate('Focus')}
               style={styles.overviewItem}
             >
-              <DashboardGlyph name="leaf-outline" color={theme.semantic.success} tint={`${theme.semantic.success}24`} size={24} style={styles.overviewIcon} />
+              <DashboardGlyph name="leaf-outline" color={theme.semantic.success} size={24} style={styles.overviewIcon} />
               <View style={styles.overviewCopy}>
                 <Text style={[styles.overviewLabel, { color: theme.content.secondary }]}>Focus session</Text>
                 <Text style={[styles.overviewValue, { color: theme.content.primary }]}>25:00</Text>
@@ -424,7 +530,7 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
               </TouchableOpacity>
             )) : (
               <View style={styles.compactEmpty}>
-                <DashboardGlyph name="calendar-outline" color={theme.accent.base} tint={theme.accent.soft} size={23} style={styles.emptyIcon} />
+                <DashboardGlyph name="calendar-outline" color={theme.accent.base} size={23} style={styles.emptyIcon} />
                 <View style={styles.emptyCopy}>
                   <Text style={[styles.emptyTitle, { color: theme.content.primary }]}>Your day is open</Text>
                   <Text style={[styles.emptyText, { color: theme.content.muted }]}>Add an event when you’re ready.</Text>
@@ -453,7 +559,7 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
               </View>
             )) : (
               <View style={styles.compactEmpty}>
-                <DashboardGlyph name="checkmark" color={theme.semantic.success} tint={`${theme.semantic.success}24`} size={23} style={styles.emptyIcon} />
+                <DashboardGlyph name="checkmark" color={theme.semantic.success} size={23} style={styles.emptyIcon} />
                 <View style={styles.emptyCopy}>
                   <Text style={[styles.emptyTitle, { color: theme.content.primary }]}>All caught up</Text>
                   <Text style={[styles.emptyText, { color: theme.content.muted }]}>Your open checklist items will appear here.</Text>
@@ -475,32 +581,20 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
           </GlassCard>
         </View>
 
-        <GlassCard style={styles.outlookCard} padding={14}>
-          <SectionHeading title="Today's insight" action="Stats" onPress={() => navigation.navigate('Stats')} />
-          <TouchableOpacity
-            accessibilityRole={selectedInsight ? 'button' : undefined}
-            disabled={!selectedInsight}
-            activeOpacity={0.78}
-            onPress={() => selectedInsight && navigation.navigate('EventDetail', { event: selectedInsight.event })}
-            style={styles.insightBody}
-          >
-            <DashboardGlyph
-              name={selectedInsight?.insight.level === 'severe' ? 'warning-outline' : 'partly-sunny-outline'}
-              size={25}
-              color={selectedInsight?.insight.level === 'severe' ? theme.semantic.danger : theme.accent.base}
-              tint={selectedInsight?.insight.level === 'severe' ? `${theme.semantic.danger}24` : theme.accent.soft}
-              style={styles.insightIcon}
-            />
-            <Text style={[styles.insightText, { color: theme.content.secondary }]} numberOfLines={4}>
-              {selectedInsight?.insight.guidance
-                || (currentWeather.weather
-                  ? `${weatherConditionLabel(currentWeather.weather.weatherCode)} today with a ${Math.round(currentWeather.weather.precipitationProbability)}% chance of rain.`
-                  : 'Add event locations and enable weather for practical planning insights.')}
-            </Text>
-            {selectedInsight ? <Ionicons name="chevron-forward" size={18} color={theme.content.muted} /> : null}
-          </TouchableOpacity>
-        </GlassCard>
+        <DayLensStrip
+          events={upcomingEvents}
+          insights={dayLens.insights}
+          isLoading={dayLens.isLoading}
+          onOpenEvent={event => navigation.navigate('EventDetail', { event })}
+        />
       </ScrollView>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.themeTransitionOverlay,
+          { backgroundColor: themeTransitionColor, opacity: themeTransition },
+        ]}
+      />
     </SafeAreaView>
   );
 }

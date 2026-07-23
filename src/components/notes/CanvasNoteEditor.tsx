@@ -1,7 +1,10 @@
 import { fontFamily } from '@/theme/typography';
+import { OMNITASK_PALETTE } from '@/theme/colors';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, PanResponder, Platform, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Modal, PanResponder, Platform, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import { AppText as Text, AppTextInput as TextInput } from '@/components/ui/AppText';
+import { OmniLoader } from '@/components/ui/OmniLoader';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -54,7 +57,7 @@ import {
 type Tool = 'hand' | 'select' | 'pen' | 'highlighter' | 'eraser';
 type Props = { note: InfiniteCanvasNote; onSave: (note: InfiniteCanvasNote) => void; onClose: () => void };
 
-const COLORS = ['#171717', '#FF7A00', '#E45B55', '#6E9FBD', '#74B82A', '#7C5CFC'];
+const COLORS = ['#171717', OMNITASK_PALETTE.actionBlue, '#C94F4A', '#587B8D', '#4F8F63', '#6C5DA8'];
 const id = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const distance = (a: CanvasPoint, b: CanvasPoint) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -65,8 +68,8 @@ function newObject(type: CanvasObjectType, layer: number): CanvasObject {
   } as CanvasObject;
   if (type === 'text') return { ...base, content: 'New text', size: { width: 210, height: 80 }, style: { ...base.style, fontSize: 22 } };
   if (type === 'sticky') return { ...base, content: 'Add an idea', size: { width: 180, height: 180 }, style: { ...base.style, backgroundColor: '#FFE59A', fontSize: 18 } };
-  if (type === 'circle') return { ...base, size: { width: 140, height: 140 }, style: { ...base.style, backgroundColor: '#FF7A0022' } };
-  if (type === 'rectangle') return { ...base, style: { ...base.style, backgroundColor: '#6E9FBD22' } };
+  if (type === 'circle') return { ...base, size: { width: 140, height: 140 }, style: { ...base.style, backgroundColor: '#D6F1FF66' } };
+  if (type === 'rectangle') return { ...base, style: { ...base.style, backgroundColor: '#D6F1FF66' } };
   if (type === 'line' || type === 'arrow') return { ...base, size: { width: 210, height: 10 } };
   return base;
 }
@@ -104,7 +107,7 @@ function CanvasObjectView({ object, selected, enabled, cleanExport, pan, zoom, r
     zIndex: object.layer,
     transform: [{ rotate: `${object.rotation}deg` }],
   };
-  const border = selected && !cleanExport ? { borderColor: '#FF7A00', borderWidth: 2 } : undefined;
+  const border = selected && !cleanExport ? { borderColor: OMNITASK_PALETTE.actionBlue, borderWidth: 2 } : undefined;
   const commonText = { color: object.style.color, fontSize: (object.style.fontSize ?? 18) * zoom, fontFamily: object.style.bold ? fontFamily.extrabold : fontFamily.medium, fontStyle: object.style.italic ? 'italic' as const : 'normal' as const, textDecorationLine: object.style.underline ? 'underline' as const : 'none' as const };
 
   return (
@@ -753,7 +756,7 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
           <View style={[styles.referenceSheet, { paddingBottom: Math.max(insets.bottom, 16), backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
             <View style={styles.arrangeHeader}><View style={styles.referenceRowCopy}><Text style={[styles.arrangeTitle, { color: theme.content.primary }]}>Add a live OmniTask item</Text><Text style={[styles.arrangeSubtitle, { color: theme.content.secondary }]}>Insert a task, event, or note that stays linked to its original data.</Text></View><TouchableOpacity accessibilityLabel="Close live item picker" style={styles.iconButton} onPress={() => setReferenceOpen(false)}><Ionicons name="close" size={23} color={theme.content.primary} /></TouchableOpacity></View>
             <View style={[styles.referenceTabs, { backgroundColor: theme.glass.secondary }]}>{(['task', 'event', 'note'] as const).map(kind => <TouchableOpacity key={kind} accessibilityRole="tab" accessibilityState={{ selected: referenceKind === kind }} style={[styles.referenceTab, referenceKind === kind && { backgroundColor: theme.accent.soft }]} onPress={() => setReferenceKind(kind)}><Text style={[styles.referenceTabText, { color: referenceKind === kind ? theme.accent.base : theme.content.secondary }]}>{kind === 'task' ? 'Tasks' : kind === 'event' ? 'Events' : 'Notes'}</Text></TouchableOpacity>)}</View>
-            {referencePickerItems.length ? <ScrollView style={styles.referenceList} contentContainerStyle={styles.referenceListContent} showsVerticalScrollIndicator={false}>{referencePickerItems.map(item => <TouchableOpacity key={item.key} accessibilityLabel={`Add live ${item.kind} ${item.title}`} style={[styles.referenceRow, { borderBottomColor: theme.divider, borderBottomWidth: StyleSheet.hairlineWidth }]} onPress={() => addReference(item)}><View style={[styles.referencePickerIcon, { backgroundColor: theme.accent.soft }]}><MaterialCommunityIcons name={item.kind === 'task' ? 'checkbox-marked-outline' : item.kind === 'event' ? 'calendar-outline' : 'note-text-outline'} size={20} color={theme.accent.base} /></View><View style={styles.referenceRowCopy}><Text numberOfLines={1} style={[styles.referenceRowTitle, item.completed && styles.referenceCompleted, { color: theme.content.primary }]}>{item.title}</Text><Text numberOfLines={1} style={[styles.referenceRowSubtitle, { color: theme.content.secondary }]}>{item.subtitle}</Text></View><Ionicons name="add-circle-outline" size={22} color={theme.accent.base} /></TouchableOpacity>)}</ScrollView> : <View style={styles.referenceEmpty}><MaterialCommunityIcons name={referenceKind === 'task' ? 'checkbox-blank-outline' : referenceKind === 'event' ? 'calendar-blank-outline' : 'note-outline'} size={31} color={theme.content.muted} /><Text style={[styles.referenceEmptyTitle, { color: theme.content.primary }]}>No {referenceKind}s available</Text><Text style={[styles.referenceEmptyText, { color: theme.content.secondary }]}>Create one in OmniTask first, then return here to add its live card.</Text></View>}
+            {referencePickerItems.length ? <ScrollView style={styles.referenceList} contentContainerStyle={styles.referenceListContent} showsVerticalScrollIndicator={false}>{referencePickerItems.map(item => <TouchableOpacity key={item.key} accessibilityLabel={`Add live ${item.kind} ${item.title}`} style={[styles.referenceRow, { borderBottomColor: theme.divider, borderBottomWidth: StyleSheet.hairlineWidth }]} onPress={() => addReference(item)}><View style={[styles.referencePickerIcon, { backgroundColor: item.kind === 'task' ? theme.iconTile.teal : item.kind === 'event' ? theme.iconTile.coral : theme.iconTile.blue }]}><MaterialCommunityIcons name={item.kind === 'task' ? 'checkbox-marked-outline' : item.kind === 'event' ? 'calendar-outline' : 'note-text-outline'} size={20} color={theme.iconTile.foreground} /></View><View style={styles.referenceRowCopy}><Text numberOfLines={1} style={[styles.referenceRowTitle, item.completed && styles.referenceCompleted, { color: theme.content.primary }]}>{item.title}</Text><Text numberOfLines={1} style={[styles.referenceRowSubtitle, { color: theme.content.secondary }]}>{item.subtitle}</Text></View><Ionicons name="add-circle-outline" size={22} color={theme.accent.base} /></TouchableOpacity>)}</ScrollView> : <View style={styles.referenceEmpty}><MaterialCommunityIcons name={referenceKind === 'task' ? 'checkbox-blank-outline' : referenceKind === 'event' ? 'calendar-blank-outline' : 'note-outline'} size={31} color={theme.content.muted} /><Text style={[styles.referenceEmptyTitle, { color: theme.content.primary }]}>No {referenceKind}s available</Text><Text style={[styles.referenceEmptyText, { color: theme.content.secondary }]}>Create one in OmniTask first, then return here to add its live card.</Text></View>}
           </View>
         </View>
       </Modal>
@@ -762,7 +765,7 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
         <View style={styles.sheetLayer}>
           <TouchableOpacity accessibilityLabel="Close collaboration" disabled={collaborationBusy} style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setCollaborationOpen(false)} />
           <View style={[styles.collaborationSheet, { paddingBottom: Math.max(insets.bottom, 18), backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
-            <View style={styles.collaborationHeader}><View style={styles.collaborationHeaderCopy}><Text style={[styles.collaborationTitle, { color: theme.content.primary }]}>Live collaboration</Text><Text style={[styles.collaborationSubtitle, { color: theme.content.secondary }]}>{collaborationId ? `${onlineCollaborators.length} online · ${collaborationMembers.length} member${collaborationMembers.length === 1 ? '' : 's'}` : 'Edit the same canvas together in real time.'}</Text></View>{collaborationBusy ? <ActivityIndicator color={theme.accent.base} /> : <TouchableOpacity accessibilityLabel="Close collaboration" style={styles.iconButton} onPress={() => setCollaborationOpen(false)}><Ionicons name="close" size={23} color={theme.content.primary} /></TouchableOpacity>}</View>
+            <View style={styles.collaborationHeader}><View style={styles.collaborationHeaderCopy}><Text style={[styles.collaborationTitle, { color: theme.content.primary }]}>Live collaboration</Text><Text style={[styles.collaborationSubtitle, { color: theme.content.secondary }]}>{collaborationId ? `${onlineCollaborators.length} online · ${collaborationMembers.length} member${collaborationMembers.length === 1 ? '' : 's'}` : 'Edit the same canvas together in real time.'}</Text></View>{collaborationBusy ? <OmniLoader size="small" accessibilityLabel="Updating collaboration" /> : <TouchableOpacity accessibilityLabel="Close collaboration" style={styles.iconButton} onPress={() => setCollaborationOpen(false)}><Ionicons name="close" size={23} color={theme.content.primary} /></TouchableOpacity>}</View>
             {!collaborationId ? <>
               <View style={[styles.collaborationInfo, { backgroundColor: theme.accent.soft }]}><MaterialCommunityIcons name="account-multiple-check-outline" size={25} color={theme.accent.base} /><View style={styles.collaborationInfoCopy}><Text style={[styles.collaborationInfoTitle, { color: theme.content.primary }]}>Private by default</Text><Text style={[styles.collaborationInfoText, { color: theme.content.secondary }]}>A short invite code stays valid for 3 days. After joining, access continues until the person leaves, is removed, or you stop sharing. Changes sync by object.</Text></View></View>
               <TouchableOpacity accessibilityRole="button" disabled={collaborationBusy} style={[styles.collaborationPrimary, { backgroundColor: theme.accent.base, opacity: collaborationBusy ? 0.55 : 1 }]} onPress={startCollaboration}><Ionicons name="radio-outline" size={20} color="#FFF" /><Text style={styles.collaborationPrimaryText}>Start collaboration</Text></TouchableOpacity>
@@ -811,7 +814,7 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
 
             <Text style={[styles.arrangeLabel, { color: theme.content.secondary }]}>Handwriting</Text>
             <View style={styles.arrangeRow}>
-              <TouchableOpacity accessibilityLabel="Recognize selected handwriting" disabled={!selectedDrawings.length || recognizingHandwriting} style={[styles.arrangeAction, styles.wideArrangeAction, { backgroundColor: theme.glass.secondary }, (!selectedDrawings.length || recognizingHandwriting) && styles.disabledAction]} onPress={() => void recognizeSelectedHandwriting()}>{recognizingHandwriting ? <ActivityIndicator size="small" color={theme.accent.base} /> : <MaterialCommunityIcons name="text-recognition" size={20} color={theme.content.primary} />}<Text style={[styles.arrangeActionText, { color: theme.content.primary }]}>{recognizingHandwriting ? 'Recognizing…' : `Recognize ${selectedDrawings.length || ''} stroke${selectedDrawings.length === 1 ? '' : 's'}`}</Text></TouchableOpacity>
+              <TouchableOpacity accessibilityLabel="Recognize selected handwriting" disabled={!selectedDrawings.length || recognizingHandwriting} style={[styles.arrangeAction, styles.wideArrangeAction, { backgroundColor: theme.glass.secondary }, (!selectedDrawings.length || recognizingHandwriting) && styles.disabledAction]} onPress={() => void recognizeSelectedHandwriting()}>{recognizingHandwriting ? <OmniLoader size="small" accessibilityLabel="Recognizing handwriting" /> : <MaterialCommunityIcons name="text-recognition" size={20} color={theme.content.primary} />}<Text style={[styles.arrangeActionText, { color: theme.content.primary }]}>{recognizingHandwriting ? 'Recognizing…' : `Recognize ${selectedDrawings.length || ''} stroke${selectedDrawings.length === 1 ? '' : 's'}`}</Text></TouchableOpacity>
             </View>
 
             <Text style={[styles.arrangeLabel, { color: theme.content.secondary }]}>Group and layer</Text>
@@ -906,7 +909,7 @@ const styles = StyleSheet.create({
   referenceList: { marginTop: 10 },
   referenceListContent: { paddingBottom: 8 },
   referenceRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  referencePickerIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  referencePickerIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   referenceRowCopy: { flex: 1 },
   referenceRowTitle: { fontSize: 14, fontFamily: fontFamily.extrabold },
   referenceRowSubtitle: { marginTop: 2, fontSize: 11, fontFamily: fontFamily.medium },

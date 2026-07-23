@@ -1,6 +1,6 @@
 import { fontFamily } from '@/theme/typography';
 import { StyleSheet } from 'react-native';
-import { BRAND_BLUE as ORANGE } from '@/theme/colors';
+import { BRAND_BLUE as ACTION_BLUE } from '@/theme/colors';
 
 export const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: 'transparent' },
@@ -27,13 +27,13 @@ export const s = StyleSheet.create({
   fields: { gap: 14 },
   errorNotice: { marginTop: 14, padding: 11, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   errorText: { flex: 1, fontSize: 13, lineHeight: 18, color: '#8F1D16' },
-  btnPrimary: { width: '100%', minHeight: 52, marginTop: 18, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: ORANGE },
+  btnPrimary: { width: '100%', minHeight: 52, marginTop: 18, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: ACTION_BLUE },
   disabled: { opacity: 0.7 },
   btnText: { color: '#FFFFFF', fontSize: 16, fontFamily: fontFamily.extrabold },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   terms: { marginTop: 14, paddingHorizontal: 6, textAlign: 'center', fontSize: 11, lineHeight: 17, color: '#85878E' },
-  termsLink: { color: ORANGE, fontFamily: fontFamily.bold },
+  termsLink: { color: ACTION_BLUE, fontFamily: fontFamily.bold },
   signInRow: { marginTop: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   gray: { color: '#777A81', fontSize: 14 },
-  link: { color: ORANGE, fontFamily: fontFamily.extrabold, fontSize: 14 },
+  link: { color: ACTION_BLUE, fontFamily: fontFamily.extrabold, fontSize: 14 },
 });

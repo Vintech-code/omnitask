@@ -1,6 +1,6 @@
 import { fontFamily } from '@/theme/typography';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { AppText as Text } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppBackground } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { OmniLoader } from '@/components/ui/OmniLoader';
 import { requestVerificationEmail } from '@/services/EmailService';
 
 const INITIAL_COOLDOWN = 60;
@@ -85,8 +86,8 @@ export default function EmailVerificationScreen() {
       <View style={styles.content}>
         <View style={[styles.card, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}>
           <Image source={require('../../../assets/omnitasklogo.png')} style={styles.logo} resizeMode="contain" />
-          <View style={[styles.mailCircle, { backgroundColor: theme.accent.soft }]}>
-            <Ionicons name="mail-unread-outline" size={31} color={theme.accent.base} />
+          <View style={[styles.mailCircle, { backgroundColor: theme.iconTile.cyan }]}>
+            <Ionicons name="mail-unread-outline" size={31} color={theme.iconTile.foreground} />
           </View>
           <Text style={[styles.title, { color: theme.content.primary }]}>Verify your email</Text>
           <Text style={[styles.copy, { color: theme.content.secondary }]}>We need to confirm that this email belongs to you before opening your OmniTask workspace.</Text>
@@ -99,13 +100,13 @@ export default function EmailVerificationScreen() {
           {error ? <Text style={[styles.message, { color: theme.semantic.danger }]}>{error}</Text> : null}
 
           <TouchableOpacity testID="verification-refresh" disabled={Boolean(action)} style={[styles.primary, { backgroundColor: theme.accent.base }, action && styles.disabled]} onPress={() => void refresh()}>
-            {action === 'refresh' ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryText}>I've verified my email</Text>}
+            {action === 'refresh' ? <OmniLoader size="small" onPrimary accessibilityLabel="Checking verification" /> : <Text style={styles.primaryText}>I've verified my email</Text>}
           </TouchableOpacity>
           <TouchableOpacity testID="verification-resend" disabled={Boolean(action) || cooldown > 0} style={[styles.outline, { borderColor: theme.glass.border, backgroundColor: theme.glass.secondary }, (action || cooldown > 0) && styles.disabled]} onPress={() => void resend()}>
-            {action === 'resend' ? <ActivityIndicator color={theme.accent.base} /> : <Text style={[styles.outlineText, { color: cooldown > 0 ? theme.content.muted : theme.accent.base }]}>{cooldown > 0 ? `Resend available in ${cooldown}s` : 'Resend verification email'}</Text>}
+            {action === 'resend' ? <OmniLoader size="small" accessibilityLabel="Resending verification email" /> : <Text style={[styles.outlineText, { color: cooldown > 0 ? theme.content.muted : theme.accent.base }]}>{cooldown > 0 ? `Resend available in ${cooldown}s` : 'Resend verification email'}</Text>}
           </TouchableOpacity>
           <TouchableOpacity testID="verification-logout" disabled={Boolean(action)} style={styles.logout} onPress={() => void logout()}>
-            {action === 'logout' ? <ActivityIndicator color={theme.content.secondary} /> : <Text style={[styles.logoutText, { color: theme.content.secondary }]}>Logout</Text>}
+            {action === 'logout' ? <OmniLoader size="small" accessibilityLabel="Signing out" /> : <Text style={[styles.logoutText, { color: theme.content.secondary }]}>Logout</Text>}
           </TouchableOpacity>
         </View>
       </View>

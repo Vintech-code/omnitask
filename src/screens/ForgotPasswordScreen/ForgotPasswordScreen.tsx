@@ -1,6 +1,6 @@
 import { fontFamily } from '@/theme/typography';
 import React, { useState } from 'react';
-import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { AppText as Text } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppBackground } from '@/components/ui';
 import { FloatingAuthField } from '@/components/auth/FloatingAuthField';
 import { useTheme } from '@/context/ThemeContext';
+import { OmniLoader } from '@/components/ui/OmniLoader';
 import { requestPasswordResetEmail } from '@/services/EmailService';
 import { isValidEmail, normalizeEmail } from '@/utils/validators';
 
@@ -56,8 +57,8 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
 
       <View style={styles.content}>
         <View style={[styles.card, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}>
-          <View style={[styles.iconCircle, { backgroundColor: theme.accent.soft }]}>
-            <Ionicons name={sent ? 'mail-open-outline' : 'key-outline'} size={30} color={theme.accent.base} />
+          <View style={[styles.iconCircle, { backgroundColor: sent ? theme.iconTile.teal : theme.iconTile.blue }]}>
+            <Ionicons name={sent ? 'mail-open-outline' : 'key-outline'} size={30} color={theme.iconTile.foreground} />
           </View>
 
           {sent ? (
@@ -95,7 +96,7 @@ export default function ForgotPasswordScreen({ navigation, route }: any) {
                 </View>
               ) : null}
               <TouchableOpacity testID="forgot-password-submit" disabled={loading} style={[styles.primary, { backgroundColor: theme.accent.base }, loading && styles.disabled]} onPress={() => void submit()}>
-                {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryText}>Send reset email</Text>}
+                {loading ? <OmniLoader size="small" onPrimary accessibilityLabel="Sending reset email" /> : <Text style={styles.primaryText}>Send reset email</Text>}
               </TouchableOpacity>
             </>
           )}

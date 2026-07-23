@@ -1,7 +1,9 @@
 import { fontFamily } from '@/theme/typography';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { View, ScrollView, TouchableOpacity, Switch, StyleSheet, Alert, Modal, Pressable, Animated, ActivityIndicator } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Switch, StyleSheet, Modal, Pressable, Animated } from 'react-native';
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import { AppText as Text, AppTextInput as TextInput } from '@/components/ui/AppText';
+import { OmniLoader } from '@/components/ui/OmniLoader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/context/ThemeContext';
@@ -452,8 +454,8 @@ export default function AlarmScreen({ navigation }: any) {
       >
         {/* -- NEXT ALARM Banner ----------------------------------- */}
         <View style={[styles.nextAlarmBanner, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}>
-          <View style={[styles.nextAlarmLeft, { backgroundColor: theme.accent.soft }]}>
-            <Ionicons name="alarm-outline" size={28} color={theme.accent.base} />
+          <View style={[styles.nextAlarmLeft, { backgroundColor: theme.iconTile.coral }]}>
+            <Ionicons name="alarm-outline" size={28} color={theme.iconTile.foreground} />
           </View>
           <View style={styles.nextAlarmBody}>
             <Text style={[styles.nextAlarmLabel, { color: theme.accent.base }]}>NEXT ALARM</Text>
@@ -584,7 +586,7 @@ export default function AlarmScreen({ navigation }: any) {
             </Text>
             <TouchableOpacity disabled={isSavingAlarm} onPress={handleSave} style={styles.editHeaderBtn}>
               {isSavingAlarm
-                ? <ActivityIndicator size="small" color={theme.accent.base} />
+                ? <OmniLoader size="small" accessibilityLabel="Importing alarm sound" />
                 : <Ionicons name="checkmark" size={26} color={theme.accent.base} />}
             </TouchableOpacity>
           </View>
@@ -768,8 +770,8 @@ export default function AlarmScreen({ navigation }: any) {
 
           <ScrollView contentContainerStyle={styles.soundScroll} showsVerticalScrollIndicator={false}>
             <View style={[styles.soundHelpCard, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}>
-              <View style={[styles.soundHelpIcon, { backgroundColor: theme.accent.soft }]}>
-                <Ionicons name="volume-high-outline" size={20} color={theme.accent.base} />
+              <View style={[styles.soundHelpIcon, { backgroundColor: theme.iconTile.blue }]}>
+                <Ionicons name="volume-high-outline" size={20} color={theme.iconTile.foreground} />
               </View>
               <View style={styles.soundHelpCopy}>
                 <Text style={[styles.soundHelpTitle, { color: theme.text }]}>Choose your alarm sound</Text>
@@ -781,8 +783,8 @@ export default function AlarmScreen({ navigation }: any) {
             <Text style={[styles.soundSection, { color: theme.textDim }]}>Your sounds</Text>
             <View style={[styles.soundPanel, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}>
               <TouchableOpacity style={styles.soundAddRow} onPress={pickCustomSound}>
-                <View style={[styles.soundAddIcon, { backgroundColor: theme.accent.soft }]}>
-                  <Ionicons name="add" size={20} color={theme.accent.base} />
+                <View style={[styles.soundAddIcon, { backgroundColor: theme.iconTile.cyan }]}>
+                  <Ionicons name="add" size={20} color={theme.iconTile.foreground} />
                 </View>
                 <View style={styles.soundLabelWrap}>
                   <Text style={[styles.soundRowTitle, { color: theme.text }]}>Add from device</Text>

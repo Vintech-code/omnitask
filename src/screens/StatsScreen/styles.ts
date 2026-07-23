@@ -22,7 +22,7 @@ export const st = StyleSheet.create({
     flex: 1, borderRadius: 20, padding: 12, alignItems: 'center', gap: 4,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  kpiIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  kpiIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
   kpiVal: { fontSize: 20, fontFamily: fontFamily.extrabold },
   kpiLabel: { fontSize: 10, fontFamily: fontFamily.bold, letterSpacing: 0.4 },
 

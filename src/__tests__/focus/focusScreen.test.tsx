@@ -36,8 +36,9 @@ jest.mock('@/context/ThemeContext', () => ({
       text: '#171717', textDim: '#666765', textSub: '#92938F', card: '#FFF', bg2: '#EEE', border: '#DDD', segBg: '#EEE', segActive: '#FFF',
       glass: { primary: 'rgba(255,255,255,.58)', secondary: 'rgba(255,255,255,.38)', solid: '#FFF', border: '#FFF' },
       content: { primary: '#171717', secondary: '#666765', muted: '#92938F' },
-      accent: { base: '#FF7A00', soft: 'rgba(255,122,0,.13)' },
-      semantic: { success: '#74B82A', info: '#6E9FBD' }, divider: '#DDD',
+      accent: { base: '#12B9A9', soft: 'rgba(196,224,225,.72)' },
+      iconTile: { coral: '#F26841', cyan: '#34C7D9', teal: '#12B9A9', blue: '#20A6EB', foreground: '#EDEDEF' },
+      semantic: { success: '#12B9A9', info: '#20A6EB' }, divider: '#DDD',
     },
   }),
 }));

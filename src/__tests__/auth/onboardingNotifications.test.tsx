@@ -13,7 +13,7 @@ jest.mock('@/context/AuthContext', () => ({
 jest.mock('@/context/ThemeContext', () => ({
   useTheme: () => ({
     theme: {
-      accent: { base: '#FF7A00', soft: 'rgba(255,122,0,0.13)' },
+      accent: { base: '#12B9A9', soft: 'rgba(196,224,225,0.72)' },
       content: { primary: '#171717', secondary: '#666765' },
       glass: {
         primary: 'rgba(255,255,255,0.58)',

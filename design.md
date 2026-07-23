@@ -7,7 +7,7 @@ Reference: the supplied three-screen glassmorphism mobile UI
 
 ## 1. Design objective
 
-Redesign OmniTask as a calm, premium personal productivity workspace. The new UI should borrow the reference image's visual language—soft glass panels, pearl-white surfaces, warm orange accents, rounded controls, subtle depth, and generous spacing—without copying its nutrition content or changing OmniTask's behavior.
+Redesign OmniTask as a calm, premium personal productivity workspace. The UI uses crisp white surfaces, a teal-to-pearl atmosphere concentrated at the top of each screen, restrained rounded controls, colorful circular icon fields, and subtle depth without changing OmniTask's behavior.
 
 All existing features, navigation destinations, data models, forms, validation, gestures, permissions, alarm behavior, timers, storage, and authentication flows must remain intact. This document changes how those features look and how their existing information is visually organized.
 
@@ -22,7 +22,7 @@ All existing features, navigation destinations, data models, forms, validation, 
 
 ### Visual keywords
 
-`frosted glass` · `pearl` · `warm orange` · `soft daylight` · `rounded` · `quiet depth` · `airy`
+`frosted glass` · `pearl ice` · `pale sky` · `soft daylight` · `rounded` · `quiet depth` · `airy`
 
 ## 2. Existing OmniTask surfaces in scope
 
@@ -56,9 +56,9 @@ Do not add reference-image features such as nutrition, premium subscriptions, or
 
 Glass is a material treatment, not decoration. Use it to group controls and establish hierarchy. Never place multiple translucent layers over one another when a single surface would communicate the grouping.
 
-### 3.2 Orange means action
+### 3.2 Teal means action
 
-Orange is the only primary accent. Reserve it for the active tab, primary buttons, progress, selected states, toggles, and the most important next action. Supporting semantic colors may appear for status, but should not compete with orange.
+The `#33AFAD` header teal establishes the brand atmosphere and `#12B9A9` is the primary interactive color. Use primary teal for active tabs, primary buttons, progress, selected states, toggles, and the most important next action. `#F26841`, `#34C7D9`, `#12B9A9`, and `#20A6EB` are reserved for circular icon backgrounds and compact categorical accents.
 
 ### 3.3 Depth comes from light
 
@@ -88,29 +88,31 @@ The redesign must not move or hide an action in a way that changes its meaning. 
 
 | Token | Value | Usage |
 | --- | --- | --- |
-| `color.bg.base` | `#F3F3F1` | Pearl app background |
-| `color.bg.top` | `#F6F3EC` | Warm ivory top of atmospheric gradient |
-| `color.bg.bottom` | `#E8EDF0` | Bottom of atmospheric gradient |
-| `color.bg.lavender` | `#F3F3F1` | Pearl diffuse ambient field |
-| `color.bg.blue` | `#DCE5E8` | Mist blue-gray ambient field |
-| `color.glass.primary` | `rgba(255,255,255,0.58)` | Main glass cards and tab bar |
-| `color.glass.secondary` | `rgba(255,255,255,0.38)` | Chips and secondary controls |
-| `color.glass.solid` | `rgba(255,255,255,0.86)` | Inputs and high-legibility surfaces |
-| `color.glass.highlight` | `rgba(255,255,255,0.92)` | Hairline top edge |
-| `color.glass.border` | `rgba(255,255,255,0.76)` | General glass outline |
-| `color.divider` | `rgba(23,23,23,0.09)` | Dividers within grouped cards |
-| `color.text.primary` | `#171717` | Titles and important values |
-| `color.text.secondary` | `#666765` | Supporting labels |
-| `color.text.muted` | `#92938F` | Metadata and placeholders |
-| `color.icon` | `#191A19` | Default icon |
-| `color.accent` | `#FF7A00` | Primary action and selection |
-| `color.accent.pressed` | `#E66E00` | Pressed primary state |
-| `color.accent.soft` | `rgba(255,122,0,0.13)` | Selected chip/icon background |
-| `color.accent.glow` | `rgba(255,160,55,0.30)` | Controlled glow around primary action |
-| `color.success` | `#74B82A` | Completed / positive state |
-| `color.warning` | `#E7A126` | Warning state |
-| `color.danger` | `#E45B55` | Destructive / overdue state |
-| `color.info` | `#6E9FBD` | Informational state only |
+| `color.bg.base` | `#EDEDEF` | Pearl app background |
+| `color.bg.top` | `#33AFAD` | Teal top of the atmospheric gradient |
+| `color.bg.mid` | `#79C6CA` | Mid teal transition |
+| `color.bg.soft` | `#C4E0E1` | Soft transition into pearl |
+| `color.bg.bottom` | `#EDEDEF` | Stable lower-screen background |
+| `color.glass.primary` | `rgba(255,255,255,0.88)` | Main cards and tab bar |
+| `color.glass.secondary` | `rgba(255,255,255,0.64)` | Chips and secondary controls |
+| `color.glass.solid` | `#FFFFFF` | Inputs, dialogs, and high-legibility surfaces |
+| `color.glass.highlight` | `#FFFFFF` | Hairline top edge |
+| `color.glass.border` | `rgba(255,255,255,0.92)` | General surface outline |
+| `color.divider` | `rgba(23,26,26,0.08)` | Dividers within grouped cards |
+| `color.text.primary` | `#171A1A` | Titles and important values |
+| `color.text.secondary` | `#5C6666` | Supporting labels |
+| `color.text.muted` | `#8A9292` | Metadata and placeholders |
+| `color.icon` | `#171A1A` | Plain utility icon |
+| `color.accent` | `#12B9A9` | Primary action and selection |
+| `color.accent.pressed` | `#0E9489` | Pressed primary state |
+| `color.accent.soft` | `rgba(196,224,225,0.72)` | Selected chip background |
+| `color.accent.glow` | `rgba(51,175,173,0.22)` | Controlled primary-action glow |
+| `color.accent.warm` | `#F26841` | Complementary emphasis |
+| `color.accent.warmSoft` | `#FCE5DE` | Warm secondary highlight |
+| `color.success` | `#12B9A9` | Completed / positive state |
+| `color.warning` | `#F26841` | Warning state |
+| `color.danger` | `#D84F37` | Destructive / overdue state |
+| `color.info` | `#20A6EB` | Informational state only |
 
 ### 4.2 Dark theme
 
@@ -118,40 +120,52 @@ Dark mode should feel like smoked glass, not a pure-black recolor.
 
 | Token | Value | Usage |
 | --- | --- | --- |
-| `color.bg.base` | `#121311` | Smoked charcoal app background |
-| `color.bg.top` | `#1A1B19` | Top gradient |
-| `color.bg.bottom` | `#111615` | Bottom gradient |
-| `color.bg.lavender` | `#1A1B19` | Smoked ambient field |
-| `color.bg.blue` | `#6E9FBD` | Low-opacity slate-cyan ambient field |
-| `color.glass.primary` | `rgba(38,39,37,0.68)` | Main card |
-| `color.glass.secondary` | `rgba(49,50,47,0.48)` | Secondary control |
-| `color.glass.solid` | `rgba(34,35,33,0.92)` | Blur fallback |
-| `color.glass.highlight` | `rgba(255,255,255,0.15)` | Highlight edge |
-| `color.glass.border` | `rgba(255,255,255,0.13)` | Glass outline |
-| `color.divider` | `rgba(255,255,255,0.10)` | Divider |
-| `color.text.primary` | `#F7F7F3` | Primary text |
-| `color.text.secondary` | `#B8B9B4` | Supporting text |
-| `color.text.muted` | `#81827E` | Metadata |
-| `color.icon` | `#F1F1ED` | Default icon |
-| `color.accent` | `#FF7A00` | Primary action and selection |
-| `color.accent.pressed` | `#F17608` | Pressed state |
-| `color.accent.soft` | `rgba(255,122,0,0.17)` | Selected background |
+| `color.bg.base` | `#101A1B` | Smoked teal app background |
+| `color.bg.top` | `#15383A` | Top gradient |
+| `color.bg.bottom` | `#0B1415` | Bottom gradient |
+| `color.glass.primary` | `rgba(29,46,47,0.84)` | Main card |
+| `color.glass.secondary` | `rgba(42,62,63,0.72)` | Secondary control |
+| `color.glass.solid` | `rgba(24,38,39,0.96)` | High-legibility surface |
+| `color.glass.highlight` | `rgba(237,237,239,0.16)` | Highlight edge |
+| `color.glass.border` | `rgba(196,224,225,0.16)` | Surface outline |
+| `color.divider` | `rgba(196,224,225,0.13)` | Divider |
+| `color.text.primary` | `#EDEDEF` | Primary text |
+| `color.text.secondary` | `#B9CACA` | Supporting text |
+| `color.text.muted` | `#819596` | Metadata |
+| `color.icon` | `#EDEDEF` | Default icon |
+| `color.accent` | `#34C7D9` | Primary action and selection |
+| `color.accent.pressed` | `#12B9A9` | Pressed state |
+| `color.accent.soft` | `rgba(52,199,217,0.16)` | Selected background |
+| `color.accent.warm` | `#F26841` | Dark-mode complementary emphasis |
 
 Semantic colors keep their meaning in dark mode and may be raised slightly in luminance to meet contrast requirements.
 
-### 4.3 Ambient background
+### 4.3 Circular icon palette
+
+Icons that sit on a colored background use one of four exact circular fills:
+
+| Role | Fill |
+| --- | --- |
+| Warm / alarm / urgent | `#F26841` |
+| Cyan / focus / supporting | `#34C7D9` |
+| Teal / task / positive | `#12B9A9` |
+| Blue / information / calendar | `#20A6EB` |
+
+The glyph on all four fills is `#EDEDEF`. These surfaces are true circles: radius equals half the width. Plain toolbar and navigation utility icons remain contrast-aware and do not receive a colored background unless the background communicates selection or category.
+
+### 4.4 Ambient background
 
 Each main screen uses the same quiet atmospheric canvas:
 
-- A pearl gradient from `#F6F3EC` to `#E8EDF0` in light mode.
-- Large fixed pearl and mist blue-gray fields sit behind the content.
+- A top-weighted gradient from `#33AFAD` through `#79C6CA` and `#C4E0E1` into `#EDEDEF`.
+- The teal transition finishes within roughly the upper 60% of the screen; the lower screen stays pearl rather than introducing a second gradient.
 - Weather content does not recolor or darken the shared application background.
 - Decorative layers ignore pointer events and remain outside screen update paths.
 - Translucent glass surfaces and floating navigation layer above the atmospheric canvas.
 
 ## 5. Typography
 
-Use the system sans-serif for standard content. Dashboard greeting typography uses bundled Nunito for a friendly rounded brand expression with consistent Android and iOS rendering.
+Use bundled Nunito across the entire application for a friendly rounded brand expression with consistent Android and iOS rendering.
 
 | Style | Size / line height | Weight | Usage |
 | --- | --- | --- | --- |
@@ -235,7 +249,7 @@ Corner radii:
 - Border: 1 px glass border.
 - Radius: pill.
 - Pressed state: increase opacity and scale to 0.98.
-- Selected state: orange icon/text with `accent.soft` fill.
+- Selected state: primary-teal icon/text with `accent.soft` fill.
 
 ### 7.4 Material behavior
 
@@ -262,9 +276,9 @@ One reusable base with `standard`, `elevated`, and `subtle` variants. Cards shou
 
 ### Buttons
 
-- Primary: orange fill, near-white label, 52 px height, pill radius.
+- Primary: primary-teal fill, near-white label, 52 px height, pill radius.
 - Secondary: compact glass surface with primary text.
-- Tonal: `accent.soft` fill with orange label/icon.
+- Tonal: `accent.soft` fill with primary-teal label/icon.
 - Destructive: glass surface with danger label; solid danger only inside final confirmation.
 - Icon button: 44 × 44 px circle, centered 20–22 px icon.
 - Disabled: 45% opacity and no glow.
@@ -273,7 +287,7 @@ One reusable base with `standard`, `elevated`, and `subtle` variants. Cards shou
 
 - Height: 52 px for single-line fields.
 - Fill: `glass.solid` or a compact glass surface.
-- Border: glass border at rest; orange at focus.
+- Border: glass border at rest; action blue at focus.
 - Radius: 16 px.
 - Label sits above the field; placeholder is not a replacement for a label.
 - Validation message uses danger color and remains below the field.
@@ -283,7 +297,7 @@ One reusable base with `standard`, `elevated`, and `subtle` variants. Cards shou
 
 - Height: 40–44 px.
 - Unselected: translucent glass, secondary text.
-- Selected: `accent.soft`, orange text/icon, brighter edge.
+- Selected: `accent.soft`, primary-teal text/icon, brighter edge.
 - Use a checkmark only when selection is not otherwise obvious.
 
 ### List row
@@ -296,7 +310,7 @@ One reusable base with `standard`, `elevated`, and `subtle` variants. Cards shou
 
 ### Progress
 
-- Orange is the default progress color.
+- Action blue is the default progress color.
 - Track: `rgba(23,23,23,0.08)` light / `rgba(255,255,255,0.10)` dark.
 - Linear track: 6 px high, fully rounded.
 - Ring: 6–8 px stroke with rounded ends.
@@ -308,34 +322,41 @@ One reusable base with `standard`, `elevated`, and `subtle` variants. Cards shou
 - One concise heading, one explanation, and at most one primary action.
 - Place inside a subtle glass panel when it improves grouping.
 
-### Modal and bottom sheet
+### Dialog and task sheet
 
-- Dim/blur the page behind it.
-- Sheet uses `radius.xl` on upper corners and glass-solid fill.
+- Dim the page behind it.
+- Alerts and confirmations are centered, no wider than 400 px, use glass-solid fill, and keep padding compact.
+- Centered dialogs do not use decorative leading icons; icons appear only when they communicate required status.
+- Avoid large gaps: title-to-message uses 4 px, message-to-actions uses 14 px, and actions are at least 44 px high.
+- Task-specific pickers and editors may remain bottom sheets when spatial continuity or keyboard access requires it.
 - Destructive confirmations remain opaque enough for clarity.
 - Preserve keyboard avoidance and safe-area handling.
+- App alerts use the shared OmniTask dialog host rather than the platform-default alert surface.
+- Dialogs include clear title and message hierarchy, explicit cancel/close behavior, and themed destructive or primary actions.
 
 ### Skeleton loading
 
 - Never replace an entire screen with a centered spinner when its layout is known.
 - Skeletons must mirror the final hierarchy: header, compact controls, cards, and list rows.
-- Use neutral glass-tinted blocks with 10–18 px radii; do not use orange skeletons.
+- Use neutral glass-tinted blocks with 10–18 px radii; do not use blue skeletons.
 - Animation is a restrained opacity pulse between 45% and 82%, 900–1100 ms per phase.
 - Show skeletons only for genuine initial asynchronous loading, not for every refresh or button action.
 - Keep the page background and navigation stable while loading so content does not jump.
 - Match the expected number of items: three rows for a list, two metrics for a dashboard, and one hero panel for focus/alarm screens.
 - Respect reduced motion by supporting a static fallback.
 - Inline button submissions may retain a compact activity indicator because the surrounding form is already visible.
+- Indeterminate loading uses the shared two-dot OmniTask loader: crossing primary-teal and warm-coral dots, with a static two-dot fallback when reduced motion is enabled.
+- Do not introduce native circular activity indicators on new surfaces.
 
 ## 9. Floating bottom navigation
 
 The current full-width bottom bar becomes a floating glass capsule inspired by the reference.
 
-- Position: 16 px from left/right and 8 px above the bottom safe area.
+- Position: 20 px from left/right, aligned with card gutters, and 8 px above the bottom safe area.
 - Height: 68 px.
 - Five evenly distributed tab targets: Home, Focus, Alarm, Calculator, and Organize.
 - Inactive tabs: black/white monochrome outline icons with muted labels.
-- Active tab: 36 px orange circle with a white icon; no glow behind its label.
+- Active tab: 36 px primary-teal circle with a `#EDEDEF` icon; no glow behind its label.
 - Labels may remain beneath inactive icons if needed for accessibility; keep them small and stable so the layout does not jump.
 - The active destination must not rely on color alone: use the filled circle and icon weight.
 - Keep the `Tasks` route name for compatibility with existing Dashboard and Search links. Notes and Events are switched with a segmented control inside that destination; existing event detail, creation, alarm, calendar, and note editor flows remain intact.
@@ -350,21 +371,21 @@ The current full-width bottom bar becomes a floating glass capsule inspired by t
 - Place existing Lottie artwork inside a large, edge-free light area rather than a bordered card.
 - Keep the OmniTask mark compact at the top.
 - Use a strong left-aligned headline and short secondary copy.
-- Put the primary orange pill button near the bottom safe area; use a glass secondary action.
-- Page indicators use orange for the active point and translucent gray for inactive points.
+- Put the primary-teal pill button near the bottom safe area; use a glass secondary action.
+- Page indicators use action blue for the active point and translucent gray for inactive points.
 
 ### Sign in and sign up
 
 - Use a centered glass form panel on phones and tablets, maximum width 480 px.
 - Keep all current fields, Firebase behavior, validation, links, and password visibility actions.
-- Orange primary submit button; glass social/secondary actions if currently present.
+- Action-blue primary submit button; glass social/secondary actions if currently present.
 - Google is the only third-party authentication action. Use Google's official, full-color SDK button at full form width with the same pill silhouette as the other authentication buttons on Welcome, Sign In, and Sign Up; do not show Apple or a simulated provider action.
 - Google account selection feeds the same Firebase session and user-profile persistence flow as email authentication. Treat both first-time and returning Google accounts as one non-confusing continuation action.
 - Firebase's credential result decides whether a Google identity is new or returning, regardless of whether the action started on Sign In or Sign Up. Returning UIDs must restore their existing local/cloud workspace, skip onboarding, and never initialize or overwrite empty account data. Onboarding completion is scoped and synced per UID rather than shared as one device-wide flag.
 - Google button taps use the explicit Android account chooser so every device account and Add another account remain available. A successful Firebase credential must not be reported as failed because a later local-profile or cloud-sync write failed, and the official native button must be remounted after its account sheet closes if Android clears its rendered host.
 - Sign Up is account creation only: no profile photo, security badge, or other profile-preparation controls. Explain that Google creates the Firebase account automatically on first use, and offer email creation as the alternative.
 - Sign In and Sign Up fields use one compact outlined floating-label pattern with leading semantic icons: the label animates into the border on focus or when populated, the existing example placeholders appear on focus, input values stay stable, validation appears inline, and password visibility remains explicit. Place Forgot password directly below the password field, right-aligned.
-- Authentication surfaces fully consume the active theme tokens: dark mode uses smoked-glass cards and fields, light primary text, visible muted copy and dividers, orange focus/action states, and dark-safe warning/error treatments. Do not leave hard-coded light labels, icons, borders, or white field surfaces on Sign In or Sign Up.
+- Authentication surfaces fully consume the active theme tokens: dark mode uses smoked-glass cards and fields, light primary text, visible muted copy and dividers, blue focus/action states, and dark-safe warning/error treatments. Do not leave hard-coded light labels, icons, borders, or white field surfaces on Sign In or Sign Up.
 - Keyboard-open state must remain uncluttered and scrollable.
 - Never translate a network timeout, disabled provider, or Firebase configuration failure into "incorrect credentials." Show the actionable authentication error inline and reserve the credentials message for Firebase's invalid-credential response.
 - Preserve password input exactly as entered; trim email addresses but never trim passwords.
@@ -375,31 +396,32 @@ The current full-width bottom bar becomes a floating glass capsule inspired by t
 
 Use the reference's day-planning screen as the structural inspiration, translated to OmniTask:
 
-- Header: greeting and current date on the left; profile/avatar and search in circular glass controls on the right.
-- Add a horizontal seven-day date strip under the greeting. Today uses a raised glass tile with an orange dot or outline.
-- Keep upcoming events as a horizontally scrollable row of glass cards with subtle semantic priority markers.
-- Present Focus Timer and Next Alarm as two compact metric cards, or one two-column glass group on wider devices.
-- Present priority tasks as an `Agenda` section: one stacked glass row per task with checkbox/icon, title, and metadata.
-- Keep existing navigation targets for calendar, focus, alarm, tasks, profile, search, and stats.
-- Primary add action is an orange pill/circle placed in the section header or a non-colliding contextual position.
+- Header: greeting and profile/avatar, followed by one compact current-date row. Do not add a search bar or seven-day strip.
+- Weather uses one distinct condition-aware gradient card. Subtle diagonal atmospheric bands and fine contour lines create a recognizable “weather front” without decorative circles or reduced readability. Its trailing chevron is plain and has no colored circle.
+- Present Focus Timer and Next Alarm as two compact metric cards.
+- Schedule and checklist data use two clearly separated grouped sections with readable 14–15 px titles and 12 px metadata.
+- Day Lens appears after schedule and checklist content, not directly below weather. It is the single weather-planning insight surface and replaces a redundant separate “Today's insight” card.
+- Day Lens uses a 44 px circular palette icon with `#EDEDEF` glyph, 17 px title, 13 px guidance, and a compact status badge.
+- Keep existing navigation targets for events, focus, alarm, tasks, profile, and stats.
+- Primary add action is a primary-teal pill/circle placed in the section header or a non-colliding contextual position.
 
 ### Tasks and note editor
 
 - The Tasks/Organize destination begins with a two-option `Notes` / `Events` segmented control. Switching changes the workspace content without adding another bottom tab.
 - Left-align `Notes`; keep category management and create-note actions in the header.
 - Search becomes a full-width glass input.
-- Filter tabs become a pill segmented control with an orange active state.
+- Filter tabs become a pill segmented control with a blue active state.
 - Task/note cards use a calm white-glass surface. Colorful note backgrounds should become a narrow category accent, icon tint, or extremely subtle 8–12% wash rather than a fully saturated card.
-- Checkbox: 24 px rounded square; completed is orange with a white check.
+- Checkbox: 24 px rounded square; completed is action blue with a white check.
 - Priority appears as a compact semantic label, never a large block of color.
-- Note creation uses one 52 px orange action on the lower-right, positioned at least 16 px above the floating navigation capsule. Do not duplicate it in the header.
+- Note creation uses one 52 px primary-teal control on the lower-right, positioned at least 16 px above the floating navigation capsule. Do not duplicate it in the header.
 - Preserve note colors, tags, todos, formatting, attachments, and editor operations as data/features even if their controls are visually restyled.
 
 ### Calculator
 
-- Calculator is a primary tab and follows the same atmospheric background, top app bar, glass surfaces, orange action language, and floating-navigation clearance as the other main screens.
+- Calculator is a primary tab and follows the same atmospheric background, top app bar, glass surfaces, blue action language, and floating-navigation clearance as the other main screens.
 - Use one large glass display and one grouped keypad surface; avoid individually elevated or decorative key cards.
-- Number keys use high-legibility glass surfaces, utility keys use orange-soft styling, and arithmetic/equals keys use solid orange.
+- Number keys use high-legibility glass surfaces, utility keys use sky-tint styling, and arithmetic/equals keys use solid action blue.
 - Support decimal input, sign change, percent, backspace, clear, the four basic arithmetic operations, chained calculations, and division-by-zero feedback.
 - Place backspace in the final keypad row between decimal and equals. The top-right action opens a recent-calculation history sheet and may restore a result to the display.
 - Let the calculator surfaces fill the available vertical space and end at the navigation-clearance boundary; do not add decorative empty space beneath the keypad.
@@ -411,8 +433,8 @@ Use the reference's day-planning screen as the structural inspiration, translate
 ### Focus
 
 - Center the timer in one large hero glass panel.
-- Use an orange progress ring around the tabular time value.
-- Primary play/pause is a 64 px orange circle; reset and settings are smaller glass circles.
+- Use a primary-teal progress ring around the tabular time value.
+- Primary play/pause is a 64 px primary-teal circle; reset and settings are smaller glass circles.
 - Mode/duration selectors use the shared segmented control.
 - Session count and daily goal appear beneath the timer as quiet metadata/progress.
 - Existing sounds, haptics, duration choices, modals, and timer lifecycle remain unchanged.
@@ -422,8 +444,8 @@ Use the reference's day-planning screen as the structural inspiration, translate
 
 - Keep `Next alarm` as the first hero glass panel with time, label, and relative duration.
 - Alarm entries become stacked glass cards. Time remains the strongest element.
-- Use the orange switch for enabled alarms and a neutral translucent switch when disabled.
-- Repeat days are seven small circular chips; selected days are orange or orange-soft.
+- Use the blue switch for enabled alarms and a neutral translucent switch when disabled.
+- Repeat days are seven small circular chips; selected days are action blue or sky-tinted.
 - Sound, repeat, label, add, edit, enable, and delete behavior stay unchanged.
 - The alarm-sound picker uses explicit `Preview` / `Stop` controls. Do not hide preview behind a long-press gesture.
 - Sound rows use a flexible label column, a separate preview target, and a separate selection target so text and controls cannot overlap.
@@ -431,7 +453,7 @@ Use the reference's day-planning screen as the structural inspiration, translate
 ### Events, create event, and event detail
 
 - Events begins with a glass date/month control and compact calendar strip.
-- The selected date uses the raised white tile/orange state from the reference.
+- The selected date uses a raised white tile and blue selected state.
 - Event agenda rows follow the shared list-row pattern with a slim priority color marker.
 - Create/edit screens use grouped glass sections for date/time, recurrence, location, category, priority, and alarm options.
 - Put the all-day switch before date/time controls. All-day events hide time pickers; multi-day events expose a separate end date and never encode a date range in the notes field.
@@ -455,26 +477,26 @@ Use the reference's day-planning screen as the structural inspiration, translate
 
 - Search field is pinned visually at the top but floats on the atmospheric background.
 - Results are grouped by existing content type with small labels and glass rows.
-- Highlight matches with weight or a faint orange wash, not bright marker yellow.
+- Highlight matches with weight or a faint sky-blue wash, not bright marker yellow.
 - Empty and no-result states use the shared empty-state treatment.
 
 ### Statistics
 
 - Keep all existing computed values and charts.
 - Replace the dense KPI grid with horizontally scrollable or 2 × 2 glass metric cards.
-- Use orange for the principal goal/progress; use semantic secondary colors only to distinguish categories.
+- Use action blue for the principal goal/progress; use semantic secondary colors only to distinguish categories.
 - Chart tracks and dividers stay low contrast.
 - Rings, bars, labels, and numerical values must remain readable without relying on color.
 
 ### Profile
 
-Use the reference profile screen most directly:
-
-- Large left-aligned `Profile` title and a circular sign-out/back action.
-- A hero glass card contains avatar, name, email, edit profile action, and existing account details.
-- Settings/preferences become one or more grouped glass lists with circular leading icons and chevrons.
-- Theme/system-theme controls retain their current behavior and use the shared switch/segmented styling.
-- Sign out and delete account are separated from routine preferences and use clear destructive styling.
+- Use a distinct teal-pearl identity panel with restrained diagonal rails, an editable avatar, account status, and one clear edit action.
+- Keep the screen concise: display-name editing, profile-photo editing, OS notification settings, and sign out are the only visible actions until additional settings have real behavior.
+- Do not show placeholder language, privacy, backup, help, about, or account-deletion controls.
+- The edit-profile flow is a compact centered dialog with keyboard avoidance and explicit Cancel and Save actions.
+- Keep sign out visually separate from routine account controls and confirm it before acting.
+- Place the light/dark mode control in the Dashboard header beside the profile avatar. A manual selection overrides system-following mode and is persisted.
+- Animate the mode icon with a restrained 240 ms crossfade/rotation and cover the palette swap with a brief, low-opacity screen wash.
 
 ## 11. Motion and feedback
 
@@ -584,9 +606,9 @@ Each step must be visually reviewable and must not include feature or data-model
 The redesign is complete when:
 
 - Every existing screen uses the shared pearl/smoked atmospheric background and semantic theme tokens.
-- Primary actions and active states consistently use warm orange rather than the current brand blue.
+- Primary actions and active states consistently use the primary-teal and soft-teal brand family.
 - Main cards, controls, grouped lists, and the tab bar follow the glass recipes in this document.
-- The main tab bar is a floating capsule with an unmistakable orange active state.
+- The main tab bar is a floating capsule with an unmistakable blue active state.
 - Dashboard, Focus, Alarm, Events, Tasks, Statistics, and Profile feel like one product.
 - Both light and dark themes are intentional and readable.
 - Blur-off and reduced-transparency fallbacks are usable.

@@ -4,6 +4,7 @@ import { Linking, View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { enableScreens } from 'react-native-screens';
 import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ThemeProvider } from './src/context/ThemeContext';
 import { AuthProvider } from './src/context/AuthContext';
@@ -15,6 +16,8 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { flushPendingAlarmNavigation, navigationRef } from './src/navigation/navigationRef';
 import { handleNotificationProbeUrl } from './src/testing/NotificationDeviceProbe';
 import { AnimatedSplashScreen } from './src/components/AnimatedSplashScreen';
+import { AppDialogProvider } from './src/components/ui/AppDialog';
+import { OMNITASK_PALETTE } from './src/theme/colors';
 import {
   Nunito_300Light,
   Nunito_400Regular,
@@ -62,23 +65,27 @@ export default function App(): React.JSX.Element | null {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#F8F8F5' }} onLayout={revealAnimatedSplash}>
-      <ThemeProvider>
-        <AuthProvider>
-          <TaskProvider>
-            <CanvasNoteProvider>
-              <AlarmProvider>
-                <EventProvider>
-                  <NavigationContainer ref={navigationRef} onReady={flushPendingAlarmNavigation}>
-                    <RootNavigator />
-                  </NavigationContainer>
-                </EventProvider>
-              </AlarmProvider>
-            </CanvasNoteProvider>
-          </TaskProvider>
-        </AuthProvider>
-      </ThemeProvider>
-      {showAnimatedSplash ? <AnimatedSplashScreen onFinish={() => setShowAnimatedSplash(false)} /> : null}
-    </View>
+    <SafeAreaProvider>
+      <View style={{ flex: 1, backgroundColor: OMNITASK_PALETTE.pearlIce }} onLayout={revealAnimatedSplash}>
+        <ThemeProvider>
+          <AppDialogProvider>
+            <AuthProvider>
+              <TaskProvider>
+                <CanvasNoteProvider>
+                  <AlarmProvider>
+                    <EventProvider>
+                      <NavigationContainer ref={navigationRef} onReady={flushPendingAlarmNavigation}>
+                        <RootNavigator />
+                      </NavigationContainer>
+                    </EventProvider>
+                  </AlarmProvider>
+                </CanvasNoteProvider>
+              </TaskProvider>
+            </AuthProvider>
+          </AppDialogProvider>
+        </ThemeProvider>
+        {showAnimatedSplash ? <AnimatedSplashScreen onFinish={() => setShowAnimatedSplash(false)} /> : null}
+      </View>
+    </SafeAreaProvider>
   );
 }

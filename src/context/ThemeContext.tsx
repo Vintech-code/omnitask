@@ -20,7 +20,8 @@ export interface Theme {
     highlight: string;
   };
   content: { primary: string; secondary: string; muted: string };
-  accent: { base: string; pressed: string; soft: string; glow: string };
+  accent: { base: string; pressed: string; soft: string; glow: string; warm: string; warmSoft: string };
+  iconTile: { coral: string; cyan: string; teal: string; blue: string; foreground: string };
   semantic: { success: string; warning: string; danger: string; info: string };
   divider: string;
   icon: string;
@@ -42,21 +43,28 @@ export interface Theme {
 
 const createTheme = (dark: boolean): Theme => {
   const background = dark
-    ? { base: OMNITASK_PALETTE.smokedCharcoal, top: OMNITASK_PALETTE.darkGradientTop, bottom: OMNITASK_PALETTE.darkGradientEnd, ambientLavender: OMNITASK_PALETTE.darkGradientTop, ambientBlue: OMNITASK_PALETTE.slateCyan }
-    : { base: OMNITASK_PALETTE.pearl, top: OMNITASK_PALETTE.warmIvory, bottom: OMNITASK_PALETTE.lightGradientEnd, ambientLavender: OMNITASK_PALETTE.pearl, ambientBlue: OMNITASK_PALETTE.mistBlueGray };
+    ? { base: OMNITASK_PALETTE.smokedNavy, top: OMNITASK_PALETTE.darkGradientTop, bottom: OMNITASK_PALETTE.darkGradientEnd, ambientLavender: OMNITASK_PALETTE.darkGradientTop, ambientBlue: OMNITASK_PALETTE.slateBlue }
+    : { base: OMNITASK_PALETTE.pearlIce, top: OMNITASK_PALETTE.headerTeal, bottom: OMNITASK_PALETTE.lightGradientEnd, ambientLavender: OMNITASK_PALETTE.skyTint, ambientBlue: OMNITASK_PALETTE.mistBlue };
   const glass = dark
-    ? { primary: 'rgba(38,39,37,0.68)', secondary: 'rgba(49,50,47,0.48)', solid: 'rgba(34,35,33,0.92)', border: 'rgba(255,255,255,0.13)', highlight: 'rgba(255,255,255,0.15)' }
-    : { primary: 'rgba(255,255,255,0.58)', secondary: 'rgba(255,255,255,0.38)', solid: 'rgba(255,255,255,0.86)', border: 'rgba(255,255,255,0.76)', highlight: 'rgba(255,255,255,0.92)' };
+    ? { primary: 'rgba(29,46,47,0.84)', secondary: 'rgba(42,62,63,0.72)', solid: 'rgba(24,38,39,0.96)', border: 'rgba(196,224,225,0.16)', highlight: 'rgba(237,237,239,0.16)' }
+    : { primary: 'rgba(255,255,255,0.88)', secondary: 'rgba(255,255,255,0.64)', solid: '#FFFFFF', border: 'rgba(255,255,255,0.92)', highlight: '#FFFFFF' };
   const content = dark
-    ? { primary: '#F7F7F3', secondary: '#B8B9B4', muted: '#81827E' }
-    : { primary: '#171717', secondary: '#666765', muted: '#92938F' };
+    ? { primary: '#EDEDEF', secondary: '#B9CACA', muted: '#819596' }
+    : { primary: '#171A1A', secondary: '#5C6666', muted: '#8A9292' };
   const accent = dark
-    ? { base: OMNITASK_PALETTE.emberOrange, pressed: '#E66E00', soft: 'rgba(255,122,0,0.17)', glow: 'rgba(255,122,0,0.28)' }
-    : { base: OMNITASK_PALETTE.emberOrange, pressed: '#E66E00', soft: 'rgba(255,122,0,0.13)', glow: 'rgba(255,160,55,0.30)' };
+    ? { base: OMNITASK_PALETTE.brightCyan, pressed: OMNITASK_PALETTE.actionBlue, soft: 'rgba(52,199,217,0.16)', glow: 'rgba(52,199,217,0.22)', warm: OMNITASK_PALETTE.warmCoral, warmSoft: 'rgba(242,104,65,0.18)' }
+    : { base: OMNITASK_PALETTE.actionBlue, pressed: OMNITASK_PALETTE.actionBluePressed, soft: 'rgba(196,224,225,0.72)', glow: 'rgba(51,175,173,0.22)', warm: OMNITASK_PALETTE.warmCoral, warmSoft: OMNITASK_PALETTE.warmCoralSoft };
   const semantic = dark
-    ? { success: '#8ACB42', warning: '#F0AE3D', danger: '#F0706A', info: OMNITASK_PALETTE.slateCyan }
-    : { success: '#74B82A', warning: '#E7A126', danger: '#E45B55', info: OMNITASK_PALETTE.slateCyan };
-  const divider = dark ? 'rgba(255,255,255,0.10)' : 'rgba(23,23,23,0.09)';
+    ? { success: '#46C9B9', warning: '#F0A06F', danger: '#F27B5A', info: OMNITASK_PALETTE.brightCyan }
+    : { success: OMNITASK_PALETTE.actionBlue, warning: OMNITASK_PALETTE.warmCoral, danger: '#D84F37', info: OMNITASK_PALETTE.infoBlue };
+  const divider = dark ? 'rgba(196,224,225,0.13)' : 'rgba(23,26,26,0.08)';
+  const iconTile = {
+    coral: OMNITASK_PALETTE.warmCoral,
+    cyan: OMNITASK_PALETTE.brightCyan,
+    teal: OMNITASK_PALETTE.actionBlue,
+    blue: OMNITASK_PALETTE.infoBlue,
+    foreground: OMNITASK_PALETTE.iconForeground,
+  };
 
   return {
     dark,
@@ -64,11 +72,12 @@ const createTheme = (dark: boolean): Theme => {
     glass,
     content,
     accent,
+    iconTile,
     semantic,
     divider,
-    icon: dark ? '#F1F1ED' : '#191A19',
+    icon: dark ? '#EDEDEF' : '#171A1A',
     bg: background.base,
-    bg2: dark ? OMNITASK_PALETTE.darkGradientTop : OMNITASK_PALETTE.pearl,
+    bg2: dark ? OMNITASK_PALETTE.darkGradientTop : OMNITASK_PALETTE.pearlIce,
     card: glass.solid,
     border: glass.border,
     text: content.primary,
@@ -78,7 +87,7 @@ const createTheme = (dark: boolean): Theme => {
     tabBorder: glass.border,
     segBg: glass.secondary,
     segActive: glass.solid,
-    iconColor: dark ? '#F1F1ED' : '#191A19',
+    iconColor: dark ? '#EDEDEF' : '#171A1A',
   };
 };
 
@@ -127,8 +136,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = useMemo(() => (isDark ? DARK : LIGHT), [isDark]);
 
   const toggleTheme = () => {
-    if (useSystemTheme) return;
     const next = !isDark;
+    if (useSystemTheme) {
+      setUseSystemThemeState(false);
+      Storage.set(KEYS.SYSTEM_THEME, false);
+    }
     setIsDark(next);
     Storage.set(KEYS.THEME, next);
   };

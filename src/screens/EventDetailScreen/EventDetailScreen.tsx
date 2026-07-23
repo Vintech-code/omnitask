@@ -131,8 +131,8 @@ export default function EventDetailScreen({ route, navigation }: any) {
           <Text style={[s.heroTitle, { color: theme.text }]}>{event.title}</Text>
 
           <View style={[s.scheduleLine, { borderTopColor: theme.divider }]}>
-            <View style={[s.scheduleIcon, { backgroundColor: theme.accent.soft }]}>
-              <Ionicons name="calendar-outline" size={21} color={theme.accent.base} />
+            <View style={[s.scheduleIcon, { backgroundColor: theme.iconTile.blue }]}>
+              <Ionicons name="calendar-outline" size={21} color={theme.iconTile.foreground} />
             </View>
             <View style={s.scheduleCopy}>
               <Text style={[s.scheduleDate, { color: theme.text }]}>{scheduleDate}</Text>
@@ -146,8 +146,8 @@ export default function EventDetailScreen({ route, navigation }: any) {
         <Text style={[s.sectionTitle, { color: theme.textDim }]}>EVENT INFORMATION</Text>
         <View style={[s.group, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}>
           <View style={s.infoRow}>
-            <View style={[s.rowIcon, { backgroundColor: alarmActive ? theme.accent.soft : theme.glass.secondary }]}>
-              <Ionicons name={alarmActive ? 'alarm' : 'alarm-outline'} size={20} color={alarmActive ? theme.accent.base : theme.textDim} />
+            <View style={[s.rowIcon, { backgroundColor: theme.iconTile.coral }]}>
+              <Ionicons name={alarmActive ? 'alarm' : 'alarm-outline'} size={20} color={theme.iconTile.foreground} />
             </View>
             <View style={s.rowCopy}>
               <Text style={[s.rowLabel, { color: theme.text }]}>Event alarm</Text>
@@ -167,8 +167,8 @@ export default function EventDetailScreen({ route, navigation }: any) {
             <>
               <View style={[s.divider, { backgroundColor: theme.divider }]} />
               <View style={s.infoRow}>
-                <View style={[s.rowIcon, { backgroundColor: theme.glass.secondary }]}>
-                  <Ionicons name="notifications-outline" size={20} color={theme.textSub} />
+                <View style={[s.rowIcon, { backgroundColor: theme.iconTile.cyan }]}>
+                  <Ionicons name="notifications-outline" size={20} color={theme.iconTile.foreground} />
                 </View>
                 <View style={s.rowCopy}>
                   <Text style={[s.rowLabel, { color: theme.text }]}>Reminders</Text>
@@ -188,15 +188,15 @@ export default function EventDetailScreen({ route, navigation }: any) {
                 onPress={openMaps}
                 activeOpacity={0.72}
               >
-                <View style={[s.rowIcon, { backgroundColor: theme.accent.soft }]}>
-                  <Ionicons name="location-outline" size={20} color={theme.accent.base} />
+                <View style={[s.rowIcon, { backgroundColor: theme.iconTile.teal }]}>
+                  <Ionicons name="location-outline" size={20} color={theme.iconTile.foreground} />
                 </View>
                 <View style={s.rowCopy}>
                   <Text style={[s.rowLabel, { color: theme.text }]}>Location</Text>
                   <Text style={[s.rowDescription, { color: theme.textSub }]} numberOfLines={2}>{event.location}</Text>
                 </View>
-                <View style={[s.trailingAction, { backgroundColor: theme.accent.soft }]}>
-                  <Ionicons name="navigate-outline" size={18} color={theme.accent.base} />
+                <View style={[s.trailingAction, { backgroundColor: theme.iconTile.blue }]}>
+                  <Ionicons name="navigate-outline" size={18} color={theme.iconTile.foreground} />
                 </View>
               </TouchableOpacity>
             </>
@@ -206,8 +206,8 @@ export default function EventDetailScreen({ route, navigation }: any) {
             <>
               <View style={[s.divider, { backgroundColor: theme.divider }]} />
               <View style={[s.infoRow, s.notesRow]}>
-                <View style={[s.rowIcon, { backgroundColor: theme.glass.secondary }]}>
-                  <Ionicons name="document-text-outline" size={20} color={theme.textSub} />
+                <View style={[s.rowIcon, { backgroundColor: theme.iconTile.blue }]}>
+                  <Ionicons name="document-text-outline" size={20} color={theme.iconTile.foreground} />
                 </View>
                 <View style={s.rowCopy}>
                   <Text style={[s.rowLabel, { color: theme.text }]}>Notes</Text>

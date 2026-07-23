@@ -1,6 +1,6 @@
 import { fontFamily } from '@/theme/typography';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { AppText as Text, AppTextInput as TextInput } from '@/components/ui/AppText';
 import MapView, { MapPressEvent, Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -10,6 +10,7 @@ import Constants from 'expo-constants';
 
 import { AppBackground } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
+import { OmniLoader } from '@/components/ui/OmniLoader';
 import { radii } from '@/theme';
 
 export interface EventLocationSelection {
@@ -168,8 +169,8 @@ export function EventLocationPicker({
             </MapView>
           ) : (
             <View testID="event-location-map-unavailable" style={[styles.mapUnavailable, { backgroundColor: theme.glass.solid }]}>
-              <View style={[styles.mapUnavailableIcon, { backgroundColor: theme.accent.soft }]}>
-                <Ionicons name="map-outline" size={30} color={theme.accent.base} />
+              <View style={[styles.mapUnavailableIcon, { backgroundColor: theme.iconTile.blue }]}>
+                <Ionicons name="map-outline" size={30} color={theme.iconTile.foreground} />
               </View>
               <Text style={[styles.mapUnavailableTitle, { color: theme.text }]}>Map unavailable in this build</Text>
               <Text style={[styles.mapUnavailableText, { color: theme.textSub }]}>Use your current location now, or rebuild OmniTask with its Google Maps API key to choose a pin.</Text>
@@ -197,7 +198,7 @@ export function EventLocationPicker({
                 </>
               ) : (
                 <>
-                  <ActivityIndicator size="large" color={theme.accent.base} />
+                  <OmniLoader size="large" accessibilityLabel="Finding location" />
                   <Text style={[styles.mapLoadingTitle, { color: theme.text }]}>Loading map…</Text>
                 </>
               )}

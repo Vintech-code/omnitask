@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { AppState, View, TouchableOpacity, Animated, Alert, ScrollView, FlatList, Modal, Pressable } from 'react-native';
+import { AppState, View, TouchableOpacity, Animated, ScrollView, FlatList, Modal, Pressable } from 'react-native';
+import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import { AppText as Text } from '@/components/ui/AppText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -283,7 +284,7 @@ function PomodoroTab({ theme, navigation, menuRequest }: { theme: ReturnType<typ
       </View>
 
       <View style={[pom.contextCard, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}> 
-        <View style={pom.contextHeader}><View style={[pom.contextIcon, { backgroundColor: theme.accent.soft }]}><MaterialCommunityIcons name="notebook-outline" size={22} color={theme.accent.base} /></View><View style={pom.contextHeaderCopy}><Text style={[pom.contextTitle, { color: theme.content.primary }]}>Focus note</Text><Text style={[pom.contextSubtitle, { color: theme.content.secondary }]}>Keep the session connected to what matters.</Text></View></View>
+        <View style={pom.contextHeader}><View style={[pom.contextIcon, { backgroundColor: theme.iconTile.teal }]}><MaterialCommunityIcons name="notebook-outline" size={22} color={theme.iconTile.foreground} /></View><View style={pom.contextHeaderCopy}><Text style={[pom.contextTitle, { color: theme.content.primary }]}>Focus note</Text><Text style={[pom.contextSubtitle, { color: theme.content.secondary }]}>Keep the session connected to what matters.</Text></View></View>
         {linkedNote ? (
           <View style={[pom.linkedNote, { backgroundColor: theme.glass.secondary }]}> 
             <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Open ${linkedNote.title || 'Untitled note'}`} style={pom.linkedMain} onPress={() => navigation.navigate('Tasks', { section: 'notes', noteId: linkedNote.id, noteRequest: Date.now() })}>
@@ -305,7 +306,7 @@ function PomodoroTab({ theme, navigation, menuRequest }: { theme: ReturnType<typ
             <ScrollView showsVerticalScrollIndicator={false}>
               {availableNotes.map(n => {
                 const selected = linkedNoteId === n.id;
-                return <TouchableOpacity accessibilityRole="radio" accessibilityState={{ selected }} key={n.id} style={[pom.pickerRow, { borderBottomColor: theme.divider }]} onPress={() => selectNote(n.id)}><View style={[pom.pickerNoteIcon, { backgroundColor: selected ? theme.accent.soft : theme.glass.secondary }]}><MaterialCommunityIcons name="notebook-outline" size={20} color={selected ? theme.accent.base : theme.content.secondary} /></View><View style={pom.pickerRowCopy}><Text style={[pom.pickerRowText, { color: theme.content.primary }]} numberOfLines={1}>{n.title || 'Untitled note'}</Text><Text style={[pom.pickerRowMeta, { color: theme.content.muted }]} numberOfLines={1}>{n.category || 'Personal'}</Text></View>{selected ? <Ionicons name="checkmark-circle" size={22} color={theme.accent.base} /> : <Ionicons name="chevron-forward" size={18} color={theme.content.muted} />}</TouchableOpacity>;
+                return <TouchableOpacity accessibilityRole="radio" accessibilityState={{ selected }} key={n.id} style={[pom.pickerRow, { borderBottomColor: theme.divider }]} onPress={() => selectNote(n.id)}><View style={[pom.pickerNoteIcon, { backgroundColor: selected ? theme.iconTile.teal : theme.iconTile.cyan }]}><MaterialCommunityIcons name="notebook-outline" size={20} color={theme.iconTile.foreground} /></View><View style={pom.pickerRowCopy}><Text style={[pom.pickerRowText, { color: theme.content.primary }]} numberOfLines={1}>{n.title || 'Untitled note'}</Text><Text style={[pom.pickerRowMeta, { color: theme.content.muted }]} numberOfLines={1}>{n.category || 'Personal'}</Text></View>{selected ? <Ionicons name="checkmark-circle" size={22} color={theme.accent.base} /> : <Ionicons name="chevron-forward" size={18} color={theme.content.muted} />}</TouchableOpacity>;
               })}
             </ScrollView>
           )}

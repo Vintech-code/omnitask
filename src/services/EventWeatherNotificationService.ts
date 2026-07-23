@@ -7,6 +7,7 @@ import { KEYS, Storage } from '@/services/StorageService';
 import { eventStart, parseEventDateTime, systemTimeZone } from '@/utils/eventDate';
 import { assessWeatherWarning, nearestHourlyWeather, weatherWarningBody } from '@/utils/weather';
 import type { AppEvent } from '@/types/event';
+import { OMNITASK_PALETTE } from '@/theme/colors';
 
 const WEATHER_NOTIFICATION_PREFIX = 'weather_event_';
 const WEATHER_CHANNEL_ID = 'event-weather-warnings';
@@ -41,7 +42,7 @@ async function configureWeatherChannel(): Promise<void> {
     enableVibrate: true,
     vibrationPattern: [0, 250, 150, 250],
     enableLights: true,
-    lightColor: '#FF7A00',
+    lightColor: OMNITASK_PALETTE.actionBlue,
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
   });
 }

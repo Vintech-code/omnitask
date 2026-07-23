@@ -1,11 +1,12 @@
 import { fontFamily } from '@/theme/typography';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { AppText as Text } from '@/components/ui/AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import { GlassCard } from '@/components/ui';
 import { useTheme } from '@/context/ThemeContext';
+import { OmniLoader } from '@/components/ui/OmniLoader';
 import type { CurrentWeather, HourlyWeather } from '@/types/weather';
 import type { CurrentWeatherStatus } from '@/hooks/useCurrentWeather';
 import { upcomingHourlyWeather, weatherConditionLabel, weatherIconName } from '@/utils/weather';
@@ -57,7 +58,7 @@ export function WeatherCard({ date, weather, hourly, location, status, error, on
 
       {loading ? (
         <View style={styles.stateRow}>
-          <ActivityIndicator color={theme.accent.base} />
+          <OmniLoader accessibilityLabel="Loading weather" />
           <Text style={[styles.stateText, { color: theme.content.muted }]}>Checking the local forecast…</Text>
         </View>
       ) : status === 'permission-required' ? (
@@ -118,8 +119,8 @@ export function WeatherCard({ date, weather, hourly, location, status, error, on
             style={[styles.hourlyToggle, { borderTopColor: theme.divider }]}
             onPress={() => setHourlyExpanded(value => !value)}
           >
-            <View style={[styles.hourlyToggleIcon, { backgroundColor: theme.accent.soft }]}>
-              <Ionicons name="time-outline" size={17} color={theme.accent.base} />
+            <View style={[styles.hourlyToggleIcon, { backgroundColor: theme.iconTile.blue }]}>
+              <Ionicons name="time-outline" size={17} color={theme.iconTile.foreground} />
             </View>
             <View style={styles.hourlyToggleCopy}>
               <Text style={[styles.hourlyToggleTitle, { color: theme.content.primary }]}>Hourly forecast</Text>
@@ -191,7 +192,7 @@ const styles = StyleSheet.create({
   detailLabel: { fontSize: 11, fontFamily: fontFamily.semibold },
   detailValue: { marginLeft: 'auto', fontSize: 12, fontFamily: fontFamily.bold },
   hourlyToggle: { minHeight: 48, marginTop: 9, paddingTop: 7, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center' },
-  hourlyToggleIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  hourlyToggleIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   hourlyToggleCopy: { flex: 1, marginLeft: 10 },
   hourlyToggleTitle: { fontSize: 13, lineHeight: 17, fontFamily: fontFamily.bold },
   hourlyToggleSub: { marginTop: 1, fontSize: 10, lineHeight: 14 },

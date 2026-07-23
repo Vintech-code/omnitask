@@ -1,4 +1,5 @@
 import type { CanvasObject, CanvasPoint } from '@/types/note';
+import { OMNITASK_PALETTE } from '@/theme/colors';
 
 export interface CanvasConnectorGeometry {
   start: CanvasPoint;
@@ -54,7 +55,7 @@ export function createCanvasConnector(id: string, fromObjectId: string, toObject
     position: { x: 0, y: 0 },
     size: { width: 0, height: 0 },
     rotation: 0,
-    style: { color: '#FF7A00', strokeWidth: 3 },
+    style: { color: OMNITASK_PALETTE.actionBlue, strokeWidth: 3 },
     layer,
     createdAt: Date.now(),
     updatedAt: Date.now(),

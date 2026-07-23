@@ -1,7 +1,8 @@
 import { fontFamily } from '@/theme/typography';
 import React from 'react';
-import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { AppText as Text } from '@/components/ui/AppText';
+import { OmniLoader } from '@/components/ui/OmniLoader';
 
 type Props = {
   loading?: boolean;
@@ -31,7 +32,7 @@ export function GoogleAuthButton({ loading = false, disabled = false, onPress, t
     >
       {loading ? (
         <View style={styles.content}>
-          <ActivityIndicator size="small" color="#FF7A00" />
+          <OmniLoader size="small" accessibilityLabel="Connecting to Google" />
           <Text style={styles.text}>Connecting...</Text>
         </View>
       ) : (

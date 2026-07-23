@@ -1,6 +1,5 @@
 import React, { useMemo, useRef } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   ScrollView,
   StyleSheet,
@@ -20,6 +19,7 @@ import { AppBackground, GlassCard } from '@/components/ui';
 import { WeatherTrendChart } from '@/components/WeatherTrendChart';
 import { WeatherVideoBackground, weatherMediaFor } from '@/components/weather/WeatherVideoBackground';
 import { useTheme } from '@/context/ThemeContext';
+import { OmniLoader } from '@/components/ui/OmniLoader';
 import { useCurrentWeather } from '@/hooks/useCurrentWeather';
 import { fontFamily } from '@/theme/typography';
 import { upcomingHourlyWeather, weatherConditionLabel } from '@/utils/weather';
@@ -52,7 +52,7 @@ export default function WeatherScreen({ navigation }: any) {
           {weatherState.status === 'permission-required' ? (
             <View style={styles.center}>
               <GlassCard variant="solid" style={styles.stateCard} contentStyle={styles.stateContent}>
-                <View style={[styles.stateIcon, { backgroundColor: theme.accent.soft }]}><Ionicons name="location-outline" size={26} color={theme.accent.base} /></View>
+                <View style={[styles.stateIcon, { backgroundColor: theme.iconTile.blue }]}><Ionicons name="location-outline" size={26} color={theme.iconTile.foreground} /></View>
                 <Text style={[styles.stateTitle, { color: theme.content.primary }]}>Weather needs your location</Text>
                 <Text style={[styles.stateText, { color: theme.content.secondary }]}>Allow location access to show your local forecast and event weather warnings.</Text>
                 <TouchableOpacity disabled={isBusy} style={[styles.enable, { backgroundColor: theme.accent.base }]} onPress={() => void weatherState.requestPermission()}>
@@ -61,11 +61,11 @@ export default function WeatherScreen({ navigation }: any) {
               </GlassCard>
             </View>
           ) : isBusy ? (
-            <View style={styles.center}><ActivityIndicator color={theme.accent.base} size="large" /><Text style={[styles.loading, { color: theme.content.secondary }]}>Preparing your forecast…</Text></View>
+            <View style={styles.center}><OmniLoader size="large" accessibilityLabel="Preparing forecast" /><Text style={[styles.loading, { color: theme.content.secondary }]}>Preparing your forecast…</Text></View>
           ) : (
             <View style={styles.center}>
               <GlassCard variant="solid" style={styles.stateCard} contentStyle={styles.stateContent}>
-                <View style={[styles.stateIcon, { backgroundColor: theme.accent.soft }]}><Ionicons name="cloud-offline-outline" size={26} color={theme.accent.base} /></View>
+                <View style={[styles.stateIcon, { backgroundColor: theme.iconTile.cyan }]}><Ionicons name="cloud-offline-outline" size={26} color={theme.iconTile.foreground} /></View>
                 <Text style={[styles.stateTitle, { color: theme.content.primary }]}>Forecast unavailable</Text>
                 <Text style={[styles.stateText, { color: theme.content.secondary }]}>{weatherState.error || 'Check your connection and try again.'}</Text>
                 <TouchableOpacity disabled={isBusy} style={[styles.enable, { backgroundColor: theme.accent.base }]} onPress={() => void weatherState.refresh()}>
@@ -108,7 +108,7 @@ export default function WeatherScreen({ navigation }: any) {
             <Text style={styles.locationSubtitle}>Live local weather</Text>
           </View>
           <TouchableOpacity accessibilityLabel="Refresh weather" disabled={isBusy} style={[styles.iconButton, isBusy && styles.disabled]} onPress={() => void weatherState.refresh()}>
-            {isBusy ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Ionicons name="refresh" size={23} color="#FFFFFF" />}
+            {isBusy ? <OmniLoader size="small" onPrimary accessibilityLabel="Refreshing weather" /> : <Ionicons name="refresh" size={23} color="#FFFFFF" />}
           </TouchableOpacity>
         </View>
 

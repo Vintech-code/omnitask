@@ -75,7 +75,7 @@ export default function MainTabNavigator() {
           tabBarLabel: 'Home',
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused}>
-              <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={focused ? '#FFF' : theme.icon} />
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
             </TabIcon>
           ),
         }}
@@ -86,7 +86,7 @@ export default function MainTabNavigator() {
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused}>
-              <Ionicons name={focused ? 'timer' : 'timer-outline'} size={22} color={focused ? '#FFF' : theme.icon} />
+              <Ionicons name={focused ? 'timer' : 'timer-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
             </TabIcon>
           ),
         }}
@@ -97,7 +97,7 @@ export default function MainTabNavigator() {
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused}>
-              <Ionicons name={focused ? 'alarm' : 'alarm-outline'} size={22} color={focused ? '#FFF' : theme.icon} />
+              <Ionicons name={focused ? 'alarm' : 'alarm-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
             </TabIcon>
           ),
         }}
@@ -108,7 +108,7 @@ export default function MainTabNavigator() {
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused}>
-              <Ionicons name={focused ? 'calculator' : 'calculator-outline'} size={22} color={focused ? '#FFF' : theme.icon} />
+              <Ionicons name={focused ? 'calculator' : 'calculator-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
             </TabIcon>
           ),
         }}
@@ -120,7 +120,7 @@ export default function MainTabNavigator() {
           tabBarLabel: 'Organize',
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused}>
-              <MaterialCommunityIcons name={focused ? 'note-text' : 'note-text-outline'} size={22} color={focused ? '#FFF' : theme.icon} />
+              <MaterialCommunityIcons name={focused ? 'note-text' : 'note-text-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
             </TabIcon>
           ),
         }}
@@ -132,8 +132,8 @@ export default function MainTabNavigator() {
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    left: 16,
-    right: 16,
+    left: 20,
+    right: 20,
     height: 68,
     borderRadius: radii.pill,
     borderTopWidth: 1,

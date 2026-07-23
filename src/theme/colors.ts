@@ -1,56 +1,37 @@
 /**
- * Centralized color tokens for the entire app.
- * Use these instead of hardcoded hex strings in screens/components.
+ * Centralized color tokens for OmniTask.
+ *
+ * Reference-derived teal, pearl, and icon-circle palette.
  */
-
 export const OMNITASK_PALETTE = {
-  pearl: '#F3F3F1',
-  warmIvory: '#F6F3EC',
-  mistBlueGray: '#DCE5E8',
-  lightGradientEnd: '#E8EDF0',
-  slateCyan: '#6E9FBD',
-  emberOrange: '#FF7A00',
-  smokedCharcoal: '#121311',
-  darkGradientTop: '#1A1B19',
-  darkGradientEnd: '#111615',
-  deepSlate: '#1E2E38',
+  pearlIce: '#EDEDEF',
+  frostWhite: '#FFFFFF',
+  skyTint: '#C4E0E1',
+  mistBlue: '#79C6CA',
+  headerTeal: '#33AFAD',
+  lightGradientEnd: '#EDEDEF',
+  actionBlue: '#12B9A9',
+  actionBluePressed: '#0E9489',
+  warmCoral: '#F26841',
+  warmCoralSoft: '#FCE5DE',
+  brightCyan: '#34C7D9',
+  infoBlue: '#20A6EB',
+  iconForeground: '#EDEDEF',
+  slateBlue: '#397E80',
+  smokedNavy: '#101A1B',
+  darkGradientTop: '#15383A',
+  darkGradientEnd: '#0B1415',
 } as const;
 
-// ── Brand ────────────────────────────────────────────────────────────────────
-/** Legacy token name retained during migration; the redesigned primary accent is warm orange. */
-export const BRAND_BLUE     = OMNITASK_PALETTE.emberOrange;
-export const BRAND_GREEN    = '#3DAE7C';
-export const BRAND_ORANGE   = OMNITASK_PALETTE.emberOrange;
-export const BRAND_RED      = '#E05252';
-export const BRAND_PURPLE   = '#9B6DD4';
-
-// ── Note card palette ────────────────────────────────────────────────────────
-export const CARD_COLORS = [
-  '#FFF9C4', '#FFFDE7', '#FFF3E0', '#F3E5F5',
-  '#E8F5E9', '#E3F2FD', '#FCE4EC', '#E0F7FA', '#FFFFFF',
+export const ICON_TILE_COLORS = [
+  OMNITASK_PALETTE.warmCoral,
+  OMNITASK_PALETTE.brightCyan,
+  OMNITASK_PALETTE.actionBlue,
+  OMNITASK_PALETTE.infoBlue,
 ] as const;
 
-// ── Tag / badge palette ──────────────────────────────────────────────────────
-export const TAG_PALETTE = [
-  '#7C5CBF', '#2196F3', '#4CAF50', '#F44336',
-  '#FF9800', '#009688', '#E91E63', '#607D8B',
-] as const;
+/** Compatibility name used by screens that have not migrated to ThemeContext. */
+export const BRAND_BLUE = OMNITASK_PALETTE.actionBlue;
 
-// ── Neutral text ─────────────────────────────────────────────────────────────
-export const TEXT_PRIMARY   = '#111111';
-export const TEXT_SECONDARY = '#555555';
-export const TEXT_MUTED     = '#888888';
-export const TEXT_DISABLED  = '#C0C0C0';
-export const TEXT_LIGHT     = '#aaa';
-
-// ── Surface ──────────────────────────────────────────────────────────────────
-export const SURFACE_WHITE  = '#FFFFFF';
-export const SURFACE_LIGHT  = '#FAFAFA';
-export const SURFACE_INPUT  = '#F8F8F8';
-export const BORDER_DEFAULT = '#DDD';
-export const BORDER_SUBTLE  = 'rgba(0,0,0,0.06)';
-export const BORDER_TOOLBAR = 'rgba(0,0,0,0.07)';
-
-// ── Overlay ──────────────────────────────────────────────────────────────────
-export const OVERLAY_DARK   = 'rgba(0,0,0,0.45)';
-export const OVERLAY_LIGHT  = 'rgba(255,255,255,0.6)';
+/** New notes use one calm neutral tint; existing stored note colors are preserved. */
+export const CARD_COLORS = [OMNITASK_PALETTE.frostWhite] as const;

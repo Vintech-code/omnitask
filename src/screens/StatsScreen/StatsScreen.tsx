@@ -9,14 +9,15 @@ import { useTaskStore } from '@/context/TaskStore';
 import { useEvents } from '@/context/EventStore';
 import { useAlarmStore } from '@/context/AlarmStore';
 import { useAuth } from '@/context/AuthContext';
-import { BRAND_BLUE as BLUE } from '@/theme/colors';
+import { OMNITASK_PALETTE } from '@/theme/colors';
 import { mb, st } from './styles';
 import { AppBackground, ScreenSkeleton } from '@/components/ui';
 import { hydrateFocusSessions } from '@/services/FocusStatsService';
 
-const GREEN  = '#52B788';
-const ORANGE = '#E09C52';
-const PURPLE = '#9B6DD4';
+const GREEN = OMNITASK_PALETTE.actionBlue;
+const ORANGE = OMNITASK_PALETTE.warmCoral;
+const BLUE = OMNITASK_PALETTE.infoBlue;
+const CYAN = OMNITASK_PALETTE.brightCyan;
 
 // Simple bar-chart component without SVG
 function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
@@ -107,7 +108,7 @@ export default function StatsScreen({ navigation }: any) {
   notes.forEach(n => { catMap[n.category] = (catMap[n.category] || 0) + 1; });
   const catEntries = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
-  const CAT_COLORS = [BLUE, GREEN, ORANGE, PURPLE, '#E05252'];
+  const CAT_COLORS = [BLUE, GREEN, ORANGE, CYAN];
 
   // Priority breakdown
   const priorities = ['High', 'Medium', 'Low'];
@@ -135,11 +136,11 @@ export default function StatsScreen({ navigation }: any) {
             { label: 'Notes', value: totalNotes, icon: 'document-text-outline', color: GREEN },
             { label: 'Events', value: totalEvents, icon: 'calendar-outline', color: BLUE },
             { label: 'Alarms', value: totalAlarms, icon: 'alarm-outline', color: ORANGE },
-            { label: 'Sessions', value: sessions, icon: 'timer-outline', color: PURPLE },
+            { label: 'Sessions', value: sessions, icon: 'timer-outline', color: CYAN },
           ].map(k => (
             <View key={k.label} style={[st.kpiCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <View style={[st.kpiIcon, { backgroundColor: `${k.color}18` }]}>
-                <Ionicons name={k.icon as any} size={20} color={k.color} />
+              <View style={[st.kpiIcon, { backgroundColor: k.color }]}>
+                <Ionicons name={k.icon as any} size={20} color={theme.iconTile.foreground} />
               </View>
               <Text style={[st.kpiVal, { color: theme.text }]}>{k.value}</Text>
               <Text style={[st.kpiLabel, { color: theme.textDim }]}>{k.label}</Text>
@@ -150,16 +151,16 @@ export default function StatsScreen({ navigation }: any) {
         {/* ── Focus section ── */}
         <View style={[st.section, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <View style={st.sectionHead}>
-            <Ionicons name="timer-outline" size={16} color={PURPLE} />
+            <Ionicons name="timer-outline" size={16} color={CYAN} />
             <Text style={[st.sectionTitle, { color: theme.text }]}>Focus Time</Text>
           </View>
           <View style={st.focusRow}>
-            <RingBadge pct={goalPct} color={PURPLE} size={80} />
+            <RingBadge pct={goalPct} color={CYAN} size={80} />
             <View style={{ flex: 1, marginLeft: 20, gap: 10 }}>
               <View>
                 <Text style={[st.focusTimeLabel, { color: theme.textDim }]}>Today's Sessions</Text>
                 <Text style={[st.focusTimeVal, { color: theme.text }]}>{sessions} / {dailyGoal} sessions</Text>
-                <MiniBar value={sessions} max={dailyGoal} color={PURPLE} />
+                <MiniBar value={sessions} max={dailyGoal} color={CYAN} />
               </View>
               <View>
                 <Text style={[st.focusTimeLabel, { color: theme.textDim }]}>Total Focus Time</Text>
