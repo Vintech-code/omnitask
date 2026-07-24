@@ -4,6 +4,36 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 const navigate = jest.fn();
 const mockSetForUser = jest.fn(async (..._args: unknown[]) => undefined);
+const mockSetTaskStatus = jest.fn(async () => undefined);
+const mockUpdateTask = jest.fn(async (task: unknown) => task);
+const mockPauseSession = jest.fn((id: string) => ({
+  id,
+  kind: 'pomodoro',
+  plannedMinutes: 25,
+  status: 'paused',
+  startedAt: Date.now(),
+  elapsedMs: 1_000,
+  completed: false,
+  interruptionCount: 1,
+  segments: [{ startedAt: Date.now() - 1_000, endedAt: Date.now() }],
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  version: 1,
+}));
+const mockUpdateSessionLinks = jest.fn();
+const mockStartSession = jest.fn((input: { kind: string; plannedMinutes: number }) => ({
+  id: 'focus-1',
+  ...input,
+  status: 'active',
+  startedAt: Date.now(),
+  elapsedMs: 0,
+  completed: false,
+  interruptionCount: 0,
+  segments: [{ startedAt: Date.now() }],
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  version: 1,
+}));
 
 jest.mock('react-native-svg', () => { const { View: MockView } = require('react-native'); return { __esModule: true, default: MockView, Circle: MockView }; });
 jest.mock('react-native-safe-area-context', () => { const ReactRuntime = require('react'); const { View: MockView } = require('react-native'); return { SafeAreaView: ({ children }: { children: React.ReactNode }) => ReactRuntime.createElement(MockView, null, children), useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }) }; });
@@ -15,12 +45,36 @@ jest.mock('expo-notifications', () => ({
   scheduleNotificationAsync: jest.fn(async () => 'focus-notification'),
 }));
 jest.mock('@/services/NotificationService', () => ({ requestNotificationPermission: jest.fn(async () => true), cancelNotification: jest.fn(async () => undefined) }));
-jest.mock('@/services/FocusStatsService', () => ({
-  hydrateFocusSessions: jest.fn(async (_uid: string, onValue: (value: number) => void) => onValue(2)),
-  saveFocusSessions: jest.fn(async () => undefined),
+jest.mock('@/context/FocusSessionContext', () => ({
+  useFocusSessions: () => ({
+    sessions: [],
+    preferences: { dailyGoalMinutes: 120, updatedAt: 1, version: 1 },
+    legacySummary: null,
+    metrics: {
+      todayMinutes: 50,
+      todayCompletedSessions: 2,
+      weekMinutes: 50,
+      lifetimeMinutes: 50,
+      lifetimeCompletedSessions: 2,
+      legacyCompletedSessions: 0,
+      currentStreak: 0,
+      interruptionCount: 0,
+      productiveHour: null,
+      goalProgress: 50 / 120,
+    },
+    activePomodoro: null,
+    activeStopwatch: null,
+    isLoading: false,
+    startSession: mockStartSession,
+    pauseSession: mockPauseSession,
+    resumeSession: jest.fn(),
+    finishSession: jest.fn(),
+    updateSessionLinks: mockUpdateSessionLinks,
+    setDailyGoalMinutes: jest.fn(),
+  }),
 }));
 jest.mock('@/services/StorageService', () => ({
-  KEYS: { LINKED_NOTE: 'linked-note' },
+  KEYS: { LINKED_NOTE: 'linked-note', LINKED_TASK: 'linked-task' },
   Storage: { getForUser: jest.fn(async () => null), setForUser: (...args: unknown[]) => mockSetForUser(...args), removeForUser: jest.fn(async () => undefined) },
 }));
 jest.mock('@/context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'user-1' } }) }));
@@ -28,6 +82,9 @@ jest.mock('@/context/TaskStore', () => ({
   useTaskStore: () => ({
     isLoading: false,
     notes: [{ id: 'note-1', title: 'Project brief', category: 'Work', archived: false, tags: [] }],
+    tasks: [{ id: 'task-1', title: 'Finish brief', status: 'inbox', priority: 'high', actualFocusMinutes: 0 }],
+    updateTask: mockUpdateTask,
+    setTaskStatus: mockSetTaskStatus,
   }),
 }));
 jest.mock('@/context/ThemeContext', () => ({
@@ -43,24 +100,36 @@ jest.mock('@/context/ThemeContext', () => ({
   }),
 }));
 jest.mock('@/components/BurgerMenu', () => { const ReactRuntime = require('react'); const { View: MockView } = require('react-native'); return { BurgerMenu: () => ReactRuntime.createElement(MockView) }; });
-jest.mock('@/components/ui', () => { const ReactRuntime = require('react'); const { View: MockView } = require('react-native'); return { AppBackground: () => ReactRuntime.createElement(MockView), ScreenSkeleton: () => ReactRuntime.createElement(MockView) }; });
+jest.mock('@/components/ui', () => { const ReactRuntime = require('react'); const { View: MockView } = require('react-native'); return { AppBackground: () => ReactRuntime.createElement(MockView), ScreenSkeleton: () => ReactRuntime.createElement(MockView), ProgressRing: () => ReactRuntime.createElement(MockView) }; });
 
 import FocusScreen from '@/screens/FocusScreen/FocusScreen';
 
 describe('FocusScreen', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('starts the timer, links and opens a note, and exposes working overflow actions', async () => {
+  it('links a task, starts its focus status, and keeps note linking functional', async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     const screen = await render(<FocusScreen navigation={{ navigate }} />);
 
     expect(screen.getByText('25:00')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Link a task to this focus session'));
+    await fireEvent.press(screen.getByText('Finish brief'));
+    await waitFor(() => expect(mockSetForUser).toHaveBeenCalledWith('linked-task', 'user-1', 'task-1'));
+
     await fireEvent.press(screen.getByLabelText('Start timer'));
-    await waitFor(() => expect(screen.getByText('In progress')).toBeTruthy());
+    await waitFor(() => expect(mockSetTaskStatus).toHaveBeenCalledWith('task-1', 'in-progress'));
+    expect(mockStartSession).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'pomodoro',
+      taskId: 'task-1',
+    }));
 
     await fireEvent.press(screen.getByLabelText('Link a note to this focus session'));
     await fireEvent.press(screen.getByText('Project brief'));
     await waitFor(() => expect(mockSetForUser).toHaveBeenCalledWith('linked-note', 'user-1', 'note-1'));
+    expect(mockUpdateSessionLinks).toHaveBeenCalledWith('focus-1', { noteId: 'note-1' });
+
+    await fireEvent.press(screen.getByLabelText('Pause timer'));
+    expect(mockPauseSession).toHaveBeenCalledWith('focus-1');
 
     await fireEvent.press(screen.getByLabelText('Open Project brief'));
     expect(navigate).toHaveBeenCalledWith('Tasks', expect.objectContaining({ section: 'notes', noteId: 'note-1' }));

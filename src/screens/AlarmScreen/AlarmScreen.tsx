@@ -14,7 +14,7 @@ import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as DocumentPicker from 'expo-document-picker';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { styles } from './styles';
-import { AppBackground, ScreenSkeleton } from '@/components/ui';
+import { AppBackground, ScreenSkeleton, WheelPickerColumn } from '@/components/ui';
 import { ALARM_SOUNDS } from '@/services/AlarmSounds';
 
 
@@ -26,8 +26,6 @@ const SNOOZE_OPTIONS = [5, 10, 15, 20, 25, 30];
 const HOURS_LIST   = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
 const MINUTES_LIST = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 const PERIODS_LIST = ['AM', 'PM'];
-
-const ITEM_H = 58;
 
 function toMinutes(hour: number, minute: number, period: Period): number {
   let h = hour;
@@ -67,84 +65,6 @@ function padTime(hour: number, minute: number): string {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-// --- Wheel Picker Column ----------------------------------------------------
-interface WheelColProps {
-  items: string[];
-  selectedIndex: number;
-  onSelect: (i: number) => void;
-  width?: number;
-}
-
-function WheelCol({ items, selectedIndex, onSelect, width = 80 }: WheelColProps) {
-  const scrollRef = useRef<ScrollView>(null);
-  const { theme } = useTheme();
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      scrollRef.current?.scrollTo({ y: selectedIndex * ITEM_H, animated: false });
-    }, 50);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleEnd = (e: any) => {
-    const i = Math.round(e.nativeEvent.contentOffset.y / ITEM_H);
-    const clamped = Math.max(0, Math.min(items.length - 1, i));
-    onSelect(clamped);
-  };
-
-  return (
-    <View style={{ width, height: ITEM_H * 5, overflow: 'hidden' }}>
-      {/* centre-selection highlight band */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute', left: 0, right: 0,
-          top: ITEM_H * 2, height: ITEM_H,
-          backgroundColor: 'rgba(74,144,217,0.10)',
-          borderTopWidth: 1, borderBottomWidth: 1, borderColor: BLUE,
-        }}
-      />
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_H}
-        decelerationRate="fast"
-        onMomentumScrollEnd={handleEnd}
-        onScrollEndDrag={handleEnd}
-        contentContainerStyle={{ paddingVertical: ITEM_H * 2 }}
-      >
-        {items.map((item, i) => {
-          const dist = Math.abs(i - selectedIndex);
-          const isSelected = dist === 0;
-          const isAdjacent = dist === 1;
-          return (
-            <TouchableOpacity
-              key={i}
-              style={{ height: ITEM_H, justifyContent: 'center', alignItems: 'center' }}
-              onPress={() => {
-                onSelect(i);
-                scrollRef.current?.scrollTo({ y: i * ITEM_H, animated: true });
-              }}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={{
-                  fontSize: isSelected ? 38 : isAdjacent ? 30 : 24,
-                  fontFamily: isSelected ? fontFamily.bold : fontFamily.regular,
-                  color: isSelected ? theme.text : isAdjacent ? theme.textSub : theme.textDim,
-                }}
-              >
-                {item}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-}
-
 // --- Settings Row ------------------------------------------------------------
 function SettingRow({
   label, value, onPress, isSwitch, switchVal, onSwitch,
@@ -163,7 +83,7 @@ function SettingRow({
       onPress={!isSwitch ? onPress : undefined}
       activeOpacity={isSwitch ? 1 : 0.6}
     >
-      <Text style={[styles.settingLabel, { color: theme.text }]}>{label}</Text>
+      <Text style={[styles.settingLabel, { color: theme.content.primary }]}>{label}</Text>
       {isSwitch ? (
         <Switch
           value={switchVal}
@@ -173,8 +93,8 @@ function SettingRow({
         />
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Text style={[styles.settingValue, { color: theme.textDim }]}>{value}</Text>
-          <Ionicons name="chevron-forward" size={16} color={theme.textDim} />
+          <Text style={[styles.settingValue, { color: theme.content.muted }]}>{value}</Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.content.muted} />
         </View>
       )}
     </TouchableOpacity>
@@ -441,7 +361,7 @@ export default function AlarmScreen({ navigation }: any) {
       {/* Top Bar */}
       <View style={[styles.topBar, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }]}>
         <BurgerMenu navigation={navigation} />
-        <Text style={[styles.topBarTitle, { color: theme.text }]}>Alarms</Text>
+        <Text style={[styles.topBarTitle, { color: theme.content.primary }]}>Alarms</Text>
         <AnimIconBtn onPress={openAdd}>
           <Ionicons name="add-circle-outline" size={26} color={BLUE} />
         </AnimIconBtn>
@@ -459,12 +379,12 @@ export default function AlarmScreen({ navigation }: any) {
           </View>
           <View style={styles.nextAlarmBody}>
             <Text style={[styles.nextAlarmLabel, { color: theme.accent.base }]}>NEXT ALARM</Text>
-            <Text style={[styles.nextAlarmTime, { color: theme.text }]}>
+            <Text style={[styles.nextAlarmTime, { color: theme.content.primary }]}>
               {nextAlarm
                 ? `${padTime(nextAlarm.hour, nextAlarm.minute)} ${nextAlarm.period} · ${nextAlarm.label}`
                 : 'No active alarms'}
             </Text>
-            <Text style={[styles.nextAlarmSub, { color: theme.textSub }]}>
+            <Text style={[styles.nextAlarmSub, { color: theme.content.secondary }]}>
               {nextAlarm
                 ? `Alarm in ${timeUntil(nextAlarm.hour, nextAlarm.minute, nextAlarm.period)}`
                 : 'Enable an alarm to see it here'}
@@ -504,22 +424,22 @@ export default function AlarmScreen({ navigation }: any) {
               {/* Left: time + label */}
               <View style={styles.alarmLeft}>
                 <View style={styles.alarmTimeRow}>
-                  <Text style={[styles.alarmTime, { color: theme.text }, !alarm.active && styles.dimText]}>
+                  <Text style={[styles.alarmTime, { color: theme.content.primary }, !alarm.active && styles.dimText]}>
                     {padTime(alarm.hour, alarm.minute)}
                   </Text>
-                  <Text style={[styles.alarmPeriod, { color: theme.textSub }, !alarm.active && styles.dimText]}>
+                  <Text style={[styles.alarmPeriod, { color: theme.content.secondary }, !alarm.active && styles.dimText]}>
                     {alarm.period}
                   </Text>
                   {alarm.label.length > 0 && (
                     <Text
-                      style={[styles.alarmLabel, { color: theme.textSub }, !alarm.active && styles.dimText]}
+                      style={[styles.alarmLabel, { color: theme.content.secondary }, !alarm.active && styles.dimText]}
                       numberOfLines={1}
                     >
                       {alarm.label}
                     </Text>
                   )}
                 </View>
-                <Text style={[styles.alarmSub, { color: theme.textDim }, !alarm.active && styles.dimText]}>
+                <Text style={[styles.alarmSub, { color: theme.content.muted }, !alarm.active && styles.dimText]}>
                   {getRepeatLabel(alarm.days)}
                   {alarm.active
                     ? ` · Alarm in ${timeUntil(alarm.hour, alarm.minute, alarm.period)}`
@@ -546,7 +466,7 @@ export default function AlarmScreen({ navigation }: any) {
             </TouchableOpacity>
 
             {/* Divider (not after last item) */}
-            {idx < alarms.length - 1 && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
+            {idx < alarms.length - 1 && <View style={[styles.divider, { backgroundColor: theme.glass.border }]} />}
           </View>
         ))}
 
@@ -556,8 +476,8 @@ export default function AlarmScreen({ navigation }: any) {
             <Ionicons name="moon-outline" size={22} color={BLUE} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.sleepTipTitle, { color: theme.text }]}>Sleep Tip</Text>
-            <Text style={[styles.sleepTipText, { color: theme.textSub }]}>
+            <Text style={[styles.sleepTipTitle, { color: theme.content.primary }]}>Sleep Tip</Text>
+            <Text style={[styles.sleepTipText, { color: theme.content.secondary }]}>
               Try to maintain a consistent sleep schedule. Going to bed and waking up at the same
               time each day improves sleep quality.
             </Text>
@@ -575,13 +495,13 @@ export default function AlarmScreen({ navigation }: any) {
         transparent={false}
         onRequestClose={() => setModalVisible(false)}
       >
-        <SafeAreaView style={[styles.editSafe, { backgroundColor: theme.bg2 }]} edges={['top', 'bottom']}>
+        <SafeAreaView style={[styles.editSafe, { backgroundColor: theme.background.top }]} edges={['top', 'bottom']}>
           {/* Header */}
-          <View style={[styles.editHeader, { backgroundColor: theme.bg, borderBottomColor: theme.border }]}>
+          <View style={[styles.editHeader, { backgroundColor: theme.background.base, borderBottomColor: theme.glass.border }]}>
             <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.editHeaderBtn}>
-              <Ionicons name="close" size={24} color={theme.textSub} />
+              <Ionicons name="close" size={24} color={theme.content.secondary} />
             </TouchableOpacity>
-            <Text style={[styles.editHeaderTitle, { color: theme.text }]}>
+            <Text style={[styles.editHeaderTitle, { color: theme.content.primary }]}>
               {editingId ? 'Edit Alarm' : 'New Alarm'}
             </Text>
             <TouchableOpacity disabled={isSavingAlarm} onPress={handleSave} style={styles.editHeaderBtn}>
@@ -593,32 +513,44 @@ export default function AlarmScreen({ navigation }: any) {
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* -- Drum-roll time picker ----------------------- */}
-            <View style={[styles.pickerContainer, { backgroundColor: theme.bg }]}>
-              <WheelCol
-                key={`h-${modalKey}`}
+            <View style={[styles.pickerContainer, { backgroundColor: theme.background.base }]}>
+              <WheelPickerColumn
+                resetKey={`h-${modalKey}`}
                 items={HOURS_LIST}
                 selectedIndex={formHourIdx}
                 onSelect={setFormHourIdx}
                 width={90}
+                itemHeight={58}
+                selectedFontSize={38}
+                adjacentFontSize={30}
+                distantFontSize={24}
               />
-              <WheelCol
-                key={`m-${modalKey}`}
+              <WheelPickerColumn
+                resetKey={`m-${modalKey}`}
                 items={MINUTES_LIST}
                 selectedIndex={formMinuteIdx}
                 onSelect={setFormMinuteIdx}
                 width={90}
+                itemHeight={58}
+                selectedFontSize={38}
+                adjacentFontSize={30}
+                distantFontSize={24}
               />
-              <WheelCol
-                key={`p-${modalKey}`}
+              <WheelPickerColumn
+                resetKey={`p-${modalKey}`}
                 items={PERIODS_LIST}
                 selectedIndex={formPeriodIdx}
                 onSelect={setFormPeriodIdx}
                 width={80}
+                itemHeight={58}
+                selectedFontSize={38}
+                adjacentFontSize={30}
+                distantFontSize={24}
               />
             </View>
 
             {/* -- Settings panel ----------------------------- */}
-            <View style={[styles.settingsPanel, { backgroundColor: theme.card }]}>
+            <View style={[styles.settingsPanel, { backgroundColor: theme.glass.solid }]}>
               <SettingRow
                 label="Repeat"
                 value={getRepeatLabel(formDays)}
@@ -756,13 +688,13 @@ export default function AlarmScreen({ navigation }: any) {
         transparent={false}
         onRequestClose={() => { stopPreview(); setSoundModal(false); }}
       >
-        <SafeAreaView style={[styles.editSafe, { backgroundColor: theme.bg2 }]} edges={['top', 'bottom']}>
+        <SafeAreaView style={[styles.editSafe, { backgroundColor: theme.background.top }]} edges={['top', 'bottom']}>
           <AppBackground />
           <View style={[styles.editHeader, { backgroundColor: 'transparent', borderBottomColor: theme.divider }]}>
             <TouchableOpacity onPress={() => { stopPreview(); setSoundModal(false); }} style={styles.editHeaderBtn}>
-              <Ionicons name="arrow-back" size={22} color={theme.textSub} />
+              <Ionicons name="arrow-back" size={22} color={theme.content.secondary} />
             </TouchableOpacity>
-            <Text style={[styles.editHeaderTitle, { color: theme.text }]}>Alarm Sound</Text>
+            <Text style={[styles.editHeaderTitle, { color: theme.content.primary }]}>Alarm Sound</Text>
             <TouchableOpacity onPress={() => { stopPreview(); setSoundModal(false); }} style={styles.editHeaderDoneBtn}>
               <Text style={[styles.editHeaderDoneText, { color: theme.accent.base }]}>Done</Text>
             </TouchableOpacity>
@@ -774,21 +706,21 @@ export default function AlarmScreen({ navigation }: any) {
                 <Ionicons name="volume-high-outline" size={20} color={theme.iconTile.foreground} />
               </View>
               <View style={styles.soundHelpCopy}>
-                <Text style={[styles.soundHelpTitle, { color: theme.text }]}>Choose your alarm sound</Text>
-                <Text style={[styles.soundHelpText, { color: theme.textSub }]}>Tap Preview to listen, then tap a row to select it.</Text>
+                <Text style={[styles.soundHelpTitle, { color: theme.content.primary }]}>Choose your alarm sound</Text>
+                <Text style={[styles.soundHelpText, { color: theme.content.secondary }]}>Tap Preview to listen, then tap a row to select it.</Text>
               </View>
             </View>
 
             {/* -- Your (custom) sounds -- */}
-            <Text style={[styles.soundSection, { color: theme.textDim }]}>Your sounds</Text>
+            <Text style={[styles.soundSection, { color: theme.content.muted }]}>Your sounds</Text>
             <View style={[styles.soundPanel, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}>
               <TouchableOpacity style={styles.soundAddRow} onPress={pickCustomSound}>
                 <View style={[styles.soundAddIcon, { backgroundColor: theme.iconTile.cyan }]}>
                   <Ionicons name="add" size={20} color={theme.iconTile.foreground} />
                 </View>
                 <View style={styles.soundLabelWrap}>
-                  <Text style={[styles.soundRowTitle, { color: theme.text }]}>Add from device</Text>
-                  <Text style={[styles.soundRowMeta, { color: theme.textDim }]}>Choose an audio file stored on this device</Text>
+                  <Text style={[styles.soundRowTitle, { color: theme.content.primary }]}>Add from device</Text>
+                  <Text style={[styles.soundRowMeta, { color: theme.content.muted }]}>Choose an audio file stored on this device</Text>
                 </View>
               </TouchableOpacity>
               {customSounds.map((cs, i) => (
@@ -803,8 +735,8 @@ export default function AlarmScreen({ navigation }: any) {
                     ])}
                   >
                     <View style={styles.soundLabelWrap}>
-                      <Text style={[styles.soundRowTitle, { color: theme.text }]} numberOfLines={1}>{cs.label}</Text>
-                      <Text style={[styles.soundRowMeta, { color: theme.textDim }]}>Custom sound</Text>
+                      <Text style={[styles.soundRowTitle, { color: theme.content.primary }]} numberOfLines={1}>{cs.label}</Text>
+                      <Text style={[styles.soundRowMeta, { color: theme.content.muted }]}>Custom sound</Text>
                     </View>
                     <View style={styles.soundActions}>
                       <TouchableOpacity
@@ -824,12 +756,12 @@ export default function AlarmScreen({ navigation }: any) {
                 </View>
               ))}
               {customSounds.length === 0 && (
-                <Text style={[styles.soundEmptyText, { color: theme.textDim }]}>No custom sounds added yet.</Text>
+                <Text style={[styles.soundEmptyText, { color: theme.content.muted }]}>No custom sounds added yet.</Text>
               )}
             </View>
 
             {/* -- Built-in sounds -- */}
-            <Text style={[styles.soundSection, { color: theme.textDim }]}>Ringtones</Text>
+            <Text style={[styles.soundSection, { color: theme.content.muted }]}>Ringtones</Text>
             <View style={[styles.soundPanel, { backgroundColor: theme.glass.primary, borderColor: theme.glass.border }]}>
               {BUILT_IN_SOUNDS.map((s, i) => (
                 <View key={s.label}>
@@ -838,8 +770,8 @@ export default function AlarmScreen({ navigation }: any) {
                     onPress={() => setFormSound(s.label)}
                   >
                     <View style={styles.soundLabelWrap}>
-                      <Text style={[styles.soundRowTitle, { color: theme.text }]} numberOfLines={1}>{s.label}</Text>
-                      <Text style={[styles.soundRowMeta, { color: theme.textDim }]}>{s.file === null ? 'No alarm audio' : 'Built-in ringtone'}</Text>
+                      <Text style={[styles.soundRowTitle, { color: theme.content.primary }]} numberOfLines={1}>{s.label}</Text>
+                      <Text style={[styles.soundRowMeta, { color: theme.content.muted }]}>{s.file === null ? 'No alarm audio' : 'Built-in ringtone'}</Text>
                     </View>
                     <View style={styles.soundActions}>
                       {s.file !== null && (
@@ -876,14 +808,14 @@ export default function AlarmScreen({ navigation }: any) {
         onRequestClose={() => setLabelModal(false)}
       >
         <Pressable style={styles.subOverlay} onPress={() => setLabelModal(false)} />
-        <View style={[styles.labelSheet, { backgroundColor: theme.card }]}>
-          <Text style={[styles.subTitle, { color: theme.text }]}>Label</Text>
+        <View style={[styles.labelSheet, { backgroundColor: theme.glass.solid }]}>
+          <Text style={[styles.subTitle, { color: theme.content.primary }]}>Label</Text>
           <TextInput
-            style={[styles.labelInput, { color: theme.text, backgroundColor: theme.bg2, borderColor: theme.border }]}
+            style={[styles.labelInput, { color: theme.content.primary, backgroundColor: theme.background.top, borderColor: theme.glass.border }]}
             value={tempLabel}
             onChangeText={setTempLabel}
             placeholder="e.g. Morning Workout"
-            placeholderTextColor={theme.textDim}
+            placeholderTextColor={theme.content.muted}
             autoFocus
             maxLength={40}
           />

@@ -20,8 +20,7 @@ import {
   getAlarmPayload,
   snoozeAlarmNotification,
 } from '@/services/NotificationService';
-import { openRingingAlarm } from '@/navigation/navigationRef';
-import { openEventDetail } from '@/navigation/navigationRef';
+import { openEventDetail, openRingingAlarm, openTaskDetail } from '@/navigation/navigationRef';
 import { useEvents } from '@/context/EventStore';
 
 import WelcomeScreen      from '@/screens/WelcomeScreen';
@@ -69,6 +68,10 @@ export default function RootNavigator() {
       if (data?.type === 'event-weather' && typeof data.eventId === 'string') {
         const event = eventsRef.current.find(item => item.id === data.eventId);
         if (event) openEventDetail(event);
+        return;
+      }
+      if (data?.type === 'task' && typeof data.taskId === 'string') {
+        openTaskDetail(data.taskId);
         return;
       }
       const payload = getAlarmPayload(response.notification);

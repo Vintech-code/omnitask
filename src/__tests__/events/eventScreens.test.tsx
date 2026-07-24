@@ -23,6 +23,8 @@ jest.mock('@/context/ThemeContext', () => ({
       bg: '#ffffff',
       bg2: '#f4f4f4',
       card: '#ffffff',
+      background: { base: '#ffffff', top: '#f4f4f4' },
+      content: { primary: '#111111', secondary: '#444444', muted: '#777777' },
       glass: { solid: '#ffffff', border: '#dddddd', secondary: '#f7f7f7' },
       accent: { base: '#2563eb', soft: '#dbeafe' },
       semantic: { danger: '#dc2626', warning: '#d97706', success: '#16a34a' },
@@ -38,6 +40,10 @@ jest.mock('@/components/ui', () => ({
   ScreenSkeleton: () => {
     const { View: MockView } = require('react-native');
     return <MockView />;
+  },
+  WheelPickerColumn: ({ items, onSelect }: any) => {
+    const { Text: MockText, TouchableOpacity: MockTouchableOpacity, View: MockView } = require('react-native');
+    return <MockView>{items.map((item: string, index: number) => <MockTouchableOpacity key={`${item}-${index}`} onPress={() => onSelect(index)}><MockText>{item}</MockText></MockTouchableOpacity>)}</MockView>;
   },
 }));
 

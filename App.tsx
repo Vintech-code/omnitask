@@ -12,6 +12,9 @@ import { EventProvider } from './src/context/EventStore';
 import { TaskProvider } from './src/context/TaskStore';
 import { CanvasNoteProvider } from './src/context/CanvasNoteStore';
 import { AlarmProvider } from './src/context/AlarmStore';
+import { AttachmentProvider } from './src/context/AttachmentStore';
+import { SyncProvider } from './src/context/SyncStore';
+import { FocusSessionProvider } from './src/context/FocusSessionStore';
 import RootNavigator from './src/navigation/RootNavigator';
 import { flushPendingAlarmNavigation, navigationRef } from './src/navigation/navigationRef';
 import { handleNotificationProbeUrl } from './src/testing/NotificationDeviceProbe';
@@ -70,17 +73,23 @@ export default function App(): React.JSX.Element | null {
         <ThemeProvider>
           <AppDialogProvider>
             <AuthProvider>
-              <TaskProvider>
-                <CanvasNoteProvider>
-                  <AlarmProvider>
-                    <EventProvider>
-                      <NavigationContainer ref={navigationRef} onReady={flushPendingAlarmNavigation}>
-                        <RootNavigator />
-                      </NavigationContainer>
-                    </EventProvider>
-                  </AlarmProvider>
-                </CanvasNoteProvider>
-              </TaskProvider>
+              <SyncProvider>
+                <AttachmentProvider>
+                  <TaskProvider>
+                    <FocusSessionProvider>
+                      <CanvasNoteProvider>
+                        <AlarmProvider>
+                          <EventProvider>
+                            <NavigationContainer ref={navigationRef} onReady={flushPendingAlarmNavigation}>
+                              <RootNavigator />
+                            </NavigationContainer>
+                          </EventProvider>
+                        </AlarmProvider>
+                      </CanvasNoteProvider>
+                    </FocusSessionProvider>
+                  </TaskProvider>
+                </AttachmentProvider>
+              </SyncProvider>
             </AuthProvider>
           </AppDialogProvider>
         </ThemeProvider>

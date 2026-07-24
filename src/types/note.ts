@@ -1,5 +1,7 @@
 /** Shared Note domain types — single source of truth. */
 
+export const NOTE_SCHEMA_VERSION = 1;
+
 export interface NoteTag {
   label: string;
   color: string;
@@ -9,6 +11,8 @@ export interface ChecklistItem {
   id: string;
   text: string;
   done: boolean;
+  /** Real Task linked to this checklist item after migration or promotion. */
+  linkedTaskId?: string;
   parentId?: string;
   createdAt?: number;
   completedAt?: number;
@@ -27,22 +31,77 @@ export interface Note {
   tags: NoteTag[];
   todos?: ChecklistItem[];
   images?: string[];
+  attachmentIds?: string[];
   fontFamily?: string;
   updatedAt?: number;
   createdAt?: number;
   type?: StandardNoteType;
   pinned?: boolean;
   archived?: boolean;
+  version?: number;
 }
 
 export type CanvasObjectType = 'text' | 'image' | 'rectangle' | 'circle' | 'sticky' | 'line' | 'arrow' | 'drawing' | 'reference' | 'connector';
 export type CanvasReferenceKind = 'task' | 'event' | 'note';
 export const CANVAS_DOCUMENT_VERSION = 7;
 
+export type CanvasCollaborationRole = 'owner' | 'editor' | 'commenter' | 'viewer';
+
 export interface CanvasCollaborationMember {
   uid: string;
   name: string;
   joinedAt: number;
+  role: CanvasCollaborationRole;
+  invitedBy?: string;
+  inviteCode?: string;
+}
+
+export type CanvasCollaborationActivityType =
+  | 'board-created'
+  | 'member-joined'
+  | 'member-removed'
+  | 'member-left'
+  | 'role-changed'
+  | 'ownership-transferred'
+  | 'invite-created'
+  | 'version-created'
+  | 'version-restored'
+  | 'comment-added'
+  | 'comment-resolved'
+  | 'sharing-stopped';
+
+export interface CanvasCollaborationActivity {
+  id: string;
+  type: CanvasCollaborationActivityType;
+  actorId: string;
+  actorName: string;
+  createdAt: number;
+  targetId?: string;
+  targetName?: string;
+  detail?: string;
+}
+
+export interface CanvasCollaborationComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  mentions: string[];
+  parentId?: string;
+  objectId?: string;
+  createdAt: number;
+  updatedAt: number;
+  resolvedAt?: number;
+  resolvedBy?: string;
+}
+
+export interface CanvasCollaborationVersion {
+  id: string;
+  label: string;
+  createdAt: number;
+  createdBy: string;
+  createdByName: string;
+  objectCount: number;
 }
 
 export interface CanvasPoint {
@@ -71,6 +130,10 @@ export interface CanvasObject {
   rotation: number;
   content?: string;
   imageUri?: string;
+  attachmentId?: string;
+  /** Download URL embedded for collaborators who cannot access owner metadata. */
+  attachmentRemoteUrl?: string;
+  attachmentThumbnailUrl?: string;
   reference?: {
     kind: CanvasReferenceKind;
     id: string;

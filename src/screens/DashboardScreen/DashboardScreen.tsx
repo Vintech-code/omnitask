@@ -9,74 +9,26 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AppBackground, GlassCard, PillButton, ScreenSkeleton } from '@/components/ui';
 import { DayLensStrip } from '@/components/weather';
 import { buttonShadow } from '@/theme';
-import { useAlarmStore, type Alarm } from '@/context/AlarmStore';
+import { useAlarmStore } from '@/context/AlarmStore';
 import { useAuth } from '@/context/AuthContext';
 import { useEvents } from '@/context/EventStore';
 import { useTaskStore } from '@/context/TaskStore';
 import { useTheme } from '@/context/ThemeContext';
 import { useCurrentWeather } from '@/hooks/useCurrentWeather';
 import { useDayLens } from '@/hooks/useDayLens';
-import { hydrateFocusSessions } from '@/services/FocusStatsService';
-import type { Note } from '@/types/note';
+import { useFocusSessions } from '@/context/FocusSessionContext';
+import { taskOccursOnDate } from '@/types/task';
 import { eventOccurrenceStartOnDate, eventStart } from '@/utils/eventDate';
 import { weatherConditionLabel } from '@/utils/weather';
 import { weatherArtwork } from '@/components/weather/weatherArtwork';
 import { styles } from './styles';
+import { AttachmentImage } from '@/components/attachments';
+import { nextAlarmFrom as findNextAlarm, taskMeta as formatTaskMeta } from './dashboardUtils';
+import { environmentLabel, IS_NON_PRODUCTION } from '@/config/environment';
 
 type DashboardNavigation = {
   navigate: (screen: string, params?: Record<string, unknown>) => void;
 };
-
-type DashboardTask = {
-  note: Note;
-  item: NonNullable<Note['todos']>[number];
-};
-
-function addDays(date: Date, amount: number) {
-  const result = new Date(date);
-  result.setHours(12, 0, 0, 0);
-  result.setDate(result.getDate() + amount);
-  return result;
-}
-
-function alarmMinutes(alarm: Alarm) {
-  let hour = alarm.hour;
-  if (alarm.period === 'PM' && hour !== 12) hour += 12;
-  if (alarm.period === 'AM' && hour === 12) hour = 0;
-  return hour * 60 + alarm.minute;
-}
-
-function nextAlarmOccurrence(alarm: Alarm, now: Date): Date | null {
-  if (!alarm.active) return null;
-  if (alarm.scheduledFor) {
-    const scheduled = new Date(alarm.scheduledFor);
-    return scheduled.getTime() > now.getTime() ? scheduled : null;
-  }
-
-  const selectedDays = alarm.days
-    .map((selected, index) => selected ? index : -1)
-    .filter(index => index >= 0);
-
-  for (let offset = 0; offset <= 7; offset += 1) {
-    const candidate = addDays(now, offset);
-    const minutes = alarmMinutes(alarm);
-    candidate.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
-    const dayMatches = selectedDays.length === 0 || selectedDays.includes(candidate.getDay());
-    if (dayMatches && candidate.getTime() > now.getTime()) return candidate;
-  }
-  return null;
-}
-
-function nextAlarmFrom(alarms: Alarm[], now: Date) {
-  return alarms
-    .map(alarm => ({ alarm, occurrence: nextAlarmOccurrence(alarm, now) }))
-    .filter((value): value is { alarm: Alarm; occurrence: Date } => Boolean(value.occurrence))
-    .sort((left, right) => left.occurrence.getTime() - right.occurrence.getTime())[0] ?? null;
-}
-
-function taskMeta(note: Note) {
-  return note.tags[0]?.label || note.category || 'Checklist';
-}
 
 function DashboardGlyph({
   name,
@@ -255,12 +207,12 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
   const { width } = useWindowDimensions();
   const { events, isLoading: eventsLoading } = useEvents();
   const { theme, isDark, toggleTheme } = useTheme();
-  const { user, profilePhoto } = useAuth();
+  const { user, profilePhoto, profilePhotoAttachmentId } = useAuth();
   const { alarms, isLoading: alarmsLoading } = useAlarmStore();
-  const { notes, updateNote, isLoading: notesLoading } = useTaskStore();
+  const { tasks, setTaskStatus, isLoading: tasksLoading } = useTaskStore();
   const currentWeather = useCurrentWeather();
 
-  const [sessions, setSessions] = useState(0);
+  const { metrics: focusMetrics, isLoading: focusLoading } = useFocusSessions();
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(new Date());
   const [dayLensRefresh, setDayLensRefresh] = useState(0);
@@ -291,16 +243,18 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
     .slice(0, 5)
     .map(item => item.event), [events, now]);
 
-  const tasks = useMemo<DashboardTask[]>(() => notes
-    .filter(note => !note.archived)
-    .flatMap(note => (note.todos ?? []).filter(item => !item.done).map(item => ({ note, item })))
-    .slice(0, 4), [notes]);
+  const dashboardTasks = useMemo(() => tasks
+    .filter(task => task.status !== 'completed')
+    .sort((left, right) => {
+      const leftToday = taskOccursOnDate(left, now);
+      const rightToday = taskOccursOnDate(right, now);
+      if (leftToday !== rightToday) return leftToday ? -1 : 1;
+      return (left.scheduledStart ?? left.dueAt ?? Number.MAX_SAFE_INTEGER)
+        - (right.scheduledStart ?? right.dueAt ?? Number.MAX_SAFE_INTEGER);
+    })
+    .slice(0, 4), [now, tasks]);
 
-  const nextAlarm = useMemo(() => nextAlarmFrom(alarms, now), [alarms, now]);
-  useEffect(() => {
-    if (user) void hydrateFocusSessions(user.id, setSessions);
-  }, [user?.id]);
-
+  const nextAlarm = useMemo(() => findNextAlarm(alarms, now), [alarms, now]);
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(timer);
@@ -310,22 +264,12 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
     setRefreshing(true);
     setNow(new Date());
     setDayLensRefresh(value => value + 1);
-    if (user) void hydrateFocusSessions(user.id, setSessions);
     void currentWeather.refresh().finally(() => setRefreshing(false));
   };
 
-  const toggleTask = (task: DashboardTask) => {
-    updateNote({
-      ...task.note,
-      updatedAt: Date.now(),
-      todos: task.note.todos?.map(item => item.id === task.item.id
-        ? { ...item, done: true, completedAt: Date.now() }
-        : item),
-    });
-  };
-
-  const openTasks = () => navigation.navigate('Tasks', { section: 'notes' });
-  const createChecklist = () => navigation.navigate('Tasks', { section: 'notes', createType: 'checklist', createRequest: Date.now() });
+  const openTasks = () => navigation.navigate('Tasks', { section: 'tasks' });
+  const openTask = (taskId: string) => navigation.navigate('Tasks', { section: 'tasks', taskId, taskRequest: Date.now() });
+  const createTask = () => navigation.navigate('Tasks', { section: 'tasks', createTaskRequest: Date.now() });
   const openEvents = () => navigation.navigate('Tasks', { section: 'events' });
   const scheduleTitle = "Today's schedule";
   const switchTheme = () => {
@@ -346,7 +290,7 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
     });
   };
 
-  if (eventsLoading || alarmsLoading || notesLoading) {
+  if (eventsLoading || alarmsLoading || tasksLoading || focusLoading) {
     return <ScreenSkeleton variant="dashboard" />;
   }
 
@@ -367,7 +311,19 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
       >
         <View style={styles.header}>
           <View style={styles.headerCopy}>
-            <Text style={[styles.greeting, { color: theme.accent.base }]}>{greeting},</Text>
+            <View style={styles.greetingRow}>
+              <Text style={[styles.greeting, { color: theme.accent.base }]}>{greeting},</Text>
+              {IS_NON_PRODUCTION ? (
+                <View
+                  accessibilityLabel={`${environmentLabel()} environment`}
+                  style={[styles.environmentBadge, { backgroundColor: theme.glass.secondary }]}
+                >
+                  <Text style={[styles.environmentBadgeText, { color: theme.content.secondary }]}>
+                    {environmentLabel()}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
             <Text style={[styles.name, { color: theme.content.primary }]} numberOfLines={1}>{firstName}!</Text>
             <Text style={[styles.encouragement, { color: theme.content.secondary }]}>Make today count. You’ve got this!</Text>
           </View>
@@ -379,8 +335,8 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
               onPress={() => navigation.navigate('Profile')}
               style={styles.avatar}
             >
-              {profilePhoto ? (
-                <Image source={{ uri: profilePhoto }} style={styles.avatarPhoto} />
+            {profilePhoto || profilePhotoAttachmentId ? (
+                <AttachmentImage attachmentId={profilePhotoAttachmentId ?? undefined} fallbackUri={profilePhoto ?? undefined} style={styles.avatarPhoto} />
               ) : (
                 <>
                   <LinearGradient
@@ -502,7 +458,9 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
               <View style={styles.overviewCopy}>
                 <Text style={[styles.overviewLabel, { color: theme.content.secondary }]}>Focus session</Text>
                 <Text style={[styles.overviewValue, { color: theme.content.primary }]}>25:00</Text>
-                <Text style={[styles.overviewMeta, { color: theme.content.muted }]} numberOfLines={1}>{sessions} sessions completed</Text>
+                <Text style={[styles.overviewMeta, { color: theme.content.muted }]} numberOfLines={1}>
+                  {focusMetrics.todayCompletedSessions} completed · {Math.round(focusMetrics.todayMinutes)} min today
+                </Text>
               </View>
             </TouchableOpacity>
           </GlassCard>
@@ -541,34 +499,34 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
           </GlassCard>
 
           <GlassCard style={styles.sectionCard} padding={14}>
-            <SectionHeading title="Open checklist items" subtitle="Unfinished items from your Notes" action="View all" onPress={openTasks} />
-            {tasks.length ? tasks.map((task, index) => (
-              <View key={`${task.note.id}_${task.item.id}`} style={[styles.taskRow, index > 0 && { borderTopColor: theme.divider, borderTopWidth: 1 }]}>
+            <SectionHeading title="Today's tasks" subtitle="Planned, due, and inbox actions" action="View all" onPress={openTasks} />
+            {dashboardTasks.length ? dashboardTasks.map((task, index) => (
+              <View key={task.id} style={[styles.taskRow, index > 0 && { borderTopColor: theme.divider, borderTopWidth: 1 }]}>
                 <TouchableOpacity
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: false }}
-                  accessibilityLabel={`Complete ${task.item.text}`}
-                  onPress={() => toggleTask(task)}
+                  accessibilityLabel={`Complete ${task.title}`}
+                  onPress={() => void setTaskStatus(task.id, 'completed')}
                   style={[styles.checkbox, { borderColor: theme.content.muted }]}
                 />
-                <TouchableOpacity style={styles.taskCopy} onPress={openTasks} activeOpacity={0.7}>
-                  <Text style={[styles.taskTitle, { color: theme.content.primary }]} numberOfLines={1}>{task.item.text}</Text>
-                  <Text style={[styles.taskMeta, { color: task.note.pinned ? theme.accent.base : theme.content.muted }]}>{taskMeta(task.note)}</Text>
+                <TouchableOpacity style={styles.taskCopy} onPress={() => openTask(task.id)} activeOpacity={0.7}>
+                  <Text style={[styles.taskTitle, { color: theme.content.primary }]} numberOfLines={1}>{task.title}</Text>
+                  <Text style={[styles.taskMeta, { color: task.priority === 'high' ? theme.semantic.warning : theme.content.muted }]}>{formatTaskMeta(task)}</Text>
                 </TouchableOpacity>
-                {task.note.pinned ? <Ionicons name="star" size={16} color={theme.accent.base} /> : null}
+                {task.priority === 'high' ? <Ionicons name="alert-circle" size={16} color={theme.semantic.danger} /> : null}
               </View>
             )) : (
               <View style={styles.compactEmpty}>
                 <DashboardGlyph name="checkmark" color={theme.semantic.success} size={23} style={styles.emptyIcon} />
                 <View style={styles.emptyCopy}>
                   <Text style={[styles.emptyTitle, { color: theme.content.primary }]}>All caught up</Text>
-                  <Text style={[styles.emptyText, { color: theme.content.muted }]}>Your open checklist items will appear here.</Text>
+                  <Text style={[styles.emptyText, { color: theme.content.muted }]}>Your open tasks will appear here.</Text>
                 </View>
               </View>
             )}
             <TouchableOpacity
               accessibilityRole="button"
-              onPress={createChecklist}
+              onPress={createTask}
               style={[
                 styles.addTask,
                 buttonShadow,
@@ -576,7 +534,7 @@ export default function DashboardScreen({ navigation }: { navigation: DashboardN
               ]}
             >
               <Ionicons name="add" size={19} color={theme.accent.base} />
-              <Text style={[styles.addTaskText, { color: theme.accent.base }]}>New checklist</Text>
+              <Text style={[styles.addTaskText, { color: theme.accent.base }]}>New task</Text>
             </TouchableOpacity>
           </GlassCard>
         </View>

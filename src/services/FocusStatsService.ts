@@ -1,6 +1,6 @@
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
-import { queueCloudSet } from './OfflineSyncService';
+import { queueCloudSet, recordCloudSnapshot } from './OfflineSyncService';
 import { KEYS, Storage } from './StorageService';
 
 const focusPath = (uid: string) => ['users', uid, 'meta', 'focusStats'];
@@ -18,6 +18,7 @@ export async function hydrateFocusSessions(
   onValue(cached);
 
   void getDoc(doc(db, focusPath(uid).join('/'))).then(async snapshot => {
+    if (snapshot.exists()) await recordCloudSnapshot(uid, focusPath(uid), snapshot.data());
     const remote = snapshot.data()?.sessions;
     const resolved = typeof remote === 'number' ? Math.max(cached, remote) : cached;
     onValue(resolved);

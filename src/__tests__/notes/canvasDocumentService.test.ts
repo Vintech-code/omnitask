@@ -2,6 +2,10 @@ jest.mock('expo-file-system/legacy', () => ({}));
 jest.mock('expo-print', () => ({}));
 jest.mock('expo-sharing', () => ({}));
 jest.mock('react-native-view-shot', () => ({ captureRef: jest.fn() }));
+jest.mock('@/services/AttachmentService', () => ({
+  attachmentById: jest.fn(() => undefined),
+  attachmentDisplayUri: jest.fn(() => undefined),
+}));
 
 import { canvasToMarkdown, canvasToPlainText, serializeCanvasDocument } from '@/services/CanvasDocumentService';
 import type { InfiniteCanvasNote } from '@/types/note';

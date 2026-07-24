@@ -8,6 +8,7 @@ jest.mock('@/context/ThemeContext', () => ({
       text: '#111111',
       textSub: '#444444',
       textDim: '#777777',
+      content: { primary: '#111111', secondary: '#444444', muted: '#777777' },
       glass: { solid: '#ffffff', border: '#dddddd' },
       accent: { base: '#12B9A9', soft: 'rgba(196,224,225,0.72)' },
       iconTile: { coral: '#F26841', cyan: '#34C7D9', teal: '#12B9A9', blue: '#20A6EB', foreground: '#EDEDEF' },

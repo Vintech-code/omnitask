@@ -31,35 +31,86 @@ service cloud.firestore {
       }
     }
 
-    // Shared canvas metadata and object documents are readable only by members.
-    // Membership changes are performed by verified callable functions so an
-    // invited user cannot add arbitrary accounts from the mobile client.
+    // Shared canvas metadata and content are readable only by verified members.
+    // Invite redemption must match a live, unexpired capability document.
     match /sharedCanvasBoards/{boardId} {
+      function member() {
+        return get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid)).data;
+      }
+
       function isCanvasMember() {
         return hasVerifiedEmail()
           && resource.data.active == true
           && exists(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid));
       }
 
+      function isCanvasOwner() {
+        return isCanvasMember() && resource.data.ownerId == request.auth.uid;
+      }
+
+      function canEditCanvas() {
+        return isCanvasMember()
+          && (
+            resource.data.ownerId == request.auth.uid
+            || member().role == 'owner'
+            || member().role == 'editor'
+            || !member().keys().hasAny(['role'])
+          );
+      }
+
       allow read: if isCanvasMember();
       allow create: if hasVerifiedEmail()
         && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.active == true;
+        && request.resource.data.active == true
+        && request.resource.data.memberLimit == 20
+        && request.resource.data.objectLimit == 1000;
       allow delete: if false;
-      allow update: if isCanvasMember()
-        && request.resource.data.ownerId == resource.data.ownerId
-        && (
-          request.resource.data.active == resource.data.active
-          || (request.auth.uid == resource.data.ownerId && request.resource.data.active == false)
+      allow update: if
+        (
+          canEditCanvas()
+          && request.resource.data.ownerId == resource.data.ownerId
+          && request.resource.data.active == resource.data.active
+          && request.resource.data.memberLimit == resource.data.memberLimit
+          && request.resource.data.objectLimit == resource.data.objectLimit
+        )
+        || (
+          isCanvasOwner()
+          && request.resource.data.memberLimit == resource.data.memberLimit
+          && request.resource.data.objectLimit == resource.data.objectLimit
+          && (
+            request.resource.data.active == false
+            || (
+              request.resource.data.active == true
+              && request.resource.data.ownerId != resource.data.ownerId
+              && getAfter(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.resource.data.ownerId)).data.role == 'owner'
+              && getAfter(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid)).data.role == 'editor'
+            )
+          )
         );
 
       match /objects/{objectId} {
+        function nestedBoard() {
+          return get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data;
+        }
+        function nestedMember() {
+          return get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid)).data;
+        }
         function isNestedCanvasMember() {
           return hasVerifiedEmail()
-            && get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data.active == true
+            && nestedBoard().active == true
             && exists(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid));
         }
-        allow read, create, update, delete: if isNestedCanvasMember();
+        function canEditNestedCanvas() {
+          return isNestedCanvasMember()
+            && (
+              nestedBoard().ownerId == request.auth.uid
+              || nestedMember().role == 'owner'
+              || nestedMember().role == 'editor'
+              || !nestedMember().keys().hasAny(['role'])
+            );
+        }
+        allow read: if isNestedCanvasMember();
+        allow create, update, delete: if canEditNestedCanvas();
       }
 
       match /members/{userId} {
@@ -71,7 +122,15 @@ service cloud.firestore {
             && request.resource.data.uid == userId
             && request.resource.data.inviteCode is string
             && get(/databases/$(database)/documents/canvasCollaborationInvites/$(request.resource.data.inviteCode)).data.boardId == boardId
-            && get(/databases/$(database)/documents/canvasCollaborationInvites/$(request.resource.data.inviteCode)).data.expiresAt > request.time;
+            && get(/databases/$(database)/documents/canvasCollaborationInvites/$(request.resource.data.inviteCode)).data.expiresAt > request.time
+            && (
+              request.resource.data.role == get(/databases/$(database)/documents/canvasCollaborationInvites/$(request.resource.data.inviteCode)).data.role
+              || (
+                !get(/databases/$(database)/documents/canvasCollaborationInvites/$(request.resource.data.inviteCode)).data.keys().hasAny(['role'])
+                && request.resource.data.role == 'editor'
+              )
+            )
+            && request.resource.data.role in ['editor', 'commenter', 'viewer'];
         }
         allow read: if hasVerifiedEmail()
           && exists(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid));
@@ -79,11 +138,26 @@ service cloud.firestore {
           && board().active == true
           && (
             memberCanJoin()
-            || (request.auth.uid == userId && board().ownerId == userId && request.resource.data.owner == true)
+            || (request.auth.uid == userId && board().ownerId == userId && request.resource.data.role == 'owner')
           );
-        allow update: if false;
+        allow update: if hasVerifiedEmail()
+          && request.auth.uid == board().ownerId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+          && request.resource.data.role in ['owner', 'editor', 'commenter', 'viewer']
+          && (
+            getAfter(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data.ownerId == board().ownerId
+            || (
+              getAfter(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data.ownerId == userId
+              && request.resource.data.role == 'owner'
+            )
+            || (
+              userId == request.auth.uid
+              && request.resource.data.role == 'editor'
+            )
+          );
         allow delete: if hasVerifiedEmail()
-          && (request.auth.uid == userId || request.auth.uid == board().ownerId);
+          && (request.auth.uid == userId || request.auth.uid == board().ownerId)
+          && userId != board().ownerId;
       }
 
       match /presence/{userId} {
@@ -97,6 +171,109 @@ service cloud.firestore {
         allow delete: if hasVerifiedEmail()
           && (request.auth.uid == userId || request.auth.uid == get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data.ownerId);
       }
+
+      match /comments/{commentId} {
+        function board() {
+          return get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data;
+        }
+        function member() {
+          return get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid)).data;
+        }
+        function isMember() {
+          return hasVerifiedEmail()
+            && board().active == true
+            && exists(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid));
+        }
+        function canComment() {
+          return isMember()
+            && (
+              board().ownerId == request.auth.uid
+              || member().role in ['owner', 'editor', 'commenter']
+              || !member().keys().hasAny(['role'])
+            );
+        }
+        allow read: if isMember();
+        allow create: if canComment()
+          && request.resource.data.id == commentId
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.body is string
+          && request.resource.data.body.size() > 0
+          && request.resource.data.body.size() <= 2000
+          && request.resource.data.mentions is list
+          && request.resource.data.mentions.size() <= 20;
+        allow update: if canComment()
+          && (resource.data.authorId == request.auth.uid || member().role in ['owner', 'editor'])
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['resolvedAt', 'resolvedBy', 'updatedAt']);
+        allow delete: if canComment()
+          && (resource.data.authorId == request.auth.uid || member().role == 'owner');
+      }
+
+      match /versions/{versionId} {
+        function board() {
+          return get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data;
+        }
+        function member() {
+          return get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid)).data;
+        }
+        function isMember() {
+          return hasVerifiedEmail()
+            && board().active == true
+            && exists(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid));
+        }
+        function canEdit() {
+          return isMember()
+            && (
+              board().ownerId == request.auth.uid
+              || member().role in ['owner', 'editor']
+              || !member().keys().hasAny(['role'])
+            );
+        }
+        allow read: if isMember();
+        allow create: if canEdit()
+          && request.resource.data.id == versionId
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.objectCount is int
+          && request.resource.data.objectCount <= 1000;
+        allow update: if false;
+        allow delete: if canEdit();
+
+        match /objects/{objectId} {
+          allow read: if hasVerifiedEmail()
+            && get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data.active == true
+            && exists(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid));
+          allow create, delete: if hasVerifiedEmail()
+            && get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data.active == true
+            && (
+              get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data.ownerId == request.auth.uid
+              || get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid)).data.role in ['owner', 'editor']
+              || !get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid)).data.keys().hasAny(['role'])
+            );
+          allow update: if false;
+        }
+      }
+
+      match /activity/{activityId} {
+        function board() {
+          return get(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)).data;
+        }
+        function isMember() {
+          return hasVerifiedEmail()
+            && board().active == true
+            && exists(/databases/$(database)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid));
+        }
+        allow read: if isMember();
+        allow create: if isMember()
+          && request.resource.data.id == activityId
+          && request.resource.data.actorId == request.auth.uid
+          && request.resource.data.type in [
+            'board-created', 'member-joined', 'member-removed', 'member-left',
+            'role-changed', 'ownership-transferred', 'invite-created',
+            'version-created', 'version-restored', 'comment-added',
+            'comment-resolved', 'sharing-stopped'
+          ];
+        allow update, delete: if false;
+      }
     }
 
     match /canvasCollaborationInvites/{inviteId} {
@@ -106,6 +283,7 @@ service cloud.firestore {
       allow list: if false;
       allow create: if hasVerifiedEmail()
         && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.role in ['editor', 'commenter', 'viewer']
         && get(/databases/$(database)/documents/sharedCanvasBoards/$(request.resource.data.boardId)).data.ownerId == request.auth.uid
         && get(/databases/$(database)/documents/sharedCanvasBoards/$(request.resource.data.boardId)).data.active == true;
       allow update: if false;

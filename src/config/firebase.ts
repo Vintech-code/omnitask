@@ -15,18 +15,12 @@ import {
   initializeAuth,
 } from 'firebase/auth';
 import { getFirestore, initializeFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { requireFirebaseConfig } from './environment';
 
-const firebaseConfig = {
-  apiKey:            'AIzaSyDs7SVepUDkvWPbpBHAa6Gz4UtPTj81QSs',
-  authDomain:        'omnitask-d5b47.firebaseapp.com',
-  projectId:         'omnitask-d5b47',
-  storageBucket:     'omnitask-d5b47.firebasestorage.app',
-  messagingSenderId: '385511004673',
-  appId:             '1:385511004673:web:90727f4bcd26ab399dbe00',
-  measurementId:     'G-1PJG4L44FT',
-};
+const firebaseConfig = requireFirebaseConfig();
 
 // Prevent duplicate initialization in hot-reload
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
@@ -66,4 +60,5 @@ export const db = (() => {
     return getFirestore(app);
   }
 })();
+export const firebaseStorage = getStorage(app);
 export default app;

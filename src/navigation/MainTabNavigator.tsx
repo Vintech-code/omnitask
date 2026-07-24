@@ -12,8 +12,10 @@ import TasksScreen from '@/screens/TasksScreen';
 import { useTheme } from '@/context/ThemeContext';
 import { floatingShadow, radii } from '@/theme';
 import { fontFamily } from '@/theme/typography';
+import type { MainTabParamList } from '@/types/navigation';
+import { OfflineModeBanner } from '@/components/sync';
 
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
 function TabIcon({ focused, children }: { focused: boolean; children: React.ReactNode }) {
   const { theme } = useTheme();
@@ -30,106 +32,110 @@ export default function MainTabNavigator() {
   const bottom = Math.max(insets.bottom, 8) + 8;
 
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: theme.accent.base,
-        tabBarInactiveTintColor: theme.content.muted,
-        tabBarHideOnKeyboard: true,
-        tabBarStyle: [
-          styles.tabBar,
-          floatingShadow,
-          {
-            bottom,
-            backgroundColor: 'transparent',
-            borderColor: theme.dark ? 'rgba(255,255,255,0.19)' : 'rgba(255,255,255,0.88)',
-          },
-        ],
-        tabBarBackground: () => (
-          <View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFill,
-              styles.tabBarFill,
-              { backgroundColor: theme.dark ? 'rgba(35,36,34,0.86)' : 'rgba(250,250,248,0.72)' },
-            ]}
-          >
+    <View style={[styles.screen, { backgroundColor: theme.background.base }]}>
+      <OfflineModeBanner />
+      <Tab.Navigator
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: theme.accent.base,
+          tabBarInactiveTintColor: theme.content.muted,
+          tabBarHideOnKeyboard: true,
+          tabBarStyle: [
+            styles.tabBar,
+            floatingShadow,
+            {
+              bottom,
+              backgroundColor: 'transparent',
+              borderColor: theme.dark ? 'rgba(255,255,255,0.19)' : 'rgba(255,255,255,0.88)',
+            },
+          ],
+          tabBarBackground: () => (
             <View
+              pointerEvents="none"
               style={[
                 StyleSheet.absoluteFill,
-                styles.glassTint,
-                { backgroundColor: theme.dark ? 'rgba(110,159,189,0.035)' : 'rgba(255,255,255,0.20)' },
+                styles.tabBarFill,
+                { backgroundColor: theme.dark ? 'rgba(35,36,34,0.86)' : 'rgba(250,250,248,0.72)' },
               ]}
-            />
-            <View style={[styles.glassHighlight, { backgroundColor: theme.glass.highlight }]} />
-          </View>
-        ),
-        tabBarItemStyle: styles.tabItem,
-        tabBarLabelStyle: styles.label,
-      }}
-    >
-      <Tab.Screen
-        name="Dashboard"
-        component={DashboardScreen}
-        options={{
-          tabBarLabel: 'Home',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused}>
-              <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
-            </TabIcon>
+            >
+              <View
+                style={[
+                  StyleSheet.absoluteFill,
+                  styles.glassTint,
+                  { backgroundColor: theme.dark ? 'rgba(110,159,189,0.035)' : 'rgba(255,255,255,0.20)' },
+                ]}
+              />
+              <View style={[styles.glassHighlight, { backgroundColor: theme.glass.highlight }]} />
+            </View>
           ),
+          tabBarItemStyle: styles.tabItem,
+          tabBarLabelStyle: styles.label,
         }}
-      />
-      <Tab.Screen
-        name="Focus"
-        component={FocusScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused}>
-              <Ionicons name={focused ? 'timer' : 'timer-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
-            </TabIcon>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Alarm"
-        component={AlarmScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused}>
-              <Ionicons name={focused ? 'alarm' : 'alarm-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
-            </TabIcon>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Calculator"
-        component={CalculatorScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused}>
-              <Ionicons name={focused ? 'calculator' : 'calculator-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
-            </TabIcon>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Tasks"
-        component={TasksScreen}
-        options={{
-          tabBarLabel: 'Organize',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused}>
-              <MaterialCommunityIcons name={focused ? 'note-text' : 'note-text-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
-            </TabIcon>
-          ),
-        }}
-      />
-    </Tab.Navigator>
+      >
+        <Tab.Screen
+          name="Dashboard"
+          component={DashboardScreen}
+          options={{
+            tabBarLabel: 'Home',
+            tabBarIcon: ({ focused }) => (
+              <TabIcon focused={focused}>
+                <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
+              </TabIcon>
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Focus"
+          component={FocusScreen}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <TabIcon focused={focused}>
+                <Ionicons name={focused ? 'timer' : 'timer-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
+              </TabIcon>
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Alarm"
+          component={AlarmScreen}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <TabIcon focused={focused}>
+                <Ionicons name={focused ? 'alarm' : 'alarm-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
+              </TabIcon>
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Calculator"
+          component={CalculatorScreen}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <TabIcon focused={focused}>
+                <Ionicons name={focused ? 'calculator' : 'calculator-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
+              </TabIcon>
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Tasks"
+          component={TasksScreen}
+          options={{
+            tabBarLabel: 'Organize',
+            tabBarIcon: ({ focused }) => (
+              <TabIcon focused={focused}>
+                <MaterialCommunityIcons name={focused ? 'note-text' : 'note-text-outline'} size={22} color={focused ? theme.iconTile.foreground : theme.icon} />
+              </TabIcon>
+            ),
+          }}
+        />
+      </Tab.Navigator>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   tabBar: {
     position: 'absolute',
     left: 20,

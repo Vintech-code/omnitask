@@ -59,8 +59,8 @@ export function EventActionSheet({
           ]}
         >
           <View style={[styles.handle, { backgroundColor: theme.divider }]} />
-          <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>{title}</Text>
-          {message ? <Text style={[styles.message, { color: theme.textSub }]}>{message}</Text> : null}
+          <Text style={[styles.title, { color: theme.content.primary }]} numberOfLines={2}>{title}</Text>
+          {message ? <Text style={[styles.message, { color: theme.content.secondary }]}>{message}</Text> : null}
 
           {actions.length > 0 ? (
             <View style={[styles.actionGroup, { borderColor: theme.glass.border }]}>
@@ -69,7 +69,7 @@ export function EventActionSheet({
                   ? theme.semantic.danger
                   : action.tone === 'accent'
                     ? theme.accent.base
-                    : theme.text;
+                    : theme.content.primary;
                 return (
                   <TouchableOpacity
                     key={action.label}
@@ -90,10 +90,10 @@ export function EventActionSheet({
                     <View style={styles.actionCopy}>
                       <Text style={[styles.actionLabel, { color }]}>{action.label}</Text>
                       {action.description ? (
-                        <Text style={[styles.actionDescription, { color: theme.textDim }]}>{action.description}</Text>
+                        <Text style={[styles.actionDescription, { color: theme.content.muted }]}>{action.description}</Text>
                       ) : null}
                     </View>
-                    <Ionicons name="chevron-forward" size={17} color={theme.textDim} />
+                    <Ionicons name="chevron-forward" size={17} color={theme.content.muted} />
                   </TouchableOpacity>
                 );
               })}
@@ -106,7 +106,7 @@ export function EventActionSheet({
             style={[styles.closeButton, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}
             onPress={onClose}
           >
-            <Text style={[styles.closeLabel, { color: theme.text }]}>{closeLabel}</Text>
+            <Text style={[styles.closeLabel, { color: theme.content.primary }]}>{closeLabel}</Text>
           </TouchableOpacity>
         </View>
       </View>

@@ -1,7 +1,7 @@
 import { doc, getDoc } from 'firebase/firestore';
 
 import { db } from '@/config/firebase';
-import { queueCloudSet } from '@/services/OfflineSyncService';
+import { queueCloudSet, recordCloudSnapshot } from '@/services/OfflineSyncService';
 import { KEYS, Storage } from '@/services/StorageService';
 import { withAuthTimeout } from '@/services/AuthNetworkService';
 
@@ -19,6 +19,7 @@ export async function resolveOnboardingCompleted(
       getDoc(doc(db, accountMetaPath(uid).join('/'))),
       3500,
     );
+    if (snapshot.exists()) await recordCloudSnapshot(uid, accountMetaPath(uid), snapshot.data());
     if (snapshot.data()?.onboardingCompleted === true) {
       await Storage.setForUser(KEYS.ONBOARDING_DONE, uid, true);
       return true;

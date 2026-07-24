@@ -38,6 +38,8 @@ export const st = StyleSheet.create({
   focusRow: { flexDirection: 'row', alignItems: 'center' },
   focusTimeLabel: { fontSize: 11, fontFamily: fontFamily.semibold, marginBottom: 3 },
   focusTimeVal: { fontSize: 17, fontFamily: fontFamily.extrabold, marginBottom: 5 },
+  focusDetails: { marginTop: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
+  legacyNote: { marginTop: 3, fontSize: 11, lineHeight: 16, fontFamily: fontFamily.medium },
 
   todoProgressRow: { flexDirection: 'row', alignItems: 'center' },
   statLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

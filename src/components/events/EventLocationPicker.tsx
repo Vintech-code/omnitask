@@ -133,9 +133,9 @@ export function EventLocationPicker({
         <AppBackground />
         <View style={styles.header}>
           <TouchableOpacity accessibilityRole="button" style={styles.headerAction} onPress={onCancel}>
-            <Text style={[styles.cancel, { color: theme.textSub }]}>Cancel</Text>
+            <Text style={[styles.cancel, { color: theme.content.secondary }]}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.text }]}>Choose location</Text>
+          <Text style={[styles.title, { color: theme.content.primary }]}>Choose location</Text>
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityState={{ disabled: !coordinate }}
@@ -143,7 +143,7 @@ export function EventLocationPicker({
             style={styles.headerAction}
             onPress={() => coordinate && onSelect({ ...coordinate, label: label.trim() || 'Pinned location' })}
           >
-            <Text style={[styles.done, { color: coordinate ? theme.accent.base : theme.textDim }]}>Done</Text>
+            <Text style={[styles.done, { color: coordinate ? theme.accent.base : theme.content.muted }]}>Done</Text>
           </TouchableOpacity>
         </View>
 
@@ -172,8 +172,8 @@ export function EventLocationPicker({
               <View style={[styles.mapUnavailableIcon, { backgroundColor: theme.iconTile.blue }]}>
                 <Ionicons name="map-outline" size={30} color={theme.iconTile.foreground} />
               </View>
-              <Text style={[styles.mapUnavailableTitle, { color: theme.text }]}>Map unavailable in this build</Text>
-              <Text style={[styles.mapUnavailableText, { color: theme.textSub }]}>Use your current location now, or rebuild OmniTask with its Google Maps API key to choose a pin.</Text>
+              <Text style={[styles.mapUnavailableTitle, { color: theme.content.primary }]}>Map unavailable in this build</Text>
+              <Text style={[styles.mapUnavailableText, { color: theme.content.secondary }]}>Use your current location now, or rebuild OmniTask with its Google Maps API key to choose a pin.</Text>
             </View>
           )}
           {mapsConfigured && !mapLoaded ? (
@@ -181,8 +181,8 @@ export function EventLocationPicker({
               {mapLoadTimedOut ? (
                 <>
                   <Ionicons name="map-outline" size={30} color={theme.accent.base} />
-                  <Text style={[styles.mapLoadingTitle, { color: theme.text }]}>Map couldn’t load</Text>
-                  <Text style={[styles.mapLoadingText, { color: theme.textSub }]}>Check your connection and Google Maps key access, then try again.</Text>
+                  <Text style={[styles.mapLoadingTitle, { color: theme.content.primary }]}>Map couldn’t load</Text>
+                  <Text style={[styles.mapLoadingText, { color: theme.content.secondary }]}>Check your connection and Google Maps key access, then try again.</Text>
                   <TouchableOpacity
                     accessibilityRole="button"
                     style={[styles.retryButton, { backgroundColor: theme.accent.base }]}
@@ -199,7 +199,7 @@ export function EventLocationPicker({
               ) : (
                 <>
                   <OmniLoader size="large" accessibilityLabel="Finding location" />
-                  <Text style={[styles.mapLoadingTitle, { color: theme.text }]}>Loading map…</Text>
+                  <Text style={[styles.mapLoadingTitle, { color: theme.content.primary }]}>Loading map…</Text>
                 </>
               )}
             </View>
@@ -212,26 +212,26 @@ export function EventLocationPicker({
             disabled={locating}
           >
             <Ionicons name="locate-outline" size={19} color={theme.accent.base} />
-            <Text style={[styles.currentLabel, { color: theme.text }]}>{locating ? 'Locating...' : 'Use my location'}</Text>
+            <Text style={[styles.currentLabel, { color: theme.content.primary }]}>{locating ? 'Locating...' : 'Use my location'}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.form}>
-          <Text style={[styles.fieldLabel, { color: theme.textSub }]}>Location label</Text>
+          <Text style={[styles.fieldLabel, { color: theme.content.secondary }]}>Location label</Text>
           <TextInput
             value={label}
             onChangeText={setLabel}
             placeholder="Venue, address, or meeting point"
-            placeholderTextColor={theme.textDim}
-            style={[styles.input, { color: theme.text, backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}
+            placeholderTextColor={theme.content.muted}
+            style={[styles.input, { color: theme.content.primary, backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}
           />
           {status ? (
             <View style={[styles.status, { backgroundColor: theme.accent.soft }]}>
               <Ionicons name="information-circle-outline" size={18} color={theme.accent.base} />
-              <Text style={[styles.statusText, { color: theme.textSub }]}>{status}</Text>
+              <Text style={[styles.statusText, { color: theme.content.secondary }]}>{status}</Text>
             </View>
           ) : null}
-          <Text style={[styles.hint, { color: theme.textDim }]}>
+          <Text style={[styles.hint, { color: theme.content.muted }]}>
             {mapsConfigured ? 'Tap anywhere on the map to move the event pin.' : 'A map pin requires a Maps-enabled app build.'}
           </Text>
           {onClear && (initialLabel || coordinate) ? (

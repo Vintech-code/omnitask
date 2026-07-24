@@ -243,27 +243,27 @@ export default function CalculatorScreen({ navigation }: any) {
       <AppBackground />
       <View style={styles.header}>
         <BurgerMenu navigation={navigation} />
-        <Text style={[styles.title, { color: theme.text }]}>Calculator</Text>
+        <Text style={[styles.title, { color: theme.content.primary }]}>Calculator</Text>
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Open calculation history"
           style={styles.headerButton}
           onPress={() => setHistoryVisible(true)}
         >
-          <Ionicons name="time-outline" size={25} color={theme.text} />
+          <Ionicons name="time-outline" size={25} color={theme.content.primary} />
         </TouchableOpacity>
       </View>
 
       <View style={[styles.content, { paddingBottom: bottomClearance }]}>
         <View style={[styles.displayArea, scientificVisible && styles.displayAreaExpanded]}>
-          <Text style={[styles.expression, { color: error ? theme.semantic.danger : theme.textDim }]} numberOfLines={2}>
+          <Text style={[styles.expression, { color: error ? theme.semantic.danger : theme.content.muted }]} numberOfLines={2}>
             {error ?? (expression ? displayExpression(expression) : '0')}
           </Text>
           <Text
             adjustsFontSizeToFit
             minimumFontScale={0.38}
             numberOfLines={1}
-            style={[styles.result, { color: result === 'Error' ? theme.semantic.danger : theme.text }]}
+            style={[styles.result, { color: result === 'Error' ? theme.semantic.danger : theme.content.primary }]}
           >
             {result}
           </Text>
@@ -275,7 +275,7 @@ export default function CalculatorScreen({ navigation }: any) {
           style={styles.expandButton}
           onPress={() => setScientificVisible(previous => !previous)}
         >
-          <Ionicons name={scientificVisible ? 'chevron-down' : 'chevron-up'} size={25} color={theme.textSub} />
+          <Ionicons name={scientificVisible ? 'chevron-down' : 'chevron-up'} size={25} color={theme.content.secondary} />
         </TouchableOpacity>
 
         <ScrollView
@@ -301,7 +301,7 @@ export default function CalculatorScreen({ navigation }: any) {
                   ? '#FFF'
                   : key.tone === 'operator' || active
                     ? theme.accent.base
-                    : theme.text;
+                    : theme.content.primary;
                 return (
                   <TouchableOpacity
                     key={`${key.label}-${key.action}`}
@@ -344,8 +344,8 @@ export default function CalculatorScreen({ navigation }: any) {
           <View style={[styles.historySheet, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border, paddingBottom: Math.max(insets.bottom, 20) }]}>
             <View style={styles.historyHeader}>
               <View>
-                <Text style={[styles.historyTitle, { color: theme.text }]}>History</Text>
-                <Text style={[styles.historySubtitle, { color: theme.textDim }]}>Recent calculations</Text>
+                <Text style={[styles.historyTitle, { color: theme.content.primary }]}>History</Text>
+                <Text style={[styles.historySubtitle, { color: theme.content.muted }]}>Recent calculations</Text>
               </View>
               {history.length > 0 ? (
                 <TouchableOpacity style={styles.clearHistoryButton} onPress={() => setHistory([])}>
@@ -356,8 +356,8 @@ export default function CalculatorScreen({ navigation }: any) {
             <ScrollView style={styles.historyList} showsVerticalScrollIndicator={false}>
               {history.length === 0 ? (
                 <View style={styles.emptyHistory}>
-                  <Ionicons name="time-outline" size={34} color={theme.textDim} />
-                  <Text style={[styles.emptyHistoryText, { color: theme.textDim }]}>No calculations yet</Text>
+                  <Ionicons name="time-outline" size={34} color={theme.content.muted} />
+                  <Text style={[styles.emptyHistoryText, { color: theme.content.muted }]}>No calculations yet</Text>
                 </View>
               ) : history.map((entry, index) => (
                 <TouchableOpacity
@@ -371,8 +371,8 @@ export default function CalculatorScreen({ navigation }: any) {
                     setHistoryVisible(false);
                   }}
                 >
-                  <Text style={[styles.historyExpression, { color: theme.textDim }]}>{entry.expression}</Text>
-                  <Text style={[styles.historyResult, { color: theme.text }]}>= {entry.result}</Text>
+                  <Text style={[styles.historyExpression, { color: theme.content.muted }]}>{entry.expression}</Text>
+                  <Text style={[styles.historyResult, { color: theme.content.primary }]}>= {entry.result}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>

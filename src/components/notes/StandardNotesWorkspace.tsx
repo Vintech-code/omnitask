@@ -1,6 +1,6 @@
 import { fontFamily } from '@/theme/typography';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import { AppText as Text } from '@/components/ui/AppText';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -14,6 +14,7 @@ import { formatDate } from '@/utils/date';
 import { StandardNoteEditor } from './StandardNoteEditor';
 import { NewNoteSheet } from './NewNoteSheet';
 import { OmniLoader } from '@/components/ui/OmniLoader';
+import { AttachmentImage } from '@/components/attachments';
 
 type SortMode = 'updated' | 'created' | 'category' | 'favorites';
 const createDraft = (type: StandardNoteType): Note => { const now = Date.now(); return { id: `${now}_${Math.random().toString(36).slice(2, 6)}`, title: '', body: '', date: formatDate(now), timestamp: now, createdAt: now, updatedAt: now, category: 'Personal', cardColor: CARD_COLORS[0], tags: [], todos: [], images: [], type, pinned: false, archived: false }; };
@@ -27,10 +28,10 @@ function NoteRow({ note, onOpen, onMenu }: { note: Note; onOpen: () => void; onM
       : note.type === 'rich'
         ? theme.iconTile.blue
         : theme.iconTile.cyan;
-  return <TouchableOpacity style={[styles.noteRow, { borderBottomColor: theme.divider }]} onPress={onOpen} onLongPress={onMenu} delayLongPress={350}><View style={[styles.noteMark, { backgroundColor: tileColor }]}><MaterialCommunityIcons name={note.type === 'checklist' ? 'checkbox-marked-outline' : note.type === 'rich' ? 'file-document-edit-outline' : 'note-text-outline'} size={21} color={theme.iconTile.foreground} /></View><View style={styles.noteCopy}><View style={styles.noteTitleRow}><Text style={[styles.noteTitle, { color: theme.content.primary }]} numberOfLines={1}>{note.title.trim() || 'Untitled'}</Text>{note.pinned ? <Ionicons name="pin" size={13} color={theme.accent.base} /> : null}</View><Text style={[styles.previewText, { color: theme.content.secondary }]} numberOfLines={1}>{note.body.trim() || (total ? `${done} of ${total} checklist items complete` : 'Empty note')}</Text><View style={styles.noteMeta}><Text style={[styles.metaText, { color: theme.content.muted }]}>{note.category} · {new Date(note.updatedAt ?? note.timestamp).toLocaleDateString()}</Text>{total ? <View style={[styles.progressMini, { backgroundColor: theme.divider }]}><View style={{ height: 3, borderRadius: 2, width: `${total ? done / total * 100 : 0}%`, backgroundColor: theme.accent.base }} /></View> : null}</View></View>{note.images?.[0] ? <Image source={{ uri: note.images[0] }} style={styles.thumb} /> : <Ionicons name="chevron-forward" size={17} color={theme.content.muted} />}</TouchableOpacity>;
+  return <TouchableOpacity style={[styles.noteRow, { borderBottomColor: theme.divider }]} onPress={onOpen} onLongPress={onMenu} delayLongPress={350}><View style={[styles.noteMark, { backgroundColor: tileColor }]}><MaterialCommunityIcons name={note.type === 'checklist' ? 'checkbox-marked-outline' : note.type === 'rich' ? 'file-document-edit-outline' : 'note-text-outline'} size={21} color={theme.iconTile.foreground} /></View><View style={styles.noteCopy}><View style={styles.noteTitleRow}><Text style={[styles.noteTitle, { color: theme.content.primary }]} numberOfLines={1}>{note.title.trim() || 'Untitled'}</Text>{note.pinned ? <Ionicons name="pin" size={13} color={theme.accent.base} /> : null}</View><Text style={[styles.previewText, { color: theme.content.secondary }]} numberOfLines={1}>{note.body.trim() || (total ? `${done} of ${total} checklist items complete` : 'Empty note')}</Text><View style={styles.noteMeta}><Text style={[styles.metaText, { color: theme.content.muted }]}>{note.category} · {new Date(note.updatedAt ?? note.timestamp).toLocaleDateString()}</Text>{total ? <View style={[styles.progressMini, { backgroundColor: theme.divider }]}><View style={{ height: 3, borderRadius: 2, width: `${total ? done / total * 100 : 0}%`, backgroundColor: theme.accent.base }} /></View> : null}</View></View>{note.attachmentIds?.[0] || note.images?.[0] ? <AttachmentImage attachmentId={note.attachmentIds?.[0]} fallbackUri={note.images?.[0]} style={styles.thumb} /> : <Ionicons name="chevron-forward" size={17} color={theme.content.muted} />}</TouchableOpacity>;
 }
 
-export function StandardNotesWorkspace({ initialNoteId, openRequest, createType, createRequest, query = '' }: { initialNoteId?: string; openRequest?: number; createType?: StandardNoteType; createRequest?: number; query?: string } = {}) {
+export function StandardNotesWorkspace({ initialNoteId, openRequest, createType, createRequest, query = '', onOpenTask }: { initialNoteId?: string; openRequest?: number; createType?: StandardNoteType; createRequest?: number; query?: string; onOpenTask?: (taskId: string) => void } = {}) {
   const { theme } = useTheme();
   const { notes, categories, isLoading, addNote, updateNote, removeNote, addCategory } = useTaskStore();
   const [category, setCategory] = useState('All'); const [sort, setSort] = useState<SortMode>('updated'); const [archived, setArchived] = useState(false); const [active, setActive] = useState<Note | null>(null);
@@ -66,7 +67,7 @@ export function StandardNotesWorkspace({ initialNoteId, openRequest, createType,
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>{filtered.length ? <>{renderSection('PINNED', pinned)}{renderSection(archived ? 'ARCHIVED' : 'RECENTLY EDITED', recent)}</> : <View style={styles.empty}><View style={[styles.emptyIcon, { backgroundColor: theme.iconTile.cyan }]}><MaterialCommunityIcons name="note-plus-outline" size={29} color={theme.iconTile.foreground} /></View><Text style={[styles.emptyTitle, { color: theme.content.primary }]}>{archived ? 'Archive is clear' : 'A clear space for your thinking'}</Text><Text style={[styles.emptyText, { color: theme.content.secondary }]}>{archived ? 'Archived notes will appear here.' : 'Capture a thought, build a checklist, or compose a richer document.'}</Text></View>}</ScrollView>
     {!archived ? <TouchableOpacity style={[styles.create, { backgroundColor: theme.accent.base }]} onPress={() => setCreateOpen(true)}><Ionicons name="add" size={24} color="#FFF" /><Text style={styles.createText}>New</Text></TouchableOpacity> : null}
     <NewNoteSheet visible={createOpen} onClose={() => setCreateOpen(false)} onCreateNote={() => create('text')} onCreateChecklist={() => create('checklist')} />
-    {active ? <StandardNoteEditor note={active} onSave={save} onClose={close} onDelete={() => { removeNote(active.id); setActive(null); }} /> : null}
+    {active ? <StandardNoteEditor note={active} onSave={save} onClose={close} onDelete={() => { removeNote(active.id); setActive(null); }} onOpenTask={onOpenTask} /> : null}
   </View>;
 }
 

@@ -22,7 +22,7 @@ export function BurgerMenu({ navigation }: { navigation: any }) {
         activeOpacity={1}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <Ionicons name="menu-outline" size={26} color={theme.iconColor} />
+        <Ionicons name="menu-outline" size={26} color={theme.icon} />
       </TouchableOpacity>
     </Animated.View>
   );

@@ -65,13 +65,13 @@ export default function EventAlarmsScreen({
       {/* Top Bar */}
       <View style={[styles.topBar, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }]}>
         <BurgerMenu navigation={navigation} />
-        <Text style={[styles.topBarTitle, { color: theme.text }]}>Events</Text>
+        <Text style={[styles.topBarTitle, { color: theme.content.primary }]}>Events</Text>
         <View style={styles.topBarRight}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => { setViewMode(v => v === 'list' ? 'calendar' : 'list'); setSelectedDay(null); }}>
-            <Ionicons name={viewMode === 'list' ? 'calendar-outline' : 'list-outline'} size={22} color={theme.text} />
+            <Ionicons name={viewMode === 'list' ? 'calendar-outline' : 'list-outline'} size={22} color={theme.content.primary} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={() => navigation?.navigate('CreateEvent')}>
-            <Ionicons name="add-outline" size={24} color={theme.text} />
+            <Ionicons name="add-outline" size={24} color={theme.content.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -84,7 +84,7 @@ export default function EventAlarmsScreen({
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.textDim} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.content.muted} />}
       >
         {viewMode === 'calendar' ? (
           // -- CALENDAR VIEW --
@@ -103,12 +103,12 @@ export default function EventAlarmsScreen({
         {/* Stat Cards */}
         <View style={styles.statRow}>
           <View style={[styles.statCard, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
-            <Text style={[styles.statLabel, { color: theme.textDim }]}>ACTIVE ALARMS</Text>
-            <Text style={[styles.statValueBlue, { color: theme.text }]}>{activeCount}</Text>
+            <Text style={[styles.statLabel, { color: theme.content.muted }]}>ACTIVE ALARMS</Text>
+            <Text style={[styles.statValueBlue, { color: theme.content.primary }]}>{activeCount}</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
-            <Text style={[styles.statLabel, { color: theme.textDim }]}>NEXT EVENT</Text>
-            <Text style={[styles.statValueDark, { color: theme.text }]} numberOfLines={1}>
+            <Text style={[styles.statLabel, { color: theme.content.muted }]}>NEXT EVENT</Text>
+            <Text style={[styles.statValueDark, { color: theme.content.primary }]} numberOfLines={1}>
               {nextEvent ? nextEvent.title : 'None'}
             </Text>
           </View>
@@ -117,7 +117,7 @@ export default function EventAlarmsScreen({
         {/* EVENT ALARMS header */}
         <View style={styles.sectionHeader}>
           <View style={styles.blueDot} />
-          <Text style={[styles.sectionTitle, { color: theme.textDim }]}>EVENT ALARMS</Text>
+          <Text style={[styles.sectionTitle, { color: theme.content.muted }]}>EVENT ALARMS</Text>
           {events.length > 0 && (
             <TouchableOpacity style={styles.manageAllBtn} onPress={() => setManageVisible(true)}>
               <Text style={styles.manageAllText}>Manage All</Text>
@@ -128,9 +128,9 @@ export default function EventAlarmsScreen({
         {/* Empty state */}
         {events.length === 0 && (
           <View style={styles.emptyState}>
-            <Ionicons name="calendar-outline" size={40} color={theme.textDim} />
-            <Text style={[styles.emptyTitle, { color: theme.textDim }]}>No events yet</Text>
-            <Text style={[styles.emptySub, { color: theme.textDim }]}>Create an event to see it here</Text>
+            <Ionicons name="calendar-outline" size={40} color={theme.content.muted} />
+            <Text style={[styles.emptyTitle, { color: theme.content.muted }]}>No events yet</Text>
+            <Text style={[styles.emptySub, { color: theme.content.muted }]}>Create an event to see it here</Text>
             <TouchableOpacity
               style={styles.emptyAddBtn}
               onPress={() => navigation?.navigate('CreateEvent')}
@@ -159,10 +159,10 @@ export default function EventAlarmsScreen({
                 {/* Time + Toggle */}
                 <View style={styles.alarmTopRow}>
                   <View style={styles.alarmTimeBlock}>
-                    <Text style={[styles.alarmTime, { color: theme.text }, !event.alarmActive && styles.alarmTimeInactive]}>
+                    <Text style={[styles.alarmTime, { color: theme.content.primary }, !event.alarmActive && styles.alarmTimeInactive]}>
                       {time}
                     </Text>
-                    <Text style={[styles.alarmPeriod, { color: theme.textSub }, !event.alarmActive && styles.alarmTimeInactive]}>
+                    <Text style={[styles.alarmPeriod, { color: theme.content.secondary }, !event.alarmActive && styles.alarmTimeInactive]}>
                       {' '}{period}
                     </Text>
                   </View>
@@ -182,19 +182,19 @@ export default function EventAlarmsScreen({
                       onPress={() => setMenuEvent(event)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Ionicons name="ellipsis-vertical" size={16} color={theme.textDim} />
+                      <Ionicons name="ellipsis-vertical" size={16} color={theme.content.muted} />
                     </TouchableOpacity>
                   </View>
                 </View>
 
                 {/* Event Name + Meta */}
-                <Text style={[styles.alarmTitle, { color: theme.text }, !event.alarmActive && styles.alarmTitleInactive]}>
+                <Text style={[styles.alarmTitle, { color: theme.content.primary }, !event.alarmActive && styles.alarmTitleInactive]}>
                   {event.title}
                 </Text>
 
                 <View style={styles.alarmEventRow}>
-                  <Ionicons name="calendar-outline" size={12} color={theme.textDim} />
-                  <Text style={[styles.alarmEventText, { color: theme.textDim }]}>
+                  <Ionicons name="calendar-outline" size={12} color={theme.content.muted} />
+                  <Text style={[styles.alarmEventText, { color: theme.content.muted }]}>
                     {formatEventSchedule(event)}
                   </Text>
                 </View>
@@ -205,11 +205,11 @@ export default function EventAlarmsScreen({
                     <>
                       <Ionicons name="location-outline" size={12} color={BLUE} />
                       <Text style={styles.alarmMetaBlue} numberOfLines={1}>{event.location}</Text>
-                      <Text style={[styles.alarmMetaDot, { color: theme.textDim }]}>·</Text>
+                      <Text style={[styles.alarmMetaDot, { color: theme.content.muted }]}>·</Text>
                     </>
                   ) : null}
                   <View style={[styles.repeatBadge, { backgroundColor: isDark ? '#2A2A2A' : '#F0F0F0' }]}>
-                    <Text style={[styles.repeatBadgeText, { color: theme.textSub }]}>{repeat}</Text>
+                    <Text style={[styles.repeatBadgeText, { color: theme.content.secondary }]}>{repeat}</Text>
                   </View>
                 </View>
 
@@ -221,8 +221,8 @@ export default function EventAlarmsScreen({
                     </View>
                     {notificationChips.slice(0, 2).map((chip, i) => (
                       <View key={i} style={[styles.chip, { backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5' }]}>
-                        <Ionicons name="alarm-outline" size={11} color={theme.textDim} />
-                        <Text style={[styles.chipText, { color: theme.textSub }]}>{chip}</Text>
+                        <Ionicons name="alarm-outline" size={11} color={theme.content.muted} />
+                        <Text style={[styles.chipText, { color: theme.content.secondary }]}>{chip}</Text>
                       </View>
                     ))}
                   </View>
@@ -378,18 +378,18 @@ function CalendarView({ events, theme, isDark, calDate, setCalDate, selectedDay,
       {/* Month navigation */}
       <View style={calS.monthRow}>
         <TouchableOpacity onPress={() => setCalDate(new Date(year, month - 1, 1))} style={calS.navBtn}>
-          <Ionicons name="chevron-back" size={20} color={theme.text} />
+          <Ionicons name="chevron-back" size={20} color={theme.content.primary} />
         </TouchableOpacity>
-        <Text style={[calS.monthTitle, { color: theme.text }]}>{MONTH_NAMES[month]} {year}</Text>
+        <Text style={[calS.monthTitle, { color: theme.content.primary }]}>{MONTH_NAMES[month]} {year}</Text>
         <TouchableOpacity onPress={() => setCalDate(new Date(year, month + 1, 1))} style={calS.navBtn}>
-          <Ionicons name="chevron-forward" size={20} color={theme.text} />
+          <Ionicons name="chevron-forward" size={20} color={theme.content.primary} />
         </TouchableOpacity>
       </View>
 
       {/* Day name headers */}
       <View style={calS.dayNamesRow}>
         {DAY_NAMES.map(d => (
-          <Text key={d} style={[calS.dayName, { color: theme.textDim }]}>{d}</Text>
+          <Text key={d} style={[calS.dayName, { color: theme.content.muted }]}>{d}</Text>
         ))}
       </View>
 
@@ -408,7 +408,7 @@ function CalendarView({ events, theme, isDark, calDate, setCalDate, selectedDay,
             >
               <Text style={[
                 calS.dayNum,
-                { color: theme.text },
+                { color: theme.content.primary },
                 isToday && calS.todayNum,
                 isSelected && { color: BLUE, fontFamily: fontFamily.extrabold },
               ]}>{day}</Text>
@@ -427,24 +427,24 @@ function CalendarView({ events, theme, isDark, calDate, setCalDate, selectedDay,
       {/* Selected day events */}
       {selectedDay !== null && (
         <View style={{ marginTop: 16 }}>
-          <Text style={[calS.dayEventsTitle, { color: theme.textDim }]}>
+          <Text style={[calS.dayEventsTitle, { color: theme.content.muted }]}>
             {MONTH_NAMES[month]} {selectedDay}
           </Text>
           {selectedEvents.length === 0 && (
-            <Text style={{ color: theme.textDim, fontSize: 14, paddingVertical: 10 }}>No events this day</Text>
+            <Text style={{ color: theme.content.muted, fontSize: 14, paddingVertical: 10 }}>No events this day</Text>
           )}
           {selectedEvents.map(ev => (
             <TouchableOpacity
               key={ev.id}
-              style={[calS.eventRow, { backgroundColor: theme.card, borderColor: theme.border }]}
+              style={[calS.eventRow, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}
               onPress={() => navigation?.navigate('EventDetail', { event: ev })}
             >
               <View style={calS.eventDot} />
               <View style={{ flex: 1 }}>
-                <Text style={[calS.eventRowTitle, { color: theme.text }]} numberOfLines={1}>{ev.title}</Text>
-                <Text style={[calS.eventRowTime, { color: theme.textDim }]}>{ev.allDay ? 'All day' : ev.startTime}</Text>
+                <Text style={[calS.eventRowTitle, { color: theme.content.primary }]} numberOfLines={1}>{ev.title}</Text>
+                <Text style={[calS.eventRowTime, { color: theme.content.muted }]}>{ev.allDay ? 'All day' : ev.startTime}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={theme.textDim} />
+              <Ionicons name="chevron-forward" size={16} color={theme.content.muted} />
             </TouchableOpacity>
           ))}
         </View>

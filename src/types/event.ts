@@ -1,5 +1,7 @@
 /** Shared Event domain types — single source of truth. */
 
+export const EVENT_SCHEMA_VERSION = 1;
+
 export interface AppEvent {
   id: string;
   title: string;
@@ -19,4 +21,5 @@ export interface AppEvent {
   alarmActive: boolean;
   recurrence: 'none' | 'daily' | 'weekly' | 'monthly';
   updatedAt?: number;
+  version?: number;
 }

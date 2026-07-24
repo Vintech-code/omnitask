@@ -1,15 +1,22 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import { collection, doc, getDoc, onSnapshot, QuerySnapshot } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
 
-import { auth, db } from '../config/firebase';
+import { useAuth } from './AuthContext';
 import { KEYS, Storage } from '../services/StorageService';
-import { getPendingDeletePaths, queueCloudDelete, queueCloudSet } from '../services/OfflineSyncService';
+import {
+  getPendingMutationPaths,
+  queueCloudSet,
+  recordCloudSnapshot,
+  reportSyncDiagnostic,
+  syncRevision,
+  withoutSyncMetadata,
+} from '../services/OfflineSyncService';
 import { cancelEventNotifications, scheduleEventNotifications } from '../services/EventNotificationService';
 import { syncEventWeatherWarnings } from '../services/EventWeatherNotificationService';
-import type { AppEvent } from '@/types/event';
+import { EVENT_SCHEMA_VERSION, type AppEvent } from '@/types/event';
 import { DEFAULT_EVENT_CATEGORIES, normalizeEventCategories } from '@/utils/eventCategories';
+import { createUserCollectionRepository } from '@/repositories';
+import { migrateVersionedRecords } from '@/services/SchemaMigrationService';
 
 export type { AppEvent };
 
@@ -33,13 +40,25 @@ const EventContext = createContext<EventContextType>({
   addCategory: () => {}, removeCategory: () => {},
 });
 
-const eventsCol = (uid: string) => collection(db, 'users', uid, 'events');
-const eventPath = (uid: string, id: string) => ['users', uid, 'events', id];
+const eventRepository = createUserCollectionRepository<AppEvent>('events');
+const eventPath = eventRepository.path;
 const metaPath = (uid: string) => ['users', uid, 'meta', 'eventMeta'];
 const modified = (event: AppEvent) => event.updatedAt ?? 0;
 const clean = (value: Record<string, unknown>) => Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
+const migrateEvents = (events: AppEvent[]) => migrateVersionedRecords(
+  events,
+  EVENT_SCHEMA_VERSION,
+  event => ({
+    ...event,
+    reminders: Array.isArray(event.reminders) ? event.reminders : [],
+    recurrence: event.recurrence ?? 'none',
+    alarmActive: event.alarmActive ?? false,
+  }),
+);
 
 export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isLoading: authLoading } = useAuth();
+  const authenticatedUid = user?.id ?? null;
   const [events, setEvents] = useState<AppEvent[]>([]);
   const [categories, setCategories] = useState(DEFAULT_EVENT_CATEGORIES);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,58 +93,90 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async firebaseUser => {
+    let disposed = false;
       unsubRef.current?.();
       unsubRef.current = null;
-      if (!firebaseUser) {
+      if (authLoading) return () => { disposed = true; };
+      if (!authenticatedUid) {
         uidRef.current = null;
         eventsRef.current = [];
         setEvents([]);
         categoriesRef.current = DEFAULT_EVENT_CATEGORIES;
         setCategories(DEFAULT_EVENT_CATEGORIES);
         setIsLoading(false);
-        return;
+        return () => { disposed = true; };
       }
 
-      const uid = firebaseUser.uid;
+      const uid = authenticatedUid;
       uidRef.current = uid;
+      setIsLoading(true);
+      void (async () => {
       const [local, localCategories] = await Promise.all([
         Storage.getForUser<AppEvent[]>(KEYS.EVENTS, uid),
         Storage.getForUser<string[]>(KEYS.EVENT_CATEGORIES, uid),
       ]);
-      persist(local ?? []);
+      if (disposed || uidRef.current !== uid) return;
+      const localMigration = migrateEvents(local ?? []);
+      persist(localMigration.records);
+      localMigration.changedIds.forEach(id => {
+        const event = localMigration.records.find(item => item.id === id);
+        if (event) void eventRepository.set(uid, id, clean(event as unknown as Record<string, unknown>));
+      });
       persistCategories([...DEFAULT_EVENT_CATEGORIES, ...(localCategories ?? [])], false);
       setIsLoading(false);
 
-      void getDoc(doc(db, metaPath(uid).join('/'))).then(snapshot => {
-        const cloudCategories = snapshot.data()?.categories;
+      void eventRepository.readMeta(uid, 'eventMeta').then(data => {
+        if (data) void recordCloudSnapshot(uid, metaPath(uid), data);
+        const cloudCategories = data?.categories;
         if (uidRef.current === uid && Array.isArray(cloudCategories)) {
           persistCategories([...categoriesRef.current, ...cloudCategories], false);
         }
       }).catch(() => undefined);
 
-      unsubRef.current = onSnapshot(eventsCol(uid), async (snapshot: QuerySnapshot) => {
+      unsubRef.current = eventRepository.subscribe(uid, async documents => {
         if (uidRef.current !== uid) return;
-        const pendingDeletes = await getPendingDeletePaths(uid);
-        const cloud = snapshot.docs
-          .map(item => item.data() as AppEvent)
-          .filter(item => !pendingDeletes.has(eventPath(uid, item.id).join('/')));
+        const pendingPaths = await getPendingMutationPaths(uid);
+        await Promise.all(documents.map(item =>
+          recordCloudSnapshot(uid, eventPath(uid, item.id), item.raw)
+        ));
+        const cloud = documents
+          .map(item => withoutSyncMetadata<AppEvent>(item.data))
+          .filter(item => !pendingPaths.has(eventPath(uid, item.id).join('/')));
         const merged = new Map(cloud.map(item => [item.id, item]));
         for (const localItem of eventsRef.current) {
           const cloudItem = merged.get(localItem.id);
-          if (!cloudItem || modified(localItem) > modified(cloudItem)) {
+          const path = eventPath(uid, localItem.id).join('/');
+          const rawCloud = documents.find(item => item.id === localItem.id)?.raw;
+          const keepLocal = pendingPaths.has(path)
+            || !cloudItem
+            || syncRevision(rawCloud) === 0 && modified(localItem) > modified(cloudItem);
+          if (keepLocal) {
             merged.set(localItem.id, localItem);
-            void queueCloudSet(uid, eventPath(uid, localItem.id), clean(localItem as unknown as Record<string, unknown>));
+            if (!pendingPaths.has(path)) {
+              void queueCloudSet(uid, eventPath(uid, localItem.id), clean(localItem as unknown as Record<string, unknown>));
+            }
           }
         }
-        persist([...merged.values()]);
-      }, () => undefined);
-    });
+        const migration = migrateEvents([...merged.values()]);
+        persist(migration.records);
+        migration.changedIds.forEach(id => {
+          const event = migration.records.find(item => item.id === id);
+          if (event) void eventRepository.set(uid, id, clean(event as unknown as Record<string, unknown>));
+        });
+      }, error => {
+        void reportSyncDiagnostic(uid, {
+          path: `users/${uid}/events`,
+          severity: 'error',
+          code: 'firestore/events-listen-failed',
+          message: error.message || 'Events could not refresh from the cloud.',
+        });
+      });
+      })();
     return () => {
-      unsubAuth();
+      disposed = true;
       unsubRef.current?.();
     };
-  }, []);
+  }, [authenticatedUid, authLoading]);
 
   useEffect(() => {
     if (!isLoading) syncWeather();
@@ -145,12 +196,12 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const save = (event: AppEvent, isNew: boolean) => {
     const uid = uidRef.current;
     if (!uid) return;
-    const updatedEvent = { ...event, updatedAt: Date.now() };
+    const updatedEvent = { ...event, updatedAt: Date.now(), version: EVENT_SCHEMA_VERSION };
     const updated = isNew
       ? [updatedEvent, ...eventsRef.current]
       : eventsRef.current.map(item => item.id === event.id ? updatedEvent : item);
     persist(updated);
-    void queueCloudSet(uid, eventPath(uid, event.id), clean(updatedEvent as unknown as Record<string, unknown>));
+    void eventRepository.set(uid, event.id, clean(updatedEvent as unknown as Record<string, unknown>));
     if (updatedEvent.alarmActive) {
       void scheduleEventNotifications(updatedEvent).catch(() => undefined);
     } else {
@@ -165,7 +216,7 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const uid = uidRef.current;
     if (!uid) return;
     persist(eventsRef.current.filter(event => event.id !== id));
-    void queueCloudDelete(uid, eventPath(uid, id));
+    void eventRepository.remove(uid, id);
     void cancelEventNotifications(id);
   };
 

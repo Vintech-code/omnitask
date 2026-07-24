@@ -1,22 +1,28 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 import { AppAlert as Alert } from '@/components/ui/AppDialog';
-import {
-  collection, onSnapshot, QuerySnapshot,
-} from 'firebase/firestore';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { FirebaseError } from 'firebase/app';
-import { auth, db } from '../config/firebase';
+import { useAuth } from './AuthContext';
 import { Storage, KEYS } from '../services/StorageService';
-import { flushCloudMutations, getPendingDeletePaths, queueCloudDelete, queueCloudSet } from '../services/OfflineSyncService';
+import {
+  flushCloudMutations,
+  getPendingMutationPaths,
+  recordCloudSnapshot,
+  reportSyncDiagnostic,
+  syncRevision,
+  withoutSyncMetadata,
+} from '../services/OfflineSyncService';
 import {
   cancelAlarmNotifications,
   openExactAlarmSettings,
   reconcileAlarmNotifications,
   scheduleAlarmNotifications,
 } from '../services/NotificationService';
+import { createUserCollectionRepository } from '@/repositories';
+import { migrateVersionedRecords } from '@/services/SchemaMigrationService';
 
 export type Period = 'AM' | 'PM';
+export const ALARM_SCHEMA_VERSION = 1;
 
 export interface Alarm {
   id: string;
@@ -32,6 +38,7 @@ export interface Alarm {
   active: boolean;
   scheduledFor?: number;
   updatedAt?: number;
+  version?: number;
 }
 
 interface AlarmContextType {
@@ -52,7 +59,7 @@ const AlarmContext = createContext<AlarmContextType>({
   toggleAlarm: async () => {},
 });
 
-const alarmsCol = (uid: string) => collection(db, 'users', uid, 'alarms');
+const alarmRepository = createUserCollectionRepository<Alarm>('alarms');
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Unable to schedule this alarm.';
@@ -77,7 +84,23 @@ function deactivateExpiredOneTimeAlarms(alarms: Alarm[]) {
   return { normalized, changed };
 }
 
+const migrateAlarms = (alarms: Alarm[]) => migrateVersionedRecords(
+  alarms,
+  ALARM_SCHEMA_VERSION,
+  alarm => ({
+    ...alarm,
+    days: Array.isArray(alarm.days) && alarm.days.length === 7
+      ? alarm.days
+      : Array.from({ length: 7 }, (_, index) => Boolean(alarm.days?.[index])),
+    snooze: Math.max(0, alarm.snooze ?? 5),
+    vibrate: alarm.vibrate ?? true,
+    active: alarm.active ?? false,
+  }),
+);
+
 export const AlarmProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isLoading: authLoading } = useAuth();
+  const authenticatedUid = user?.id ?? null;
   const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const alarmsRef = useRef<Alarm[]>([]);
@@ -128,10 +151,11 @@ export const AlarmProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     let disposed = false;
 
-    const unsubAuth = onAuthStateChanged(auth, async (fbUser: FirebaseUser | null) => {
+    const startSession = async () => {
       unsubRef.current?.();
       unsubRef.current = null;
-      if (!fbUser) {
+      if (authLoading) return;
+      if (!authenticatedUid) {
         uidRef.current = null;
         cloudSyncBlockedRef.current = false;
         alarmsRef.current = [];
@@ -139,12 +163,19 @@ export const AlarmProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setIsLoading(false);
         return;
       }
-      uidRef.current = fbUser.uid;
+      const uid = authenticatedUid;
+      uidRef.current = uid;
       cloudSyncBlockedRef.current = false;
-      const stored = await Storage.getForUser<Alarm[]>(KEYS.ALARMS, fbUser.uid) ?? [];
-      if (disposed || uidRef.current !== fbUser.uid) return;
-      const { normalized: hydrated } = deactivateExpiredOneTimeAlarms(stored);
+      setIsLoading(true);
+      const stored = await Storage.getForUser<Alarm[]>(KEYS.ALARMS, uid) ?? [];
+      if (disposed || uidRef.current !== uid) return;
+      const localMigration = migrateAlarms(stored);
+      const { normalized: hydrated } = deactivateExpiredOneTimeAlarms(localMigration.records);
       persist(hydrated);
+      localMigration.changedIds.forEach(id => {
+        const alarm = hydrated.find(item => item.id === id);
+        if (alarm) void alarmRepository.set(uid, id, alarm);
+      });
       hydratedRef.current = true;
       setIsLoading(false);
       if (hydrated.some(alarm => alarm.active)) {
@@ -152,32 +183,61 @@ export const AlarmProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           console.warn('Alarm reconciliation failed:', errorMessage(error))
         );
       }
-      void flushCloudMutations(fbUser.uid);
-      unsubRef.current = onSnapshot(
-        alarmsCol(fbUser.uid),
-        async (snap: QuerySnapshot) => {
-          if (uidRef.current !== fbUser.uid) return;
-          const pendingDeletes = await getPendingDeletePaths(fbUser.uid);
-          const fetchedRaw = snap.docs
-            .map(document => document.data() as Alarm)
-            .filter(alarm => !pendingDeletes.has(`users/${fbUser.uid}/alarms/${alarm.id}`));
+      void flushCloudMutations(uid);
+      unsubRef.current = alarmRepository.subscribe(
+        uid,
+        async documents => {
+          if (uidRef.current !== uid) return;
+          const pendingPaths = await getPendingMutationPaths(uid);
+          await Promise.all(documents.map(document =>
+            recordCloudSnapshot(
+              uid,
+              alarmRepository.path(uid, document.id),
+              document.raw,
+            )
+          ));
+          const fetchedRaw = documents
+            .map(document => withoutSyncMetadata<Alarm>(document.data))
+            .filter(alarm => !pendingPaths.has(`users/${uid}/alarms/${alarm.id}`));
           const merged = new Map(fetchedRaw.map(alarm => [alarm.id, alarm]));
           for (const local of alarmsRef.current) {
             const remote = merged.get(local.id);
-            if (!remote || (local.updatedAt ?? 0) > (remote.updatedAt ?? 0)) {
+            const path = `users/${uid}/alarms/${local.id}`;
+            const rawRemote = documents.find(document => document.id === local.id)?.raw;
+            const keepLocal = pendingPaths.has(path)
+              || !remote
+              || syncRevision(rawRemote) === 0
+                && (local.updatedAt ?? 0) > (remote.updatedAt ?? 0);
+            if (keepLocal) {
               merged.set(local.id, local);
-              void queueCloudSet(fbUser.uid, ['users', fbUser.uid, 'alarms', local.id], local as unknown as Record<string, unknown>);
+              if (!pendingPaths.has(path)) {
+                void alarmRepository.set(uid, local.id, local);
+              }
             }
           }
-          const { normalized: fetched } = deactivateExpiredOneTimeAlarms([...merged.values()]);
+          const migration = migrateAlarms([...merged.values()]);
+          const { normalized: fetched } = deactivateExpiredOneTimeAlarms(migration.records);
           persist(fetched);
+          migration.changedIds.forEach(id => {
+            const alarm = fetched.find(item => item.id === id);
+            if (alarm) void alarmRepository.set(uid, id, alarm);
+          });
           void reconcileAlarmNotifications(fetched).catch(error =>
             console.warn('Cloud alarm reconciliation failed:', errorMessage(error))
           );
         },
-        error => handleCloudError('Alarm sync failed:', error),
+        error => {
+          handleCloudError('Alarm sync failed:', error);
+          void reportSyncDiagnostic(uid, {
+            path: `users/${uid}/alarms`,
+            severity: 'error',
+            code: 'firestore/alarms-listen-failed',
+            message: error.message || 'Alarms could not refresh from the cloud.',
+          });
+        },
       );
-    });
+    };
+    void startSession();
 
     const appStateSubscription = AppState.addEventListener('change', state => {
       if (state !== 'active' || !hydratedRef.current) return;
@@ -193,25 +253,24 @@ export const AlarmProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     return () => {
       disposed = true;
-      unsubAuth();
       unsubRef.current?.();
       appStateSubscription.remove();
     };
-  }, []);
+  }, [authenticatedUid, authLoading]);
 
   const addAlarm = async (alarm: Alarm) => {
-    const saved = { ...alarm, updatedAt: Date.now() };
+    const saved = { ...alarm, updatedAt: Date.now(), version: ALARM_SCHEMA_VERSION };
     if (saved.active) await scheduleAlarmNotifications(saved);
     const updated = [...alarmsRef.current, saved];
     persist(updated);
     if (uidRef.current) {
-      void queueCloudSet(uidRef.current, ['users', uidRef.current, 'alarms', saved.id], saved as unknown as Record<string, unknown>);
+      void alarmRepository.set(uidRef.current, saved.id, saved);
     }
     if (saved.active) void maybeOfferExactAlarmAccess();
   };
 
   const updateAlarm = async (alarm: Alarm) => {
-    const saved = { ...alarm, updatedAt: Date.now() };
+    const saved = { ...alarm, updatedAt: Date.now(), version: ALARM_SCHEMA_VERSION };
     const previous = alarmsRef.current.find(item => item.id === alarm.id);
     try {
       if (saved.active) await scheduleAlarmNotifications(saved);
@@ -228,7 +287,7 @@ export const AlarmProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const updated = alarmsRef.current.map(item => item.id === saved.id ? saved : item);
     persist(updated);
     if (uidRef.current) {
-      void queueCloudSet(uidRef.current, ['users', uidRef.current, 'alarms', saved.id], saved as unknown as Record<string, unknown>);
+      void alarmRepository.set(uidRef.current, saved.id, saved);
     }
     if (saved.active) void maybeOfferExactAlarmAccess();
   };
@@ -237,21 +296,21 @@ export const AlarmProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await cancelAlarmNotifications(id);
     persist(alarmsRef.current.filter(alarm => alarm.id !== id));
     if (uidRef.current) {
-      void queueCloudDelete(uidRef.current, ['users', uidRef.current, 'alarms', id]);
+      void alarmRepository.remove(uidRef.current, id);
     }
   };
 
   const toggleAlarm = async (id: string) => {
     const current = alarmsRef.current.find(alarm => alarm.id === id);
     if (!current) return;
-    const toggled = { ...current, active: !current.active, updatedAt: Date.now() };
+    const toggled = { ...current, active: !current.active, updatedAt: Date.now(), version: ALARM_SCHEMA_VERSION };
     if (toggled.active) await scheduleAlarmNotifications(toggled);
     else await cancelAlarmNotifications(id);
 
     const updated = alarmsRef.current.map(alarm => alarm.id === id ? toggled : alarm);
     persist(updated);
     if (uidRef.current) {
-      void queueCloudSet(uidRef.current, ['users', uidRef.current, 'alarms', id], toggled as unknown as Record<string, unknown>);
+      void alarmRepository.set(uidRef.current, id, toggled);
     }
     if (toggled.active) void maybeOfferExactAlarmAccess();
   };

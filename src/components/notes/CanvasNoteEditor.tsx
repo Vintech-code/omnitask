@@ -1,7 +1,7 @@
 import { fontFamily } from '@/theme/typography';
 import { OMNITASK_PALETTE } from '@/theme/colors';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, KeyboardAvoidingView, Modal, PanResponder, Platform, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, PanResponder, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { AppAlert as Alert } from '@/components/ui/AppDialog';
 import { AppText as Text, AppTextInput as TextInput } from '@/components/ui/AppText';
 import { OmniLoader } from '@/components/ui/OmniLoader';
@@ -12,6 +12,7 @@ import Svg, { Defs, G, Path, Pattern, Rect } from 'react-native-svg';
 
 import { useTheme } from '@/context/ThemeContext';
 import { useTaskStore } from '@/context/TaskStore';
+import { useAttachments } from '@/context/AttachmentContext';
 import { useEvents } from '@/context/EventStore';
 import { useAuth } from '@/context/AuthContext';
 import { CANVAS_DOCUMENT_VERSION, type CanvasCollaborationMember, type CanvasObject, type CanvasObjectType, type CanvasPoint, type InfiniteCanvasNote } from '@/types/note';
@@ -38,21 +39,24 @@ import {
   type CanvasSnapGuide,
 } from '@/utils/canvasMath';
 import { createCanvasConnector, getCanvasConnectorGeometry, hasCanvasConnector, removeDanglingCanvasConnectors } from '@/utils/canvasConnectors';
+import { CanvasObjectView, type CanvasReferenceAppearance } from './CanvasObjectView';
+import { useCanvasViewportObjects } from '@/hooks/useCanvasViewportObjects';
 import { CanvasExportSheet } from './CanvasExportSheet';
 import { saveCanvasThumbnail } from '@/services/CanvasDocumentService';
 import { recognizeHandwriting } from '@/services/HandwritingRecognitionService';
 import {
   createCanvasCollaboration,
-  createCanvasInvite,
+  canEditCanvas,
   leaveCanvasCollaboration,
   mergeCanvasObjects,
-  removeCanvasCollaborator,
   saveCollaborativeCanvas,
   setCanvasPresence,
   stopCanvasCollaboration,
   subscribeCanvasCollaboration,
+  updateCanvasPresenceCursor,
   type CanvasPresence,
 } from '@/services/CanvasCollaborationService';
+import { CanvasCollaborationPanel } from './CanvasCollaborationPanel';
 
 type Tool = 'hand' | 'select' | 'pen' | 'highlighter' | 'eraser';
 type Props = { note: InfiniteCanvasNote; onSave: (note: InfiniteCanvasNote) => void; onClose: () => void };
@@ -74,66 +78,10 @@ function newObject(type: CanvasObjectType, layer: number): CanvasObject {
   return base;
 }
 
-function CanvasObjectView({ object, selected, enabled, cleanExport, pan, zoom, referenceItem, referenceAppearance, onToggleReference, onSelect, onMove, onMoveEnd }: {
-  object: CanvasObject; selected: boolean; pan: CanvasPoint; zoom: number;
-  enabled: boolean; cleanExport: boolean;
-  referenceItem: CanvasReferenceItem | null;
-  referenceAppearance: { surface: string; border: string; primary: string; secondary: string; accent: string; accentSoft: string; danger: string };
-  onToggleReference: () => void;
-  onSelect: () => void; onMove: (delta: CanvasPoint) => void; onMoveEnd: () => void;
-}) {
-  const live = useRef({ object, enabled, zoom, onSelect, onMove, onMoveEnd });
-  live.current = { object, enabled, zoom, onSelect, onMove, onMoveEnd };
-  const responder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => live.current.enabled,
-    onMoveShouldSetPanResponder: () => live.current.enabled,
-    onPanResponderGrant: () => {
-      live.current.onSelect();
-    },
-    onPanResponderMove: (_, gesture) => live.current.onMove({ x: gesture.dx / live.current.zoom, y: gesture.dy / live.current.zoom }),
-    onPanResponderRelease: () => live.current.onMoveEnd(),
-    onPanResponderTerminate: () => live.current.onMoveEnd(),
-    onPanResponderTerminationRequest: () => false,
-  }), []);
-
-  if (object.type === 'drawing' || object.type === 'connector') return null;
-
-  const frame = {
-    position: 'absolute' as const,
-    left: pan.x + object.position.x * zoom,
-    top: pan.y + object.position.y * zoom - ((object.type === 'line' || object.type === 'arrow') ? 17 : 0),
-    width: object.size.width * zoom,
-    height: (object.type === 'line' || object.type === 'arrow') ? 44 : Math.max(32, object.size.height * zoom),
-    zIndex: object.layer,
-    transform: [{ rotate: `${object.rotation}deg` }],
-  };
-  const border = selected && !cleanExport ? { borderColor: OMNITASK_PALETTE.actionBlue, borderWidth: 2 } : undefined;
-  const commonText = { color: object.style.color, fontSize: (object.style.fontSize ?? 18) * zoom, fontFamily: object.style.bold ? fontFamily.extrabold : fontFamily.medium, fontStyle: object.style.italic ? 'italic' as const : 'normal' as const, textDecorationLine: object.style.underline ? 'underline' as const : 'none' as const };
-
-  return (
-    <View accessibilityLabel={`${object.type} canvas object`} {...responder.panHandlers} style={[frame, styles.objectFrame, border]}>
-      {object.type === 'image' && object.imageUri ? <Image source={{ uri: object.imageUri }} style={styles.fill} resizeMode="contain" /> : null}
-      {object.type === 'text' ? <Text style={commonText}>{object.content}</Text> : null}
-      {object.type === 'sticky' ? <View style={[styles.fill, styles.sticky, { backgroundColor: cleanExport ? 'transparent' : object.style.backgroundColor }]}><Text style={commonText}>{object.content}</Text></View> : null}
-      {object.type === 'rectangle' ? <View style={[styles.fill, styles.shape, { borderColor: object.style.color, backgroundColor: cleanExport ? 'transparent' : object.style.backgroundColor }]} /> : null}
-      {object.type === 'circle' ? <View style={[styles.fill, styles.shape, { borderRadius: 999, borderColor: object.style.color, backgroundColor: cleanExport ? 'transparent' : object.style.backgroundColor }]} /> : null}
-      {(object.type === 'line' || object.type === 'arrow') ? <View style={[styles.horizontalLine, { backgroundColor: object.style.color, height: Math.max(2, (object.style.strokeWidth ?? 3) * zoom) }]}>{object.type === 'arrow' ? <View style={[styles.arrowHead, { borderLeftColor: object.style.color }]} /> : null}</View> : null}
-      {object.type === 'reference' ? <View style={[styles.fill, styles.referenceCard, { backgroundColor: referenceAppearance.surface, borderColor: referenceAppearance.border }]}>
-        <View style={styles.referenceHeading}>
-          <View style={[styles.referenceIcon, { backgroundColor: referenceAppearance.accentSoft }]}><MaterialCommunityIcons name={object.reference?.kind === 'task' ? 'checkbox-marked-outline' : object.reference?.kind === 'event' ? 'calendar-outline' : 'note-text-outline'} size={17 * zoom} color={referenceItem ? referenceAppearance.accent : referenceAppearance.danger} /></View>
-          <Text style={[styles.referenceKind, { color: referenceItem ? referenceAppearance.accent : referenceAppearance.danger, fontSize: 10 * zoom }]}>{referenceItem ? referenceItem.kind : 'Missing item'}</Text>
-          {referenceItem?.kind === 'task' ? <TouchableOpacity accessibilityLabel={referenceItem.completed ? 'Mark task incomplete' : 'Mark task complete'} style={styles.referenceToggle} onPress={onToggleReference}><MaterialCommunityIcons name={referenceItem.completed ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'} size={23 * zoom} color={referenceItem.completed ? referenceAppearance.accent : referenceAppearance.secondary} /></TouchableOpacity> : null}
-        </View>
-        <Text numberOfLines={2} style={[styles.referenceTitle, { color: referenceAppearance.primary, fontSize: 16 * zoom, textDecorationLine: referenceItem?.completed ? 'line-through' : 'none' }]}>{referenceItem?.title ?? object.content ?? 'Linked item was deleted'}</Text>
-        <Text numberOfLines={2} style={[styles.referenceSubtitle, { color: referenceAppearance.secondary, fontSize: 11 * zoom }]}>{referenceItem?.subtitle ?? 'Remove this card or link the item again.'}</Text>
-      </View> : null}
-    </View>
-  );
-}
-
 export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
   const { theme } = useTheme();
-  const { notes, updateNote } = useTaskStore();
+  const { notes, tasks, setTaskStatus } = useTaskStore();
+  const { importImage } = useAttachments();
   const { events } = useEvents();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -170,12 +118,14 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
   const [collaborationMembers, setCollaborationMembers] = useState<CanvasCollaborationMember[]>([]);
   const [onlineCollaborators, setOnlineCollaborators] = useState<CanvasPresence[]>([]);
   const [collaborationBusy, setCollaborationBusy] = useState(false);
-  const [latestInviteCode, setLatestInviteCode] = useState<string | null>(null);
   const canvasCaptureRef = useRef<View>(null);
   const saveInFlight = useRef(false);
+  const saveAcknowledgeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
   const lastCollaborativeObjects = useRef(note.objects);
   const saveStateRef = useRef(saveState);
   const canvasSize = useRef({ width: 360, height: 560 });
+  const [viewportSize, setViewportSize] = useState({ width: 360, height: 560 });
   const objectsRef = useRef(objects);
   const selectedIdsRef = useRef(selectedIds);
   const panRef = useRef(pan);
@@ -189,17 +139,39 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
   const pinch = useRef<PinchSession>({ active: false, startDistance: 0, startZoom: zoom, anchor: { x: 0, y: 0 } });
   const drawingId = useRef<string | null>(null);
   const latestDrawingPoint = useRef<CanvasPoint | null>(null);
+  const lastPresenceCursorAt = useRef(0);
+  const collaborationEndingRef = useRef(false);
   const moveSnapshot = useRef<CanvasObject[] | null>(null);
   const moveSelectionIds = useRef<string[]>([]);
   const moveChanged = useRef(false);
   const lassoStart = useRef<CanvasPoint | null>(null);
   const lassoRect = useRef<CanvasBounds | null>(null);
   const hydrated = useRef(false);
-  const referenceItems = useMemo(() => buildCanvasReferenceItems(notes, events), [events, notes]);
-  const referencePickerItems = useMemo(() => referenceItems.filter(item => item.kind === referenceKind), [referenceItems, referenceKind]);
-  const displayObjects = objects;
+  const referenceItems = useMemo(() => buildCanvasReferenceItems(tasks, notes, events), [events, notes, tasks]);
+  const referencePickerItems = useMemo(() => referenceItems.filter(item => item.kind === referenceKind && !item.legacy), [referenceItems, referenceKind]);
+  const referenceAppearance = useMemo<CanvasReferenceAppearance>(() => ({
+    surface: theme.glass.solid,
+    border: theme.glass.border,
+    primary: theme.content.primary,
+    secondary: theme.content.secondary,
+    accent: theme.accent.base,
+    accentSoft: theme.accent.soft,
+    danger: theme.semantic.danger,
+  }), [theme]);
+  const displayObjects = useCanvasViewportObjects(objects, viewportSize, pan, zoom, selectedIds);
+  const currentCollaborationMember = collaborationMembers.find(member => member.uid === user?.id);
+  const collaborationEditable = !collaborationId
+    || collaborationOwnerId === user?.id
+    || Boolean(currentCollaborationMember && canEditCanvas(currentCollaborationMember.role));
 
   const boardPoint = (x: number, y: number): CanvasPoint => ({ x: (x - panRef.current.x) / zoomRef.current, y: (y - panRef.current.y) / zoomRef.current });
+  const acknowledgeSaved = () => {
+    if (saveAcknowledgeTimer.current) clearTimeout(saveAcknowledgeTimer.current);
+    saveAcknowledgeTimer.current = setTimeout(() => {
+      if (mountedRef.current) setSaveState('saved');
+      saveAcknowledgeTimer.current = null;
+    }, 320);
+  };
   const replace = (next: CanvasObject[], withHistory = true) => {
     if (withHistory) setHistory(items => [...items.slice(-39), objects]);
     setFuture([]);
@@ -216,12 +188,13 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
     // Editable document persistence is the critical path and must never wait for
     // native view capture. Some Android devices can delay captureRef indefinitely.
     onSave(document);
-    if (collaborationId) {
+    if (collaborationId && collaborationEditable) {
       void saveCollaborativeCanvas(collaborationId, document, lastCollaborativeObjects.current).then(() => {
         lastCollaborativeObjects.current = document.objects;
         saveInFlight.current = false;
-        setTimeout(() => setSaveState('saved'), 320);
+        acknowledgeSaved();
       }).catch(error => {
+        if (!mountedRef.current) return;
         saveInFlight.current = false;
         setSaveState('unsaved');
         Alert.alert('Shared canvas not synced', error instanceof Error ? error.message : 'Your local copy is safe. Try saving again.');
@@ -230,7 +203,7 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
       saveInFlight.current = false;
       // Keep the acknowledgement visible long enough to be perceived; React would
       // otherwise batch "saving" and "saved" into one frame.
-      setTimeout(() => setSaveState('saved'), 320);
+      acknowledgeSaved();
     }
 
     // Thumbnail generation is deliberately best-effort and runs after the board
@@ -250,6 +223,23 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
   }, [grid, objects, pan, snapEnabled, title, zoom]);
 
   useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (saveAcknowledgeTimer.current) clearTimeout(saveAcknowledgeTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!collaborationEditable) {
+      setTool('hand');
+      setSelectedIds([]);
+      setInspector(false);
+      setArrangeOpen(false);
+    }
+  }, [collaborationEditable]);
+
+  useEffect(() => {
     if (!collaborationId || !user) return;
     let removePresence: (() => Promise<void>) | null = null;
     void setCanvasPresence(collaborationId, user.name).then(remove => { removePresence = remove; }).catch(() => undefined);
@@ -257,6 +247,7 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
       setCollaborationMembers(snapshot.members);
       setOnlineCollaborators(snapshot.online);
       const remote = snapshot.note;
+      setCollaborationOwnerId(remote.collaborationOwnerId ?? null);
       const isOwnEcho = snapshot.lastEditorId === user.id;
       if (!isOwnEcho) {
         const hasLocalChanges = saveStateRef.current === 'unsaved' || saveStateRef.current === 'saving';
@@ -277,36 +268,26 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
       } else {
         lastCollaborativeObjects.current = remote.objects;
       }
-    }, message => Alert.alert('Collaboration connection', message));
+    }, message => {
+      if (!collaborationEndingRef.current) {
+        Alert.alert('Collaboration connection', message);
+      }
+    });
     return () => {
       unsubscribe();
       if (removePresence) void removePresence();
     };
   }, [collaborationId, user?.id]);
 
-  const shareInvite = async () => {
-    if (!collaborationId || collaborationBusy) return;
-    setCollaborationBusy(true);
-    try {
-      const code = latestInviteCode ?? await createCanvasInvite(collaborationId);
-      setLatestInviteCode(code);
-      await Share.share({ message: code });
-    } catch (error) {
-      Alert.alert('Could not share invite', error instanceof Error ? error.message : 'Try again.');
-    } finally {
-      setCollaborationBusy(false);
-    }
-  };
-
   const startCollaboration = async () => {
     if (collaborationBusy || !user) return;
     setCollaborationBusy(true);
+    collaborationEndingRef.current = false;
     try {
       const document = currentDocument();
       const result = await createCanvasCollaboration(document);
       setCollaborationId(result.boardId);
       setCollaborationOwnerId(user.id);
-      setLatestInviteCode(result.inviteCode);
       lastCollaborativeObjects.current = document.objects;
       onSave({ ...document, collaborationId: result.boardId, collaborationOwnerId: user.id });
       Alert.alert('Collaboration is live', 'Your board is private to you and invited collaborators. Invite codes work for 3 days; joined collaborators keep access until they leave, are removed, or you stop sharing.');
@@ -323,7 +304,6 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
     setCollaborationOwnerId(null);
     setCollaborationMembers([]);
     setOnlineCollaborators([]);
-    setLatestInviteCode(null);
     onSave(local);
   };
 
@@ -333,29 +313,32 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
     Alert.alert(owner ? 'Stop collaboration?' : 'Leave shared canvas?', owner ? 'Collaborators will lose access. Your local board will remain editable.' : 'Your local copy will remain, but it will stop receiving live updates.', [
       { text: 'Cancel', style: 'cancel' },
       { text: owner ? 'Stop sharing' : 'Leave', style: 'destructive', onPress: async () => {
+        const localDocument = currentDocument();
+        collaborationEndingRef.current = true;
         setCollaborationBusy(true);
+        setCollaborationOpen(false);
         try {
           if (owner) await stopCanvasCollaboration(collaborationId); else await leaveCanvasCollaboration(collaborationId);
-          detachCollaboration(currentDocument());
-          setCollaborationOpen(false);
+          detachCollaboration(localDocument);
         } catch (error) {
-          Alert.alert(owner ? 'Could not stop sharing' : 'Could not leave canvas', error instanceof Error ? error.message : 'Try again.');
+          const message = error instanceof Error ? error.message : 'Try again.';
+          const remoteAccessAlreadyGone = /do not have access|no longer available/i.test(message);
+          if (remoteAccessAlreadyGone) {
+            // Recover local boards left linked by an earlier partial stop. The
+            // editable local copy is preserved while the dead remote link ends.
+            detachCollaboration(localDocument);
+            Alert.alert(
+              owner ? 'Sharing stopped' : 'Shared canvas left',
+              'The remote collaboration was already unavailable. Your local board remains editable.',
+            );
+          } else {
+            collaborationEndingRef.current = false;
+            setCollaborationOpen(true);
+            Alert.alert(owner ? 'Could not stop sharing' : 'Could not leave canvas', message);
+          }
         } finally {
           setCollaborationBusy(false);
         }
-      } },
-    ]);
-  };
-
-  const removeMember = (member: CanvasCollaborationMember) => {
-    if (!collaborationId || collaborationBusy) return;
-    Alert.alert(`Remove ${member.name}?`, 'They will immediately lose access to this shared canvas.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: async () => {
-        setCollaborationBusy(true);
-        try { await removeCanvasCollaborator(collaborationId, member.uid); }
-        catch (error) { Alert.alert('Could not remove collaborator', error instanceof Error ? error.message : 'Try again.'); }
-        finally { setCollaborationBusy(false); }
       } },
     ]);
   };
@@ -395,15 +378,8 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
   };
 
   const toggleReferenceTask = (item: CanvasReferenceItem | null) => {
-    if (!item || item.kind !== 'task' || !item.parentId) return;
-    const parent = notes.find(value => value.id === item.parentId);
-    if (!parent) return;
-    updateNote({ ...parent, todos: (parent.todos ?? []).map(todo => {
-      if (todo.id !== item.id) return todo;
-      if (!todo.done) return { ...todo, done: true, completedAt: Date.now() };
-      const { completedAt: _completedAt, ...incomplete } = todo;
-      return { ...incomplete, done: false };
-    }) });
+    if (!item || item.kind !== 'task' || !item.taskId) return;
+    void setTaskStatus(item.taskId, item.completed ? 'inbox' : 'completed');
   };
 
   const pickImage = async (camera = false) => {
@@ -413,9 +389,24 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
       ? await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.8 })
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.8 });
     if (!result.canceled && result.assets[0]?.uri) {
+      const asset = result.assets[0];
       const center = boardPoint(canvasSize.current.width / 2, canvasSize.current.height / 2);
-      const object = { ...newObject('image', Math.max(0, ...objects.map(item => item.layer)) + 1), imageUri: result.assets[0].uri, size: { width: 240, height: 180 }, position: { x: center.x - 120, y: center.y - 90 } };
-      replace([...objects, object]); setSelectedIds([object.id]); setMultiSelect(false); setTool('select');
+      try {
+        const attachment = await importImage({
+          uri: asset.uri,
+          purpose: 'canvas',
+          parentId: note.id,
+          mimeType: asset.mimeType,
+          fileName: asset.fileName,
+          fileSize: asset.fileSize,
+          width: asset.width,
+          height: asset.height,
+        });
+        const object = { ...newObject('image', Math.max(0, ...objects.map(item => item.layer)) + 1), attachmentId: attachment.id, imageUri: attachment.localUri, size: { width: 240, height: 180 }, position: { x: center.x - 120, y: center.y - 90 } };
+        replace([...objects, object]); setSelectedIds([object.id]); setMultiSelect(false); setTool('select');
+      } catch (error) {
+        Alert.alert('Could not attach image', error instanceof Error ? error.message : 'Please try another image.');
+      }
     }
   };
 
@@ -518,6 +509,13 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
     },
     onPanResponderMove: (event, gesture) => {
       const touches = event.nativeEvent.touches;
+      if (collaborationId && touches[0] && Date.now() - lastPresenceCursorAt.current >= 250) {
+        lastPresenceCursorAt.current = Date.now();
+        void updateCanvasPresenceCursor(
+          collaborationId,
+          boardPoint(touches[0].locationX, touches[0].locationY),
+        ).catch(() => undefined);
+      }
       if (touches.length >= 2) {
         if (!pinch.current.active && !beginPinch(touches)) return;
         const viewport = updatePinchSession(pinch.current, touches);
@@ -559,7 +557,7 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
       setSnapGuides([]);
     },
     onPanResponderTerminationRequest: () => false,
-  }), [multiSelect, snapEnabled, strokeColor, strokeWidth, tool]);
+  }), [collaborationId, multiSelect, snapEnabled, strokeColor, strokeWidth, tool]);
 
   const selectedObjects = objects.filter(item => selectedIds.includes(item.id));
   const selected = selectedObjects.length === 1 ? selectedObjects[0] : null;
@@ -671,9 +669,9 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background.base }]} edges={['top', 'bottom']}>
       <View style={[styles.topBar, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}> 
         <TouchableOpacity style={styles.iconButton} onPress={() => { saveNow(); onClose(); }}><Ionicons name="chevron-back" size={24} color={theme.content.primary} /></TouchableOpacity>
-        <View style={styles.titleColumn}><TextInput value={title} onChangeText={setTitle} placeholder="Board title" placeholderTextColor={theme.content.muted} style={[styles.titleInput, { color: theme.content.primary }]} /><Text style={[styles.saveStatus, { color: saveState === 'unsaved' ? theme.semantic.warning : theme.content.muted }]}>{saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Unsaved changes'}</Text></View>
-        <TouchableOpacity accessibilityLabel="Undo canvas change" style={styles.iconButton} onPress={undo} disabled={!history.length}><Ionicons name="arrow-undo" size={20} color={history.length ? theme.content.primary : theme.content.muted} /></TouchableOpacity>
-        <TouchableOpacity accessibilityLabel="Redo canvas change" style={styles.iconButton} onPress={redo} disabled={!future.length}><Ionicons name="arrow-redo" size={20} color={future.length ? theme.content.primary : theme.content.muted} /></TouchableOpacity>
+        <View style={styles.titleColumn}><TextInput editable={collaborationEditable} value={title} onChangeText={setTitle} placeholder="Board title" placeholderTextColor={theme.content.muted} style={[styles.titleInput, { color: theme.content.primary }]} /><Text style={[styles.saveStatus, { color: saveState === 'unsaved' ? theme.semantic.warning : theme.content.muted }]}>{!collaborationEditable ? `${currentCollaborationMember?.role ?? 'viewer'} access` : saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Unsaved changes'}</Text></View>
+        <TouchableOpacity accessibilityLabel="Undo canvas change" style={styles.iconButton} onPress={undo} disabled={!history.length || !collaborationEditable}><Ionicons name="arrow-undo" size={20} color={history.length && collaborationEditable ? theme.content.primary : theme.content.muted} /></TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Redo canvas change" style={styles.iconButton} onPress={redo} disabled={!future.length || !collaborationEditable}><Ionicons name="arrow-redo" size={20} color={future.length && collaborationEditable ? theme.content.primary : theme.content.muted} /></TouchableOpacity>
         <TouchableOpacity accessibilityLabel="Canvas collaboration" style={styles.iconButton} onPress={() => setCollaborationOpen(true)}><View><Ionicons name={collaborationId ? 'people' : 'people-outline'} size={22} color={collaborationId ? theme.accent.base : theme.content.primary} />{onlineCollaborators.length > 1 ? <View style={[styles.onlineDot, { backgroundColor: theme.semantic.success }]} /> : null}</View></TouchableOpacity>
         <TouchableOpacity accessibilityLabel="Export, share, or print canvas" style={styles.iconButton} onPress={() => setExportOpen(true)}><Ionicons name="share-outline" size={22} color={theme.accent.base} /></TouchableOpacity>
       </View>
@@ -682,7 +680,13 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
         ref={canvasCaptureRef}
         collapsable={false}
         style={[styles.canvas, { backgroundColor: theme.dark ? '#151614' : '#F8F8F5' }]}
-        onLayout={event => { canvasSize.current = event.nativeEvent.layout; }}
+        onLayout={event => {
+          const { width, height } = event.nativeEvent.layout;
+          canvasSize.current = { width, height };
+          setViewportSize(current =>
+            current.width === width && current.height === height ? current : { width, height }
+          );
+        }}
         {...boardResponder.panHandlers}
       >
         <Svg pointerEvents="none" width="100%" height="100%" style={StyleSheet.absoluteFill}>
@@ -702,15 +706,34 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
           </G>
         </Svg>
         {[...displayObjects].sort((a, b) => a.layer - b.layer).map(object => (
-          <CanvasObjectView key={object.id} object={object} selected={selectedIds.includes(object.id)} enabled={tool === 'select'} cleanExport={cleanExport} pan={pan} zoom={zoom}
+          <CanvasObjectView key={object.id} object={object} selected={selectedIds.includes(object.id)} enabled={collaborationEditable && tool === 'select'} cleanExport={cleanExport} pan={pan} zoom={zoom}
             referenceItem={resolveCanvasReference(object, referenceItems)}
-            referenceAppearance={{ surface: theme.glass.solid, border: theme.glass.border, primary: theme.content.primary, secondary: theme.content.secondary, accent: theme.accent.base, accentSoft: theme.accent.soft, danger: theme.semantic.danger }}
+            referenceAppearance={referenceAppearance}
             onToggleReference={() => toggleReferenceTask(resolveCanvasReference(object, referenceItems))}
             onSelect={() => beginObjectMove(object)}
             onMove={moveObjectSelection}
             onMoveEnd={finishObjectMove} />
         ))}
-        {tool === 'select' ? objects.filter(object => object.type === 'connector').map(object => { const geometry = getCanvasConnectorGeometry(object, objects); return geometry ? <TouchableOpacity key={object.id} accessibilityLabel="Select anchored connector" style={[styles.connectorHandle, { left: pan.x + geometry.midpoint.x * zoom - 22, top: pan.y + geometry.midpoint.y * zoom - 22 }]} onPress={() => { selectedIdsRef.current = [object.id]; setSelectedIds([object.id]); setMultiSelect(false); }}><View style={[styles.connectorDot, { backgroundColor: selectedIds.includes(object.id) ? theme.accent.base : theme.content.muted }]} /></TouchableOpacity> : null; }) : null}
+        {!cleanExport ? onlineCollaborators.filter(person => person.uid !== user?.id && person.cursor).map(person => (
+          <View
+            key={`cursor_${person.uid}`}
+            pointerEvents="none"
+            style={[
+              styles.collaboratorCursor,
+              {
+                left: pan.x + person.cursor!.x * zoom,
+                top: pan.y + person.cursor!.y * zoom,
+                backgroundColor: theme.accent.base,
+              },
+            ]}
+          >
+            <Ionicons name="navigate" size={13} color={theme.iconTile.foreground} />
+            <Text numberOfLines={1} style={[styles.collaboratorCursorName, { color: theme.iconTile.foreground }]}>
+              {person.name}
+            </Text>
+          </View>
+        )) : null}
+        {tool === 'select' ? displayObjects.filter(object => object.type === 'connector').map(object => { const geometry = getCanvasConnectorGeometry(object, objects); return geometry ? <TouchableOpacity key={object.id} accessibilityLabel="Select anchored connector" style={[styles.connectorHandle, { left: pan.x + geometry.midpoint.x * zoom - 22, top: pan.y + geometry.midpoint.y * zoom - 22 }]} onPress={() => { selectedIdsRef.current = [object.id]; setSelectedIds([object.id]); setMultiSelect(false); }}><View style={[styles.connectorDot, { backgroundColor: selectedIds.includes(object.id) ? theme.accent.base : theme.content.muted }]} /></TouchableOpacity> : null; }) : null}
         {!cleanExport && selectedIds.length > 1 && selectionBounds ? <View pointerEvents="none" style={[styles.multiSelectionFrame, { left: pan.x + selectionBounds.left * zoom, top: pan.y + selectionBounds.top * zoom, width: Math.max(1, selectionBounds.width * zoom), height: Math.max(1, selectionBounds.height * zoom), borderColor: theme.accent.base }]} /> : null}
         {!cleanExport ? snapGuides.map(guide => <View key={`${guide.axis}_${guide.position}_${guide.kind}`} pointerEvents="none" style={[styles.snapGuide, guide.axis === 'vertical' ? { left: pan.x + guide.position * zoom, top: 0, bottom: 0, width: guide.kind === 'object' ? 2 : 1 } : { top: pan.y + guide.position * zoom, left: 0, right: 0, height: guide.kind === 'object' ? 2 : 1 }, { backgroundColor: theme.accent.base, opacity: guide.kind === 'object' ? 0.9 : 0.5 }]} />) : null}
         {!cleanExport && selectionRect ? <View pointerEvents="none" style={[styles.lasso, { left: pan.x + selectionRect.left * zoom, top: pan.y + selectionRect.top * zoom, width: selectionRect.width * zoom, height: selectionRect.height * zoom, borderColor: theme.accent.base, backgroundColor: theme.accent.soft }]} /> : null}
@@ -719,7 +742,7 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
           <Text style={[styles.zoomText, { color: theme.content.secondary }]}>{Math.round(zoom * 100)}%</Text>
           <TouchableOpacity accessibilityLabel="Zoom in" style={styles.zoomButton} onPress={() => setZoom(value => Math.min(2.5, value + 0.1))}><Ionicons name="add" size={18} color={theme.content.primary} /></TouchableOpacity>
         </View> : null}
-        {!cleanExport ? <>
+        {!cleanExport && collaborationEditable ? <>
           <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: toolsOpen }} accessibilityLabel={toolsOpen ? 'Hide canvas tools' : 'Show canvas tools'} style={[styles.toolsToggle, { backgroundColor: toolsOpen ? theme.accent.base : theme.glass.solid, borderColor: theme.glass.border }]} onPress={() => setToolsOpen(value => !value)}><MaterialCommunityIcons name={toolsOpen ? 'close' : 'tools'} size={22} color={toolsOpen ? '#FFF' : theme.content.primary} /></TouchableOpacity>
           {toolsOpen ? <View style={[styles.sideTools, { bottom: selectedIds.length ? 76 : 12, backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sideToolsContent}>
             {([['hand', 'hand-back-left-outline', 'Hand'], ['select', 'cursor-default-click-outline', 'Select'], ['pen', 'pencil-outline', 'Pen'], ['highlighter', 'brush-outline', 'Highlight'], ['eraser', 'eraser', 'Eraser']] as const).map(([value, icon, label]) => <TouchableOpacity key={value} accessibilityLabel={`${label} tool`} style={[styles.railButton, tool === value && { backgroundColor: theme.accent.soft }]} onPress={() => { setTool(value); if (value !== 'select') { selectedIdsRef.current = []; setSelectedIds([]); setMultiSelect(false); setInspector(false); } }}><MaterialCommunityIcons name={icon} size={21} color={tool === value ? theme.accent.base : theme.content.primary} /><Text numberOfLines={1} style={[styles.railLabel, { color: tool === value ? theme.accent.base : theme.content.secondary }]}>{label}</Text></TouchableOpacity>)}
@@ -741,7 +764,7 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
         </> : null}
       </View>
 
-      {selectedIds.length ? <View style={[styles.selectionBar, { bottom: Math.max(insets.bottom, 12), backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}> 
+      {selectedIds.length && collaborationEditable ? <View style={[styles.selectionBar, { bottom: Math.max(insets.bottom, 12), backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
         <View style={[styles.selectionCount, { backgroundColor: theme.accent.soft }]}><Text style={[styles.selectionCountText, { color: theme.accent.base }]}>{selectedIds.length}</Text></View>
         <TouchableOpacity accessibilityLabel={multiSelect ? 'Finish adding objects to selection' : 'Add objects to selection'} style={[styles.selectionAction, styles.addSelectionAction, multiSelect && { backgroundColor: theme.accent.soft }]} onPress={() => setMultiSelect(value => !value)}><Ionicons name={multiSelect ? 'checkmark' : 'add'} size={19} color={multiSelect ? theme.accent.base : theme.content.primary} /><Text style={[styles.selectionText, { color: multiSelect ? theme.accent.base : theme.content.primary }]}>{multiSelect ? 'Done' : 'Add'}</Text></TouchableOpacity>
         {selected ? <TouchableOpacity accessibilityLabel="Edit selected object" style={styles.selectionAction} onPress={() => setInspector(true)}><Ionicons name="options-outline" size={20} color={theme.content.primary} /></TouchableOpacity> : null}
@@ -769,15 +792,18 @@ export function CanvasNoteEditor({ note, onSave, onClose }: Props) {
             {!collaborationId ? <>
               <View style={[styles.collaborationInfo, { backgroundColor: theme.accent.soft }]}><MaterialCommunityIcons name="account-multiple-check-outline" size={25} color={theme.accent.base} /><View style={styles.collaborationInfoCopy}><Text style={[styles.collaborationInfoTitle, { color: theme.content.primary }]}>Private by default</Text><Text style={[styles.collaborationInfoText, { color: theme.content.secondary }]}>A short invite code stays valid for 3 days. After joining, access continues until the person leaves, is removed, or you stop sharing. Changes sync by object.</Text></View></View>
               <TouchableOpacity accessibilityRole="button" disabled={collaborationBusy} style={[styles.collaborationPrimary, { backgroundColor: theme.accent.base, opacity: collaborationBusy ? 0.55 : 1 }]} onPress={startCollaboration}><Ionicons name="radio-outline" size={20} color="#FFF" /><Text style={styles.collaborationPrimaryText}>Start collaboration</Text></TouchableOpacity>
-            </> : <>
-              <View style={styles.memberList}>{collaborationMembers.map(member => {
-                const isOnline = onlineCollaborators.some(item => item.uid === member.uid);
-                const isOwner = member.uid === collaborationOwnerId;
-                return <View key={member.uid} style={[styles.memberRow, { borderBottomColor: theme.divider }]}><View style={[styles.memberAvatar, { backgroundColor: isOnline ? theme.accent.soft : theme.glass.secondary }]}><Text style={[styles.memberInitial, { color: isOnline ? theme.accent.base : theme.content.secondary }]}>{member.name.trim().charAt(0).toUpperCase() || '?'}</Text><View style={[styles.memberPresenceDot, { backgroundColor: isOnline ? theme.semantic.success : theme.content.muted }]} /></View><View style={styles.memberCopy}><Text numberOfLines={1} style={[styles.memberName, { color: theme.content.primary }]}>{member.uid === user?.id ? `${member.name} (you)` : member.name}</Text><Text style={[styles.memberRole, { color: theme.content.secondary }]}>{isOwner ? 'Owner' : isOnline ? 'Editing now' : 'Offline'}</Text></View>{collaborationOwnerId === user?.id && !isOwner ? <TouchableOpacity disabled={collaborationBusy} accessibilityLabel={`Remove ${member.name}`} style={styles.memberRemove} onPress={() => removeMember(member)}><Ionicons name="close-circle-outline" size={22} color={theme.semantic.danger} /></TouchableOpacity> : null}</View>;
-              })}</View>
-              {collaborationOwnerId === user?.id ? <TouchableOpacity accessibilityRole="button" disabled={collaborationBusy} style={[styles.collaborationPrimary, { backgroundColor: theme.accent.base, opacity: collaborationBusy ? 0.55 : 1 }]} onPress={shareInvite}><Ionicons name="share-social-outline" size={20} color="#FFF" /><Text style={styles.collaborationPrimaryText}>Share invite</Text></TouchableOpacity> : null}
-              <TouchableOpacity disabled={collaborationBusy} style={styles.collaborationDanger} onPress={leaveOrStopCollaboration}><Text style={[styles.collaborationDangerText, { color: theme.semantic.danger }]}>{collaborationOwnerId === user?.id ? 'Stop sharing this canvas' : 'Leave shared canvas'}</Text></TouchableOpacity>
-            </>}
+            </> : user && collaborationOwnerId ? (
+              <CanvasCollaborationPanel
+                boardId={collaborationId}
+                currentUserId={user.id}
+                ownerId={collaborationOwnerId}
+                members={collaborationMembers}
+                online={onlineCollaborators}
+                disabled={collaborationBusy}
+                onBusyChange={setCollaborationBusy}
+                onLeaveOrStop={leaveOrStopCollaboration}
+              />
+            ) : null}
           </View>
         </View>
       </Modal>
@@ -872,16 +898,9 @@ const styles = StyleSheet.create({
   snapGuide: { position: 'absolute', zIndex: 94 },
   connectorHandle: { position: 'absolute', width: 44, height: 44, alignItems: 'center', justifyContent: 'center', zIndex: 91 },
   connectorDot: { width: 10, height: 10, borderRadius: 5 },
+  collaboratorCursor: { position: 'absolute', zIndex: 98, minHeight: 28, maxWidth: 130, borderRadius: 10, paddingHorizontal: 7, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  collaboratorCursorName: { flexShrink: 1, fontSize: 10, fontFamily: fontFamily.extrabold },
   lasso: { position: 'absolute', borderWidth: 1.5, borderStyle: 'dashed', opacity: 0.72, zIndex: 95 },
-  objectFrame: { overflow: 'visible' }, fill: { width: '100%', height: '100%', borderRadius: 12 }, sticky: { padding: 14, borderRadius: 2 }, shape: { borderWidth: 2 },
-  referenceCard: { padding: 12, borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  referenceHeading: { minHeight: 24, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  referenceIcon: { width: 26, height: 26, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  referenceKind: { flex: 1, textTransform: 'uppercase', fontFamily: fontFamily.extrabold, letterSpacing: 0.5 },
-  referenceToggle: { minWidth: 36, minHeight: 36, alignItems: 'center', justifyContent: 'center' },
-  referenceTitle: { marginTop: 7, fontFamily: fontFamily.extrabold, lineHeight: 21 },
-  referenceSubtitle: { marginTop: 3, fontFamily: fontFamily.medium, lineHeight: 16 },
-  horizontalLine: { position: 'absolute', left: 0, right: 0, top: '45%', borderRadius: 99 }, arrowHead: { position: 'absolute', right: -2, top: -7, width: 0, height: 0, borderTopWidth: 8, borderBottomWidth: 8, borderLeftWidth: 14, borderTopColor: 'transparent', borderBottomColor: 'transparent' },
   zoomControls: { position: 'absolute', left: 12, top: 12, minHeight: 38, borderRadius: 19, borderWidth: 1, flexDirection: 'row', alignItems: 'center' }, zoomButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' }, zoomText: { minWidth: 42, textAlign: 'center', fontFamily: fontFamily.extrabold, fontSize: 11 },
   toolsToggle: { position: 'absolute', right: 12, top: 12, width: 48, height: 48, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center', zIndex: 110 },
   sideTools: { position: 'absolute', right: 12, top: 68, width: 68, borderRadius: 22, borderWidth: 1, overflow: 'hidden', zIndex: 109 },

@@ -8,7 +8,10 @@ export const styles = StyleSheet.create({
 
   header: { minHeight: 90, flexDirection: 'row', alignItems: 'flex-start' },
   headerCopy: { flex: 1, minWidth: 0, paddingRight: 10 },
+  greetingRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   greeting: { fontSize: 18, lineHeight: 23, fontFamily: fontFamily.semiboldItalic },
+  environmentBadge: { minHeight: 22, borderRadius: 11, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
+  environmentBadgeText: { fontSize: 9, lineHeight: 12, fontFamily: fontFamily.extrabold, letterSpacing: 0.8 },
   name: { marginTop: -2, fontSize: 36, lineHeight: 41, fontFamily: fontFamily.black, letterSpacing: -1.1 },
   encouragement: { marginTop: 2, fontSize: 14, lineHeight: 19, fontFamily: fontFamily.medium },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },

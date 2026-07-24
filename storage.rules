@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isImageWithinLimit() {
+      return request.resource == null
+        || (
+          request.resource.size <= 10 * 1024 * 1024
+          && request.resource.contentType.matches('image/(jpeg|png|webp|heic|heif)')
+        );
+    }
+
+    match /users/{userId}/attachments/{attachmentId}/{fileName} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create, update: if signedIn() && request.auth.uid == userId && isImageWithinLimit();
+      allow delete: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /sharedCanvasBoards/{boardId}/attachments/{attachmentId}/{fileName} {
+      function isActiveMember() {
+        return signedIn()
+          && firestore.get(/databases/(default)/documents/sharedCanvasBoards/$(boardId)).data.active == true
+          && firestore.exists(/databases/(default)/documents/sharedCanvasBoards/$(boardId)/members/$(request.auth.uid));
+      }
+      allow read: if isActiveMember();
+      allow create, update: if isActiveMember() && isImageWithinLimit();
+      allow delete: if isActiveMember();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

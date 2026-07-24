@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -22,6 +21,7 @@ import { AppBackground, OmniLoader } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { makeStyles } from './styles';
+import { AttachmentImage } from '@/components/attachments';
 
 type ProfileNavigation = {
   goBack: () => void;
@@ -61,7 +61,7 @@ function ActionRow({ icon, label, detail, color, onPress }: ActionRowProps) {
 
 export default function ProfileScreen({ navigation }: { navigation: ProfileNavigation }) {
   const { theme } = useTheme();
-  const { user, emailVerified, signOut, updateUser, profilePhoto, updateProfilePhoto } = useAuth();
+  const { user, emailVerified, signOut, updateUser, profilePhoto, profilePhotoAttachmentId, updateProfilePhoto } = useAuth();
   const s = makeStyles(theme);
   const entrance = useRef(new Animated.Value(0)).current;
   const [editModal, setEditModal] = useState(false);
@@ -196,8 +196,8 @@ export default function ProfileScreen({ navigation }: { navigation: ProfileNavig
             onPress={() => void pickPhoto()}
             style={s.avatar}
           >
-            {profilePhoto ? (
-              <Image source={{ uri: profilePhoto }} style={s.avatarPhoto} />
+            {profilePhoto || profilePhotoAttachmentId ? (
+              <AttachmentImage attachmentId={profilePhotoAttachmentId ?? undefined} fallbackUri={profilePhoto ?? undefined} style={s.avatarPhoto} showStatus />
             ) : (
               <LinearGradient
                 colors={[theme.iconTile.blue, theme.iconTile.teal]}

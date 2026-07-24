@@ -33,6 +33,8 @@ yarn-error.*
 .env*.local
 google-services.json
 GoogleService-Info.plist
+/config/firebase/google-services.*.json
+/config/firebase/GoogleService-Info.*.plist
 
 # Firebase Admin credentials (local-only, never commit)
 /firebase-reset/*.json

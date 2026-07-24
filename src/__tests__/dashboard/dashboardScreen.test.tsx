@@ -2,7 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
 const mockNavigate = jest.fn();
-const mockUpdateNote = jest.fn();
+const mockSetTaskStatus = jest.fn(async () => undefined);
 const mockToggleTheme = jest.fn();
 
 const mockEvent = {
@@ -20,16 +20,18 @@ const mockEvent = {
   recurrence: 'none' as const,
 };
 
-const mockNote = {
-  id: 'note-1',
-  title: 'Dashboard work',
-  body: '',
-  date: 'Jul 22, 2026',
-  timestamp: 1,
-  category: 'Work',
-  cardColor: '#FFF',
-  tags: [],
-  todos: [{ id: 'todo-1', text: 'Finish dashboard design', done: false }],
+const mockTask = {
+  id: 'task-1',
+  title: 'Finish dashboard design',
+  status: 'planned',
+  priority: 'high',
+  dueAt: new Date('2026-07-22T17:00:00').getTime(),
+  recurrence: { frequency: 'none', interval: 1 },
+  reminderMinutes: [],
+  reminderIds: [],
+  createdAt: 1,
+  updatedAt: 1,
+  version: 1,
 };
 
 jest.mock('@/context/EventStore', () => ({
@@ -48,7 +50,7 @@ jest.mock('@/context/AlarmStore', () => ({
 }));
 
 jest.mock('@/context/TaskStore', () => ({
-  useTaskStore: () => ({ notes: [mockNote], updateNote: mockUpdateNote, isLoading: false }),
+  useTaskStore: () => ({ tasks: [mockTask], setTaskStatus: mockSetTaskStatus, isLoading: false }),
 }));
 
 jest.mock('@/context/AuthContext', () => ({
@@ -97,6 +99,23 @@ jest.mock('@/hooks/useDayLens', () => ({
 jest.mock('@/services/FocusStatsService', () => ({
   hydrateFocusSessions: jest.fn(async (_uid: string, onValue: (value: number) => void) => onValue(3)),
 }));
+jest.mock('@/context/FocusSessionContext', () => ({
+  useFocusSessions: () => ({
+    metrics: {
+      todayMinutes: 75,
+      todayCompletedSessions: 3,
+      weekMinutes: 75,
+      lifetimeMinutes: 75,
+      lifetimeCompletedSessions: 3,
+      legacyCompletedSessions: 0,
+      currentStreak: 0,
+      interruptionCount: 0,
+      productiveHour: null,
+      goalProgress: 0.5,
+    },
+    isLoading: false,
+  }),
+}));
 
 jest.mock('@/components/ui', () => {
   const ReactRuntime = require('react');
@@ -135,8 +154,8 @@ describe('DashboardScreen', () => {
     expect(screen.getByText('Focus session')).toBeTruthy();
     expect(screen.getByText('25:00')).toBeTruthy();
     expect(screen.getByText('Day Lens')).toBeTruthy();
-    expect(screen.getByText('Open checklist items')).toBeTruthy();
-    expect(screen.getByText('Unfinished items from your Notes')).toBeTruthy();
+    expect(screen.getByText("Today's tasks")).toBeTruthy();
+    expect(screen.getByText('Planned, due, and inbox actions')).toBeTruthy();
     expect(screen.getByText('Finish dashboard design')).toBeTruthy();
     expect(screen.queryByText('Quick actions')).toBeNull();
     expect(screen.queryByText('Hourly forecast')).toBeNull();
@@ -144,20 +163,17 @@ describe('DashboardScreen', () => {
     expect(screen.getByLabelText('Switch to dark mode')).toBeTruthy();
   });
 
-  it('keeps dashboard actions functional and completes real checklist items', async () => {
+  it('keeps dashboard actions functional and updates the shared Task object', async () => {
     const screen = await render(<DashboardScreen navigation={{ navigate: mockNavigate }} />);
 
     await fireEvent.press(screen.getByLabelText('Open focus timer'));
     expect(mockNavigate).toHaveBeenCalledWith('Focus');
 
     await fireEvent.press(screen.getByLabelText('Complete Finish dashboard design'));
-    await waitFor(() => expect(mockUpdateNote).toHaveBeenCalledWith(expect.objectContaining({
-      id: 'note-1',
-      todos: [expect.objectContaining({ id: 'todo-1', done: true })],
-    })));
+    await waitFor(() => expect(mockSetTaskStatus).toHaveBeenCalledWith('task-1', 'completed'));
 
-    await fireEvent.press(screen.getByText('New checklist'));
-    expect(mockNavigate).toHaveBeenCalledWith('Tasks', expect.objectContaining({ section: 'notes', createType: 'checklist' }));
+    await fireEvent.press(screen.getByText('New task'));
+    expect(mockNavigate).toHaveBeenCalledWith('Tasks', expect.objectContaining({ section: 'tasks', createTaskRequest: expect.any(Number) }));
 
     await act(async () => {
       await fireEvent.press(screen.getByLabelText('Switch to dark mode'));

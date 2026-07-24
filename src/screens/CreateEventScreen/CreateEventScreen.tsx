@@ -1,5 +1,5 @@
 import { fontFamily } from '@/theme/typography';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Switch, Modal, Pressable } from 'react-native';
 import { AppText as Text, AppTextInput as TextInput } from '@/components/ui/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,7 +8,7 @@ import { useEvents, AppEvent } from '@/context/EventStore';
 import { useTheme } from '@/context/ThemeContext';
 import { BRAND_BLUE as BLUE } from '@/theme/colors';
 import { fr, s } from './styles';
-import { AppBackground } from '@/components/ui';
+import { AppBackground, WheelPickerColumn } from '@/components/ui';
 import { EventActionSheet, EventLocationPicker } from '@/components/events';
 import { COMMON_TIME_ZONES, parseEventDateTime, reminderMinutes, systemTimeZone } from '@/utils/eventDate';
 
@@ -38,70 +38,9 @@ const PRIORITY_COLORS: Record<Priority, string> = {
 
 type Period = 'AM' | 'PM';
 
-const ITEM_H = 52;
 const HOURS_LIST   = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
 const MINUTES_LIST = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 const PERIODS_LIST = ['AM', 'PM'];
-
-interface WheelColProps {
-  items: string[]; selectedIndex: number; onSelect: (i: number) => void;
-  width?: number; wheelKey?: string;
-}
-function WheelCol({ items, selectedIndex, onSelect, width = 80, wheelKey }: WheelColProps) {
-  const scrollRef = useRef<ScrollView>(null);
-  const { theme } = useTheme();
-  useEffect(() => {
-    const t = setTimeout(() => {
-      scrollRef.current?.scrollTo({ y: selectedIndex * ITEM_H, animated: false });
-    }, 60);
-    return () => clearTimeout(t);
-  }, [wheelKey]);
-
-  const handleEnd = (e: any) => {
-    const i = Math.round(e.nativeEvent.contentOffset.y / ITEM_H);
-    onSelect(Math.max(0, Math.min(items.length - 1, i)));
-  };
-
-  return (
-    <View style={{ width, height: ITEM_H * 5, overflow: 'hidden' }}>
-      <View pointerEvents="none" style={{
-        position: 'absolute', left: 0, right: 0,
-        top: ITEM_H * 2, height: ITEM_H,
-        backgroundColor: theme.accent.soft,
-        borderTopWidth: 1, borderBottomWidth: 1, borderColor: theme.accent.base,
-      }} />
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_H}
-        decelerationRate="fast"
-        onMomentumScrollEnd={handleEnd}
-        onScrollEndDrag={handleEnd}
-        contentContainerStyle={{ paddingVertical: ITEM_H * 2 }}
-      >
-        {items.map((item, i) => {
-          const dist = Math.abs(i - selectedIndex);
-          const isSel = dist === 0;
-          const isAdj = dist === 1;
-          return (
-            <TouchableOpacity
-              key={i}
-              style={{ height: ITEM_H, justifyContent: 'center', alignItems: 'center' }}
-              onPress={() => { onSelect(i); scrollRef.current?.scrollTo({ y: i * ITEM_H, animated: true }); }}
-              activeOpacity={0.7}
-            >
-              <Text style={{
-                fontSize: isSel ? 32 : isAdj ? 24 : 18,
-                fontFamily: isSel ? fontFamily.bold : fontFamily.regular,
-                color: isSel ? theme.text : isAdj ? theme.textSub : theme.border,
-              }}>{item}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-}
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAY_SHORTS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
@@ -115,15 +54,15 @@ function formatDateLabel(y: number, m: number, d: number) {
 function FormRow({ icon, label, children, theme }: any) {
   const valueNode =
     typeof children === 'string' || typeof children === 'number'
-      ? <Text style={[fr.label, { color: theme.text }]}>{children}</Text>
+      ? <Text style={[fr.label, { color: theme.content.primary }]}>{children}</Text>
       : children;
   return (
-    <View style={[fr.row, { borderBottomColor: theme.border }]}>
+    <View style={[fr.row, { borderBottomColor: theme.glass.border }]}>
       <View style={fr.iconWrap}>
         <Ionicons name={icon} size={17} color={BLUE} />
       </View>
       <View style={fr.labelWrap}>
-        <Text style={[fr.label, { color: theme.textDim }]}>{label}</Text>
+        <Text style={[fr.label, { color: theme.content.muted }]}>{label}</Text>
       </View>
       <View style={fr.valueWrap}>{valueNode}</View>
     </View>
@@ -317,9 +256,9 @@ export default function CreateEventScreen({ navigation, route }: any) {
       {/* -- Header -- */}
       <View style={[s.header, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.headerBtn}>
-          <Text style={[s.cancelTxt, { color: theme.textSub }]}>Cancel</Text>
+          <Text style={[s.cancelTxt, { color: theme.content.secondary }]}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={[s.headerTitle, { color: theme.text }]}>{editEvent ? 'Edit Event' : 'New Event'}</Text>
+        <Text style={[s.headerTitle, { color: theme.content.primary }]}>{editEvent ? 'Edit Event' : 'New Event'}</Text>
         <View style={s.headerBtn} />
       </View>
 
@@ -331,12 +270,12 @@ export default function CreateEventScreen({ navigation, route }: any) {
         keyboardShouldPersistTaps="handled"
       >
         {/* -- Title -- */}
-        <View style={[s.titleCard, { backgroundColor: cardBg, borderColor: theme.border }]}>
+        <View style={[s.titleCard, { backgroundColor: cardBg, borderColor: theme.glass.border }]}>
           <TextInput
             testID="event-title-input"
-            style={[s.titleInput, { color: theme.text }]}
+            style={[s.titleInput, { color: theme.content.primary }]}
             placeholder="Event title"
-            placeholderTextColor={theme.textDim}
+            placeholderTextColor={theme.content.muted}
             value={title}
             onChangeText={value => {
               setTitle(value);
@@ -347,9 +286,9 @@ export default function CreateEventScreen({ navigation, route }: any) {
             returnKeyType="next"
           />
           <TextInput
-            style={[s.descInput, { color: theme.text, borderTopColor: theme.border }]}
+            style={[s.descInput, { color: theme.content.primary, borderTopColor: theme.glass.border }]}
             placeholder="Notes, agenda, links…"
-            placeholderTextColor={theme.textDim}
+            placeholderTextColor={theme.content.muted}
             multiline
             value={description}
             onChangeText={setDescription}
@@ -365,129 +304,129 @@ export default function CreateEventScreen({ navigation, route }: any) {
         ) : null}
 
         {/* -- Timing card -- */}
-        <View style={[s.card, { backgroundColor: cardBg, borderColor: theme.border }]}>
-          <View style={[s.timeRow, { borderBottomColor: theme.border }]}>
+        <View style={[s.card, { backgroundColor: cardBg, borderColor: theme.glass.border }]}>
+          <View style={[s.timeRow, { borderBottomColor: theme.glass.border }]}>
             <View style={s.timeRowLeft}>
               <Ionicons name="sunny-outline" size={17} color={BLUE} style={{ marginRight: 10 }} />
-              <Text style={[s.timeRowLabel, { color: theme.textDim }]}>All day</Text>
+              <Text style={[s.timeRowLabel, { color: theme.content.muted }]}>All day</Text>
             </View>
             <Switch
               testID="event-all-day-switch"
               value={allDay}
               onValueChange={setAllDay}
-              trackColor={{ false: theme.border, true: theme.accent.soft }}
-              thumbColor={allDay ? BLUE : theme.textDim}
+              trackColor={{ false: theme.glass.border, true: theme.accent.soft }}
+              thumbColor={allDay ? BLUE : theme.content.muted}
             />
           </View>
 
-          <TouchableOpacity testID="event-start-date" style={[s.timeRow, { borderBottomColor: theme.border }]} onPress={() => openCalendar('start')}>
+          <TouchableOpacity testID="event-start-date" style={[s.timeRow, { borderBottomColor: theme.glass.border }]} onPress={() => openCalendar('start')}>
             <View style={s.timeRowLeft}>
               <Ionicons name="calendar-outline" size={17} color={BLUE} style={{ marginRight: 10 }} />
-              <Text style={[s.timeRowLabel, { color: theme.textDim }]}>Start date</Text>
+              <Text style={[s.timeRowLabel, { color: theme.content.muted }]}>Start date</Text>
             </View>
             <View style={s.timeRowRight}>
-              <Text style={[s.timeValue, { color: theme.text }]}>{formatDateLabel(selYear, selMonth, selDay)}</Text>
-              <Ionicons name="chevron-forward" size={14} color={theme.textDim} style={{ marginLeft: 4 }} />
+              <Text style={[s.timeValue, { color: theme.content.primary }]}>{formatDateLabel(selYear, selMonth, selDay)}</Text>
+              <Ionicons name="chevron-forward" size={14} color={theme.content.muted} style={{ marginLeft: 4 }} />
             </View>
           </TouchableOpacity>
 
           {!allDay ? (
-            <TouchableOpacity testID="event-start-time" style={[s.timeRow, { borderBottomColor: theme.border }]} onPress={() => openTimePicker('start')}>
+            <TouchableOpacity testID="event-start-time" style={[s.timeRow, { borderBottomColor: theme.glass.border }]} onPress={() => openTimePicker('start')}>
               <View style={s.timeRowLeft}>
                 <Ionicons name="time-outline" size={17} color={BLUE} style={{ marginRight: 10 }} />
-                <Text style={[s.timeRowLabel, { color: theme.textDim }]}>Start time</Text>
+                <Text style={[s.timeRowLabel, { color: theme.content.muted }]}>Start time</Text>
               </View>
               <View style={s.timeRowRight}>
-                <Text style={[s.timeValue, { color: theme.text }]}>{fmtTime(startHourIdx, startMinuteIdx, startPeriodIdx)}</Text>
-                <Ionicons name="chevron-forward" size={14} color={theme.textDim} style={{ marginLeft: 4 }} />
+                <Text style={[s.timeValue, { color: theme.content.primary }]}>{fmtTime(startHourIdx, startMinuteIdx, startPeriodIdx)}</Text>
+                <Ionicons name="chevron-forward" size={14} color={theme.content.muted} style={{ marginLeft: 4 }} />
               </View>
             </TouchableOpacity>
           ) : null}
 
           {hasEnd ? (
             <>
-              <TouchableOpacity testID="event-end-date" style={[s.timeRow, { borderBottomColor: theme.border }]} onPress={() => openCalendar('end')}>
+              <TouchableOpacity testID="event-end-date" style={[s.timeRow, { borderBottomColor: theme.glass.border }]} onPress={() => openCalendar('end')}>
                 <View style={s.timeRowLeft}>
-                  <Ionicons name="calendar-outline" size={17} color={theme.textDim} style={{ marginRight: 10 }} />
-                  <Text style={[s.timeRowLabel, { color: theme.textDim }]}>End date</Text>
+                  <Ionicons name="calendar-outline" size={17} color={theme.content.muted} style={{ marginRight: 10 }} />
+                  <Text style={[s.timeRowLabel, { color: theme.content.muted }]}>End date</Text>
                 </View>
                 <View style={s.timeRowRight}>
-                  <Text style={[s.timeValue, { color: theme.text }]}>{formatDateLabel(endYear, endMonth, endDay)}</Text>
-                  <Ionicons name="chevron-forward" size={14} color={theme.textDim} style={{ marginLeft: 4 }} />
+                  <Text style={[s.timeValue, { color: theme.content.primary }]}>{formatDateLabel(endYear, endMonth, endDay)}</Text>
+                  <Ionicons name="chevron-forward" size={14} color={theme.content.muted} style={{ marginLeft: 4 }} />
                 </View>
               </TouchableOpacity>
               {!allDay ? (
                 <TouchableOpacity testID="event-end-time" style={[s.timeRow, { borderBottomColor: 'transparent' }]} onPress={() => openTimePicker('end')}>
                   <View style={s.timeRowLeft}>
-                    <Ionicons name="time-outline" size={17} color={theme.textDim} style={{ marginRight: 10 }} />
-                    <Text style={[s.timeRowLabel, { color: theme.textDim }]}>End time</Text>
+                    <Ionicons name="time-outline" size={17} color={theme.content.muted} style={{ marginRight: 10 }} />
+                    <Text style={[s.timeRowLabel, { color: theme.content.muted }]}>End time</Text>
                   </View>
                   <View style={s.timeRowRight}>
-                    <Text style={[s.timeValue, { color: theme.text }]}>{fmtTime(endHourIdx, endMinuteIdx, endPeriodIdx)}</Text>
-                    <Ionicons name="chevron-forward" size={14} color={theme.textDim} style={{ marginLeft: 4 }} />
+                    <Text style={[s.timeValue, { color: theme.content.primary }]}>{fmtTime(endHourIdx, endMinuteIdx, endPeriodIdx)}</Text>
+                    <Ionicons name="chevron-forward" size={14} color={theme.content.muted} style={{ marginLeft: 4 }} />
                   </View>
                 </TouchableOpacity>
               ) : null}
               <TouchableOpacity testID="event-remove-end" style={[s.timeRow, { borderBottomColor: 'transparent' }]} onPress={() => setHasEnd(false)}>
                 <View style={s.timeRowLeft}>
-                  <Ionicons name="close-circle-outline" size={17} color={theme.textDim} style={{ marginRight: 10 }} />
-                  <Text style={[s.addEndTxt, { color: theme.textDim }]}>Remove end</Text>
+                  <Ionicons name="close-circle-outline" size={17} color={theme.content.muted} style={{ marginRight: 10 }} />
+                  <Text style={[s.addEndTxt, { color: theme.content.muted }]}>Remove end</Text>
                 </View>
               </TouchableOpacity>
             </>
           ) : (
             <TouchableOpacity testID="event-add-end" style={[s.timeRow, { borderBottomColor: 'transparent' }]} onPress={() => setHasEnd(true)}>
               <View style={s.timeRowLeft}>
-                <Ionicons name="add-circle-outline" size={17} color={theme.textDim} style={{ marginRight: 10 }} />
-                <Text style={[s.addEndTxt, { color: theme.textDim }]}>Add end date{allDay ? '' : ' and time'}</Text>
+                <Ionicons name="add-circle-outline" size={17} color={theme.content.muted} style={{ marginRight: 10 }} />
+                <Text style={[s.addEndTxt, { color: theme.content.muted }]}>Add end date{allDay ? '' : ' and time'}</Text>
               </View>
             </TouchableOpacity>
           )}
         </View>
 
         {/* -- Details card -- */}
-        <View style={[s.card, { backgroundColor: cardBg, borderColor: theme.border }]}>
-          <TouchableOpacity testID="event-location-picker" style={[s.timeRow, { borderBottomColor: theme.border }]} onPress={() => setLocationPickerVisible(true)}>
+        <View style={[s.card, { backgroundColor: cardBg, borderColor: theme.glass.border }]}>
+          <TouchableOpacity testID="event-location-picker" style={[s.timeRow, { borderBottomColor: theme.glass.border }]} onPress={() => setLocationPickerVisible(true)}>
             <View style={s.timeRowLeft}>
               <Ionicons name="location-outline" size={17} color={BLUE} style={{ marginRight: 10 }} />
-              <Text style={[s.timeRowLabel, { color: theme.textDim }]}>Location</Text>
+              <Text style={[s.timeRowLabel, { color: theme.content.muted }]}>Location</Text>
             </View>
             <View style={s.timeRowRight}>
-              <Text numberOfLines={1} style={[s.timeValue, { color: location ? theme.text : theme.textDim, maxWidth: 170 }]}>
+              <Text numberOfLines={1} style={[s.timeValue, { color: location ? theme.content.primary : theme.content.muted, maxWidth: 170 }]}>
                 {location || 'Choose on map'}
               </Text>
-              <Ionicons name="chevron-forward" size={14} color={theme.textDim} style={{ marginLeft: 4 }} />
+              <Ionicons name="chevron-forward" size={14} color={theme.content.muted} style={{ marginLeft: 4 }} />
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity testID="event-time-zone" style={[s.timeRow, { borderBottomColor: theme.border }]} onPress={() => setTimeZoneModal(true)}>
+          <TouchableOpacity testID="event-time-zone" style={[s.timeRow, { borderBottomColor: theme.glass.border }]} onPress={() => setTimeZoneModal(true)}>
             <View style={s.timeRowLeft}>
               <Ionicons name="globe-outline" size={17} color={BLUE} style={{ marginRight: 10 }} />
-              <Text style={[s.timeRowLabel, { color: theme.textDim }]}>Time zone</Text>
+              <Text style={[s.timeRowLabel, { color: theme.content.muted }]}>Time zone</Text>
             </View>
             <View style={s.timeRowRight}>
-              <Text numberOfLines={1} style={[s.timeValue, { color: theme.text, maxWidth: 170 }]}>{timeZone}</Text>
-              <Ionicons name="chevron-forward" size={14} color={theme.textDim} style={{ marginLeft: 4 }} />
+              <Text numberOfLines={1} style={[s.timeValue, { color: theme.content.primary, maxWidth: 170 }]}>{timeZone}</Text>
+              <Ionicons name="chevron-forward" size={14} color={theme.content.muted} style={{ marginLeft: 4 }} />
             </View>
           </TouchableOpacity>
 
           {/* Category */}
-          <TouchableOpacity style={[s.timeRow, { borderBottomColor: theme.border }]} onPress={() => { setAddCatMode(false); setCategoryModal(true); }}>
+          <TouchableOpacity style={[s.timeRow, { borderBottomColor: theme.glass.border }]} onPress={() => { setAddCatMode(false); setCategoryModal(true); }}>
             <View style={s.timeRowLeft}>
               <Ionicons name="pricetag-outline" size={17} color={BLUE} style={{ marginRight: 10 }} />
-              <Text style={[s.timeRowLabel, { color: theme.textDim }]}>Category</Text>
+              <Text style={[s.timeRowLabel, { color: theme.content.muted }]}>Category</Text>
             </View>
             <View style={s.timeRowRight}>
-              <Text style={[s.timeValue, { color: theme.text }]}>{category}</Text>
-              <Ionicons name="chevron-forward" size={14} color={theme.textDim} style={{ marginLeft: 4 }} />
+              <Text style={[s.timeValue, { color: theme.content.primary }]}>{category}</Text>
+              <Ionicons name="chevron-forward" size={14} color={theme.content.muted} style={{ marginLeft: 4 }} />
             </View>
           </TouchableOpacity>
 
           {/* Priority */}
-          <View style={[s.timeRow, { borderBottomColor: theme.border }]}>
+          <View style={[s.timeRow, { borderBottomColor: theme.glass.border }]}>
             <View style={s.timeRowLeft}>
               <Ionicons name="flag-outline" size={17} color={BLUE} style={{ marginRight: 10 }} />
-              <Text style={[s.timeRowLabel, { color: theme.textDim }]}>Priority</Text>
+              <Text style={[s.timeRowLabel, { color: theme.content.muted }]}>Priority</Text>
             </View>
             <View style={{ flexDirection: 'row', gap: 6 }}>
               {PRIORITIES.map(p => {
@@ -495,10 +434,10 @@ export default function CreateEventScreen({ navigation, route }: any) {
                 return (
                   <TouchableOpacity
                     key={p}
-                    style={[s.pill, { backgroundColor: active ? PRIORITY_COLORS[p] : theme.bg2, borderColor: active ? PRIORITY_COLORS[p] : theme.border }]}
+                    style={[s.pill, { backgroundColor: active ? PRIORITY_COLORS[p] : theme.background.top, borderColor: active ? PRIORITY_COLORS[p] : theme.glass.border }]}
                     onPress={() => setPriority(p)}
                   >
-                    <Text style={[s.pillTxt, { color: active ? '#fff' : theme.textSub }]}>{p}</Text>
+                    <Text style={[s.pillTxt, { color: active ? '#fff' : theme.content.secondary }]}>{p}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -509,7 +448,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
           <View style={[s.timeRow, { borderBottomColor: 'transparent' }]}>
             <View style={s.timeRowLeft}>
               <Ionicons name="repeat-outline" size={17} color={BLUE} style={{ marginRight: 10 }} />
-              <Text style={[s.timeRowLabel, { color: theme.textDim }]}>Repeat</Text>
+              <Text style={[s.timeRowLabel, { color: theme.content.muted }]}>Repeat</Text>
             </View>
             <View style={{ flexDirection: 'row', gap: 6 }}>
               {(['none', 'daily', 'weekly', 'monthly'] as const).map(r => {
@@ -519,10 +458,10 @@ export default function CreateEventScreen({ navigation, route }: any) {
                   <TouchableOpacity
                     testID={`event-recurrence-${r}`}
                     key={r}
-                    style={[s.pill, { backgroundColor: active ? BLUE : theme.bg2, borderColor: active ? BLUE : theme.border }]}
+                    style={[s.pill, { backgroundColor: active ? BLUE : theme.background.top, borderColor: active ? BLUE : theme.glass.border }]}
                     onPress={() => setRecurrence(r)}
                   >
-                    <Text style={[s.pillTxt, { color: active ? '#fff' : theme.textSub }]}>{label}</Text>
+                    <Text style={[s.pillTxt, { color: active ? '#fff' : theme.content.secondary }]}>{label}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -531,24 +470,24 @@ export default function CreateEventScreen({ navigation, route }: any) {
         </View>
 
         {/* -- Reminders card -- */}
-        <View style={[s.card, { backgroundColor: cardBg, borderColor: theme.border }]}>
-          <View style={[s.cardHeaderRow, { borderBottomColor: theme.border }]}>
+        <View style={[s.card, { backgroundColor: cardBg, borderColor: theme.glass.border }]}>
+          <View style={[s.cardHeaderRow, { borderBottomColor: theme.glass.border }]}>
             <Ionicons name="notifications-outline" size={15} color={BLUE} />
-            <Text style={[s.cardHeaderTxt, { color: theme.text }]}>Reminders</Text>
+            <Text style={[s.cardHeaderTxt, { color: theme.content.primary }]}>Reminders</Text>
             <TouchableOpacity testID="event-add-reminder" style={s.addRemBtn} onPress={addReminder}>
               <Ionicons name="add" size={14} color={BLUE} />
               <Text style={s.addRemTxt}>Add</Text>
             </TouchableOpacity>
           </View>
           {reminders.length === 0 ? (
-            <Text style={[s.emptyRemTxt, { color: theme.textDim }]}>No reminders</Text>
+            <Text style={[s.emptyRemTxt, { color: theme.content.muted }]}>No reminders</Text>
           ) : (
             reminders.map((r, i) => (
-              <View key={i} style={[s.remRow, { borderBottomColor: theme.border }, i === reminders.length - 1 && { borderBottomWidth: 0 }]}>
-                <Ionicons name="time-outline" size={15} color={theme.textDim} style={{ marginRight: 10 }} />
-                <Text style={[s.remTxt, { color: theme.textSub }]}>{r}</Text>
+              <View key={i} style={[s.remRow, { borderBottomColor: theme.glass.border }, i === reminders.length - 1 && { borderBottomWidth: 0 }]}>
+                <Ionicons name="time-outline" size={15} color={theme.content.muted} style={{ marginRight: 10 }} />
+                <Text style={[s.remTxt, { color: theme.content.secondary }]}>{r}</Text>
                 <TouchableOpacity testID={`event-remove-reminder-${i}`} onPress={() => removeReminder(r)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close" size={17} color={theme.textDim} />
+                  <Ionicons name="close" size={17} color={theme.content.muted} />
                 </TouchableOpacity>
               </View>
             ))
@@ -567,20 +506,20 @@ export default function CreateEventScreen({ navigation, route }: any) {
       <Modal visible={timeTarget !== null} animationType="slide" transparent onRequestClose={() => setTimeTarget(null)}>
         <Pressable style={s.overlay} onPress={() => setTimeTarget(null)} />
         <View style={[s.sheet, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
-          <View style={[s.sheetHandle, { backgroundColor: theme.border }]} />
-          <View style={[s.sheetHead, { borderBottomColor: theme.border }]}>
+          <View style={[s.sheetHandle, { backgroundColor: theme.glass.border }]} />
+          <View style={[s.sheetHead, { borderBottomColor: theme.glass.border }]}>
             <TouchableOpacity onPress={() => setTimeTarget(null)}>
-              <Text style={[s.sheetCancel, { color: theme.textDim }]}>Cancel</Text>
+              <Text style={[s.sheetCancel, { color: theme.content.muted }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[s.sheetTitle, { color: theme.text }]}>{timeTarget === 'start' ? 'Start Time' : 'End Time'}</Text>
+            <Text style={[s.sheetTitle, { color: theme.content.primary }]}>{timeTarget === 'start' ? 'Start Time' : 'End Time'}</Text>
             <TouchableOpacity onPress={confirmTime}>
               <Text style={[s.sheetDone, { color: BLUE }]}>Done</Text>
             </TouchableOpacity>
           </View>
           <View style={s.wheelRow}>
-            <WheelCol wheelKey={`h-${timeModalKey}`} items={HOURS_LIST}   selectedIndex={tempHourIdx}   onSelect={setTempHourIdx}   width={88} />
-            <WheelCol wheelKey={`m-${timeModalKey}`} items={MINUTES_LIST} selectedIndex={tempMinuteIdx} onSelect={setTempMinuteIdx} width={88} />
-            <WheelCol wheelKey={`p-${timeModalKey}`} items={PERIODS_LIST} selectedIndex={tempPeriodIdx} onSelect={setTempPeriodIdx} width={76} />
+            <WheelPickerColumn resetKey={`h-${timeModalKey}`} items={HOURS_LIST} selectedIndex={tempHourIdx} onSelect={setTempHourIdx} width={88} itemHeight={52} selectedFontSize={32} adjacentFontSize={24} distantFontSize={18} />
+            <WheelPickerColumn resetKey={`m-${timeModalKey}`} items={MINUTES_LIST} selectedIndex={tempMinuteIdx} onSelect={setTempMinuteIdx} width={88} itemHeight={52} selectedFontSize={32} adjacentFontSize={24} distantFontSize={18} />
+            <WheelPickerColumn resetKey={`p-${timeModalKey}`} items={PERIODS_LIST} selectedIndex={tempPeriodIdx} onSelect={setTempPeriodIdx} width={76} itemHeight={52} selectedFontSize={32} adjacentFontSize={24} distantFontSize={18} />
           </View>
           <View style={{ height: 20 }} />
         </View>
@@ -590,23 +529,23 @@ export default function CreateEventScreen({ navigation, route }: any) {
       <Modal visible={calendarVisible} animationType="slide" transparent onRequestClose={() => setCalendarVisible(false)}>
         <Pressable style={s.overlay} onPress={() => setCalendarVisible(false)} />
         <View style={[s.calSheet, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
-          <View style={[s.sheetHandle, { backgroundColor: theme.border }]} />
-          <View style={[s.sheetHead, { borderBottomColor: theme.border }]}>
+          <View style={[s.sheetHandle, { backgroundColor: theme.glass.border }]} />
+          <View style={[s.sheetHead, { borderBottomColor: theme.glass.border }]}>
             <TouchableOpacity onPress={() => setCalendarVisible(false)}>
-              <Text style={[s.sheetCancel, { color: theme.textDim }]}>Cancel</Text>
+              <Text style={[s.sheetCancel, { color: theme.content.muted }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[s.sheetTitle, { color: theme.text }]}>{dateTarget === 'start' ? 'Start Date' : 'End Date'}</Text>
+            <Text style={[s.sheetTitle, { color: theme.content.primary }]}>{dateTarget === 'start' ? 'Start Date' : 'End Date'}</Text>
             <TouchableOpacity onPress={confirmCalendar}>
               <Text style={[s.sheetDone, { color: BLUE }]}>Done</Text>
             </TouchableOpacity>
           </View>
           <View style={s.calNav}>
-            <TouchableOpacity onPress={calPrev} style={s.calNavBtn}><Ionicons name="chevron-back" size={20} color={theme.textSub} /></TouchableOpacity>
-            <Text style={[s.calMonthTitle, { color: theme.text }]}>{MONTH_NAMES[calMonth]} {calYear}</Text>
-            <TouchableOpacity onPress={calNext} style={s.calNavBtn}><Ionicons name="chevron-forward" size={20} color={theme.textSub} /></TouchableOpacity>
+            <TouchableOpacity onPress={calPrev} style={s.calNavBtn}><Ionicons name="chevron-back" size={20} color={theme.content.secondary} /></TouchableOpacity>
+            <Text style={[s.calMonthTitle, { color: theme.content.primary }]}>{MONTH_NAMES[calMonth]} {calYear}</Text>
+            <TouchableOpacity onPress={calNext} style={s.calNavBtn}><Ionicons name="chevron-forward" size={20} color={theme.content.secondary} /></TouchableOpacity>
           </View>
           <View style={s.calDayRow}>
-            {DAY_SHORTS.map(d => <Text key={d} style={[s.calDayHdr, { color: theme.textDim }]}>{d}</Text>)}
+            {DAY_SHORTS.map(d => <Text key={d} style={[s.calDayHdr, { color: theme.content.muted }]}>{d}</Text>)}
           </View>
           {renderCalGrid().map((row, ri) => (
             <View key={ri} style={s.calRow}>
@@ -616,7 +555,7 @@ export default function CreateEventScreen({ navigation, route }: any) {
                 const isSel = day === calSel;
                 return (
                   <TouchableOpacity testID={`calendar-day-${day}`} key={ci} style={[s.calCell, isToday && s.calToday, isSel && s.calSel]} onPress={() => setCalSel(day)}>
-                    <Text style={[s.calCellTxt, { color: theme.text }, isToday && !isSel && { color: BLUE, fontFamily: fontFamily.bold }, isSel && { color: '#fff', fontFamily: fontFamily.bold }]}>{day}</Text>
+                    <Text style={[s.calCellTxt, { color: theme.content.primary }, isToday && !isSel && { color: BLUE, fontFamily: fontFamily.bold }, isSel && { color: '#fff', fontFamily: fontFamily.bold }]}>{day}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -649,12 +588,12 @@ export default function CreateEventScreen({ navigation, route }: any) {
       <Modal visible={timeZoneModal} animationType="slide" transparent onRequestClose={() => setTimeZoneModal(false)}>
         <Pressable style={s.overlay} onPress={() => setTimeZoneModal(false)} />
         <View style={[s.catSheet, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
-          <View style={[s.sheetHandle, { backgroundColor: theme.border }]} />
-          <View style={[s.sheetHead, { borderBottomColor: theme.border }]}>
+          <View style={[s.sheetHandle, { backgroundColor: theme.glass.border }]} />
+          <View style={[s.sheetHead, { borderBottomColor: theme.glass.border }]}>
             <TouchableOpacity onPress={() => setTimeZoneModal(false)}>
-              <Text style={[s.sheetCancel, { color: theme.textDim }]}>Cancel</Text>
+              <Text style={[s.sheetCancel, { color: theme.content.muted }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[s.sheetTitle, { color: theme.text }]}>Time Zone</Text>
+            <Text style={[s.sheetTitle, { color: theme.content.primary }]}>Time Zone</Text>
             <View style={{ width: 60 }} />
           </View>
           <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
@@ -662,10 +601,10 @@ export default function CreateEventScreen({ navigation, route }: any) {
               <TouchableOpacity
                 testID={`time-zone-${zone}`}
                 key={zone}
-                style={[s.catRow, { borderBottomColor: theme.border }]}
+                style={[s.catRow, { borderBottomColor: theme.glass.border }]}
                 onPress={() => { setTimeZone(zone); setTimeZoneModal(false); }}
               >
-                <Text style={[s.catTxt, { color: zone === timeZone ? BLUE : theme.text }, zone === timeZone && { fontFamily: fontFamily.bold }]}>{zone}</Text>
+                <Text style={[s.catTxt, { color: zone === timeZone ? BLUE : theme.content.primary }, zone === timeZone && { fontFamily: fontFamily.bold }]}>{zone}</Text>
                 {zone === timeZone ? <Ionicons name="checkmark" size={18} color={BLUE} /> : null}
               </TouchableOpacity>
             ))}
@@ -677,27 +616,27 @@ export default function CreateEventScreen({ navigation, route }: any) {
       <Modal visible={categoryModal} animationType="slide" transparent onRequestClose={() => setCategoryModal(false)}>
         <Pressable style={s.overlay} onPress={() => setCategoryModal(false)} />
         <View style={[s.catSheet, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
-          <View style={[s.sheetHandle, { backgroundColor: theme.border }]} />
-          <View style={[s.sheetHead, { borderBottomColor: theme.border }]}>
+          <View style={[s.sheetHandle, { backgroundColor: theme.glass.border }]} />
+          <View style={[s.sheetHead, { borderBottomColor: theme.glass.border }]}>
             <TouchableOpacity onPress={() => setCategoryModal(false)}>
-              <Text style={[s.sheetCancel, { color: theme.textDim }]}>Cancel</Text>
+              <Text style={[s.sheetCancel, { color: theme.content.muted }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[s.sheetTitle, { color: theme.text }]}>Category</Text>
+            <Text style={[s.sheetTitle, { color: theme.content.primary }]}>Category</Text>
             <View style={{ width: 60 }} />
           </View>
           <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
             {categories.map(c => (
-              <TouchableOpacity key={c} style={[s.catRow, { borderBottomColor: theme.border }]} onPress={() => { setCategory(c); setCategoryModal(false); }}>
-                <Text style={[s.catTxt, { color: c === category ? BLUE : theme.text }, c === category && { fontFamily: fontFamily.bold }]}>{c}</Text>
+              <TouchableOpacity key={c} style={[s.catRow, { borderBottomColor: theme.glass.border }]} onPress={() => { setCategory(c); setCategoryModal(false); }}>
+                <Text style={[s.catTxt, { color: c === category ? BLUE : theme.content.primary }, c === category && { fontFamily: fontFamily.bold }]}>{c}</Text>
                 {c === category && <Ionicons name="checkmark" size={18} color={BLUE} />}
               </TouchableOpacity>
             ))}
             {addCatMode ? (
-              <View style={[s.catRow, { borderBottomColor: theme.border, gap: 8 }]}>
+              <View style={[s.catRow, { borderBottomColor: theme.glass.border, gap: 8 }]}>
                 <TextInput
-                  style={[s.catAddInput, { backgroundColor: theme.glass.secondary, borderColor: theme.border, color: theme.text, flex: 1 }]}
+                  style={[s.catAddInput, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border, color: theme.content.primary, flex: 1 }]}
                   placeholder="New category"
-                  placeholderTextColor={theme.textDim}
+                  placeholderTextColor={theme.content.muted}
                   value={customCatInput}
                   onChangeText={setCustomCatInput}
                   autoFocus maxLength={30}

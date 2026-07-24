@@ -9,6 +9,7 @@ const AUTH_BATCH_SIZE = 1000;
 const STORAGE_LIST_BATCH_SIZE = 500;
 const STORAGE_DELETE_CONCURRENCY = 20;
 const MAX_FIRESTORE_RETRIES = 5;
+let deletionStarted = false;
 
 const resetDirectory = __dirname;
 const projectRoot = path.resolve(resetDirectory, '..');
@@ -33,10 +34,13 @@ function getRepositoryFirebaseConfig() {
     'the repository Firebase project configuration',
   );
   const projectId = firebaseRc.projects?.default;
+  const developmentProjectId = firebaseRc.projects?.development;
 
-  if (!projectId || typeof projectId !== 'string') {
-    throw new Error('No default Firebase project was found in .firebaserc.');
-  }
+  assertDevelopmentResetTarget({
+    environment: process.env.OMNITASK_ENV,
+    defaultProjectId: projectId,
+    developmentProjectId,
+  });
 
   const googleServicesPath = path.join(projectRoot, 'google-services.json');
   let storageBucket;
@@ -52,6 +56,36 @@ function getRepositoryFirebaseConfig() {
       process.env.FIREBASE_STORAGE_BUCKET ||
       (typeof storageBucket === 'string' ? storageBucket : undefined),
   };
+}
+
+function assertDevelopmentResetTarget({
+  environment,
+  defaultProjectId,
+  developmentProjectId,
+  credentialProjectId,
+}) {
+  if (environment !== 'development') {
+    throw new Error(
+      'Safety check failed: OMNITASK_ENV must be explicitly set to "development". Nothing was deleted.',
+    );
+  }
+  if (!developmentProjectId || typeof developmentProjectId !== 'string') {
+    throw new Error(
+      'Safety check failed: .firebaserc must define a "development" project alias. Nothing was deleted.',
+    );
+  }
+  if (defaultProjectId !== developmentProjectId) {
+    throw new Error(
+      `Safety check failed: the default Firebase project "${defaultProjectId || 'missing'}" `
+      + `does not match the development alias "${developmentProjectId}". Nothing was deleted.`,
+    );
+  }
+  if (credentialProjectId && credentialProjectId !== developmentProjectId) {
+    throw new Error(
+      `Safety check failed: credentials belong to "${credentialProjectId}", `
+      + `but the development project is "${developmentProjectId}". Nothing was deleted.`,
+    );
+  }
 }
 
 function validateCredentials(expectedProjectId) {
@@ -72,11 +106,12 @@ function validateCredentials(expectedProjectId) {
     );
   }
 
-  if (credentials.project_id !== expectedProjectId) {
-    throw new Error(
-      `Safety check failed: credentials belong to "${credentials.project_id}", but this repository targets "${expectedProjectId}". Nothing was deleted.`,
-    );
-  }
+  assertDevelopmentResetTarget({
+    environment: process.env.OMNITASK_ENV,
+    defaultProjectId: expectedProjectId,
+    developmentProjectId: expectedProjectId,
+    credentialProjectId: credentials.project_id,
+  });
 }
 
 function loadFirebaseAdmin() {
@@ -269,6 +304,7 @@ async function main() {
   });
 
   try {
+    deletionStarted = true;
     await deleteFirestore(admin.firestore.getFirestore(app));
     await deleteAuthUsers(admin.auth.getAuth(app));
     await deleteStorageFiles(admin.storage.getStorage(app), storageBucket);
@@ -278,8 +314,18 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error('\nFirebase reset failed. Some data may already have been deleted.');
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(
+      deletionStarted
+        ? '\nFirebase reset failed. Some data may already have been deleted.'
+        : '\nFirebase reset was NOT run.',
+    );
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  assertDevelopmentResetTarget,
+};

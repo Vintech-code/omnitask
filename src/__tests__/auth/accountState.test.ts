@@ -2,8 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const mockGetDoc = jest.fn((
   _reference?: unknown,
-): Promise<{ data: () => Record<string, unknown> | undefined }> =>
-  Promise.resolve({ data: () => undefined }));
+): Promise<{ exists: () => boolean; data: () => Record<string, unknown> | undefined }> =>
+  Promise.resolve({ exists: () => false, data: () => undefined }));
 const mockQueueCloudSet = jest.fn(async (
   _uid: unknown,
   _path: unknown,
@@ -18,6 +18,7 @@ jest.mock('firebase/firestore', () => ({
 jest.mock('@/services/OfflineSyncService', () => ({
   queueCloudSet: (uid: unknown, path: unknown, data: unknown) =>
     mockQueueCloudSet(uid, path, data),
+  recordCloudSnapshot: jest.fn(async () => undefined),
 }));
 
 import {
@@ -30,7 +31,7 @@ describe('account-scoped onboarding state', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     await AsyncStorage.clear();
-    mockGetDoc.mockResolvedValue({ data: () => undefined });
+    mockGetDoc.mockResolvedValue({ exists: () => false, data: () => undefined });
   });
 
   it('does not share onboarding completion with a different account', async () => {
@@ -42,6 +43,7 @@ describe('account-scoped onboarding state', () => {
 
   it('restores completion from the account cloud marker', async () => {
     mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
       data: () => ({ onboardingCompleted: true }),
     });
 

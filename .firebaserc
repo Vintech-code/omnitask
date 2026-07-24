@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "omnitask-d5b47"
+    "default": "omnitask-d5b47",
+    "development": "omnitask-d5b47"
   }
 }

@@ -35,7 +35,7 @@ export default function EventDetailScreen({ route, navigation }: any) {
 
   if (!event) {
     return (
-      <SafeAreaView style={[s.safe, { backgroundColor: theme.bg }]} edges={['top', 'bottom']}>
+      <SafeAreaView style={[s.safe, { backgroundColor: theme.background.base }]} edges={['top', 'bottom']}>
         <AppBackground />
         <TouchableOpacity
           accessibilityRole="button"
@@ -43,11 +43,11 @@ export default function EventDetailScreen({ route, navigation }: any) {
           onPress={() => navigation.goBack()}
           style={s.missingBack}
         >
-          <Ionicons name="arrow-back" size={22} color={theme.text} />
+          <Ionicons name="arrow-back" size={22} color={theme.content.primary} />
         </TouchableOpacity>
         <View style={s.missingState}>
-          <Ionicons name="calendar-outline" size={52} color={theme.border} />
-          <Text style={[s.missingTitle, { color: theme.textDim }]}>Event not found</Text>
+          <Ionicons name="calendar-outline" size={52} color={theme.glass.border} />
+          <Text style={[s.missingTitle, { color: theme.content.muted }]}>Event not found</Text>
         </View>
       </SafeAreaView>
     );
@@ -89,11 +89,11 @@ export default function EventDetailScreen({ route, navigation }: any) {
           onPress={() => navigation.goBack()}
           style={[s.iconBtn, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}
         >
-          <Ionicons name="arrow-back" size={21} color={theme.text} />
+          <Ionicons name="arrow-back" size={21} color={theme.content.primary} />
         </TouchableOpacity>
         <View style={s.topHeading}>
-          <Text style={[s.topEyebrow, { color: theme.textDim }]}>ORGANIZE</Text>
-          <Text style={[s.topTitle, { color: theme.text }]}>Event details</Text>
+          <Text style={[s.topEyebrow, { color: theme.content.muted }]}>ORGANIZE</Text>
+          <Text style={[s.topTitle, { color: theme.content.primary }]}>Event details</Text>
         </View>
         <TouchableOpacity
           accessibilityRole="button"
@@ -101,7 +101,7 @@ export default function EventDetailScreen({ route, navigation }: any) {
           onPress={() => navigation.navigate('CreateEvent', { event })}
           style={[s.iconBtn, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}
         >
-          <Ionicons name="create-outline" size={21} color={theme.text} />
+          <Ionicons name="create-outline" size={21} color={theme.content.primary} />
         </TouchableOpacity>
       </View>
 
@@ -117,41 +117,41 @@ export default function EventDetailScreen({ route, navigation }: any) {
               <Text style={[s.badgeText, { color: theme.accent.base }]}>{event.category}</Text>
             </View>
             <View style={[s.badge, { backgroundColor: theme.glass.secondary }]}>
-              <Ionicons name={PRIORITY_ICON[event.priority] ?? 'flag-outline'} size={13} color={theme.textSub} />
-              <Text style={[s.badgeText, { color: theme.textSub }]}>{event.priority} priority</Text>
+              <Ionicons name={PRIORITY_ICON[event.priority] ?? 'flag-outline'} size={13} color={theme.content.secondary} />
+              <Text style={[s.badgeText, { color: theme.content.secondary }]}>{event.priority} priority</Text>
             </View>
             {recurrence ? (
               <View style={[s.badge, { backgroundColor: theme.glass.secondary }]}>
-                <Ionicons name="repeat-outline" size={13} color={theme.textSub} />
-                <Text style={[s.badgeText, s.capitalize, { color: theme.textSub }]}>{recurrence}</Text>
+                <Ionicons name="repeat-outline" size={13} color={theme.content.secondary} />
+                <Text style={[s.badgeText, s.capitalize, { color: theme.content.secondary }]}>{recurrence}</Text>
               </View>
             ) : null}
           </View>
 
-          <Text style={[s.heroTitle, { color: theme.text }]}>{event.title}</Text>
+          <Text style={[s.heroTitle, { color: theme.content.primary }]}>{event.title}</Text>
 
           <View style={[s.scheduleLine, { borderTopColor: theme.divider }]}>
             <View style={[s.scheduleIcon, { backgroundColor: theme.iconTile.blue }]}>
               <Ionicons name="calendar-outline" size={21} color={theme.iconTile.foreground} />
             </View>
             <View style={s.scheduleCopy}>
-              <Text style={[s.scheduleDate, { color: theme.text }]}>{scheduleDate}</Text>
-              <Text style={[s.scheduleMeta, { color: theme.textSub }]}>
+              <Text style={[s.scheduleDate, { color: theme.content.primary }]}>{scheduleDate}</Text>
+              <Text style={[s.scheduleMeta, { color: theme.content.secondary }]}>
                 {scheduleTime}{event.timeZone ? ` · ${event.timeZone}` : ''}
               </Text>
             </View>
           </View>
         </View>
 
-        <Text style={[s.sectionTitle, { color: theme.textDim }]}>EVENT INFORMATION</Text>
+        <Text style={[s.sectionTitle, { color: theme.content.muted }]}>EVENT INFORMATION</Text>
         <View style={[s.group, { backgroundColor: theme.glass.secondary, borderColor: theme.glass.border }]}>
           <View style={s.infoRow}>
             <View style={[s.rowIcon, { backgroundColor: theme.iconTile.coral }]}>
               <Ionicons name={alarmActive ? 'alarm' : 'alarm-outline'} size={20} color={theme.iconTile.foreground} />
             </View>
             <View style={s.rowCopy}>
-              <Text style={[s.rowLabel, { color: theme.text }]}>Event alarm</Text>
-              <Text style={[s.rowDescription, { color: alarmActive ? theme.accent.base : theme.textDim }]}>{alarmDescription}</Text>
+              <Text style={[s.rowLabel, { color: theme.content.primary }]}>Event alarm</Text>
+              <Text style={[s.rowDescription, { color: alarmActive ? theme.accent.base : theme.content.muted }]}>{alarmDescription}</Text>
             </View>
             <Switch
               accessibilityLabel="Event alarm"
@@ -159,7 +159,7 @@ export default function EventDetailScreen({ route, navigation }: any) {
               onValueChange={handleToggleAlarm}
               disabled={!canSchedule && !alarmActive}
               trackColor={{ false: theme.divider, true: theme.accent.soft }}
-              thumbColor={alarmActive ? theme.accent.base : theme.textDim}
+              thumbColor={alarmActive ? theme.accent.base : theme.content.muted}
             />
           </View>
 
@@ -171,8 +171,8 @@ export default function EventDetailScreen({ route, navigation }: any) {
                   <Ionicons name="notifications-outline" size={20} color={theme.iconTile.foreground} />
                 </View>
                 <View style={s.rowCopy}>
-                  <Text style={[s.rowLabel, { color: theme.text }]}>Reminders</Text>
-                  <Text style={[s.rowDescription, { color: theme.textSub }]}>{event.reminders.join(' · ')}</Text>
+                  <Text style={[s.rowLabel, { color: theme.content.primary }]}>Reminders</Text>
+                  <Text style={[s.rowDescription, { color: theme.content.secondary }]}>{event.reminders.join(' · ')}</Text>
                 </View>
               </View>
             </>
@@ -192,8 +192,8 @@ export default function EventDetailScreen({ route, navigation }: any) {
                   <Ionicons name="location-outline" size={20} color={theme.iconTile.foreground} />
                 </View>
                 <View style={s.rowCopy}>
-                  <Text style={[s.rowLabel, { color: theme.text }]}>Location</Text>
-                  <Text style={[s.rowDescription, { color: theme.textSub }]} numberOfLines={2}>{event.location}</Text>
+                  <Text style={[s.rowLabel, { color: theme.content.primary }]}>Location</Text>
+                  <Text style={[s.rowDescription, { color: theme.content.secondary }]} numberOfLines={2}>{event.location}</Text>
                 </View>
                 <View style={[s.trailingAction, { backgroundColor: theme.iconTile.blue }]}>
                   <Ionicons name="navigate-outline" size={18} color={theme.iconTile.foreground} />
@@ -210,8 +210,8 @@ export default function EventDetailScreen({ route, navigation }: any) {
                   <Ionicons name="document-text-outline" size={20} color={theme.iconTile.foreground} />
                 </View>
                 <View style={s.rowCopy}>
-                  <Text style={[s.rowLabel, { color: theme.text }]}>Notes</Text>
-                  <Text style={[s.notesText, { color: theme.textSub }]}>{event.description}</Text>
+                  <Text style={[s.rowLabel, { color: theme.content.primary }]}>Notes</Text>
+                  <Text style={[s.notesText, { color: theme.content.secondary }]}>{event.description}</Text>
                 </View>
               </View>
             </>

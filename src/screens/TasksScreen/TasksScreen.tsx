@@ -12,18 +12,19 @@ import {
   CanvasNotesWorkspace,
   StandardNotesWorkspace,
 } from '@/components/notes';
+import { TaskWorkspace } from '@/components/tasks';
 import { useTheme } from '@/context/ThemeContext';
 import EventAlarmsScreen from '@/screens/EventAlarmsScreen';
 
 export default function TasksScreen({ navigation, route }: any) {
   const { theme } = useTheme();
-  const [section, setSection] = useState<OrganizerSection>('notes');
+  const [section, setSection] = useState<OrganizerSection>('tasks');
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
 
   useEffect(() => {
     const requested = route?.params?.section;
-    if (requested === 'notes' || requested === 'canvas' || requested === 'events') setSection(requested);
+    if (requested === 'tasks' || requested === 'notes' || requested === 'canvas' || requested === 'events') setSection(requested);
   }, [route?.params?.section]);
 
   useEffect(() => {
@@ -48,14 +49,16 @@ export default function TasksScreen({ navigation, route }: any) {
         <BurgerMenu navigation={navigation} />
         {searchOpen ? <View style={[styles.headerSearch, { backgroundColor: theme.glass.solid, borderColor: theme.glass.border }]}>
           <Ionicons name="search-outline" size={19} color={theme.accent.base} />
-          <TextInput autoFocus value={query} onChangeText={setQuery} placeholder={section === 'notes' ? 'Search notes' : 'Search canvas boards'} placeholderTextColor={theme.content.muted} style={[styles.searchInput, { color: theme.content.primary }]} />
+          <TextInput autoFocus value={query} onChangeText={setQuery} placeholder={section === 'tasks' ? 'Search tasks' : section === 'notes' ? 'Search notes' : 'Search canvas boards'} placeholderTextColor={theme.content.muted} style={[styles.searchInput, { color: theme.content.primary }]} />
           {query ? <TouchableOpacity accessibilityLabel="Clear search" style={styles.headerAction} onPress={() => setQuery('')}><Ionicons name="close-circle" size={20} color={theme.content.muted} /></TouchableOpacity> : null}
         </View> : <View style={styles.headerCopy}>
           <Text style={[styles.title, { color: theme.content.primary }]}>
-            {section === 'notes' ? 'Notes' : 'Canvas'}
+            {section === 'tasks' ? 'Tasks' : section === 'notes' ? 'Notes' : 'Canvas'}
           </Text>
           <Text style={[styles.subtitle, { color: theme.content.secondary }]}>
-            {section === 'notes'
+            {section === 'tasks'
+              ? 'Plan, prioritize, and complete real actions'
+              : section === 'notes'
               ? 'Capture ideas, documents, and checklists'
               : 'Sketch, organize, and connect your ideas'}
           </Text>
@@ -63,13 +66,25 @@ export default function TasksScreen({ navigation, route }: any) {
         <TouchableOpacity accessibilityRole="button" accessibilityLabel={searchOpen ? 'Close search' : `Search ${section}`} style={[styles.headerAction, searchOpen && { backgroundColor: theme.accent.soft }]} onPress={() => { setSearchOpen(value => !value); if (searchOpen) setQuery(''); }}><Ionicons name={searchOpen ? 'close' : 'search-outline'} size={22} color={searchOpen ? theme.accent.base : theme.content.primary} /></TouchableOpacity>
       </View>
       <OrganizerSwitch value={section} onChange={setSection} />
-      {section === 'notes' ? (
+      {section === 'tasks' ? (
+        <TaskWorkspace
+          initialTaskId={route?.params?.taskId}
+          openRequest={route?.params?.taskRequest}
+          createRequest={route?.params?.createTaskRequest}
+          query={query}
+        />
+      ) : section === 'notes' ? (
         <StandardNotesWorkspace
           initialNoteId={route?.params?.noteId}
           openRequest={route?.params?.noteRequest}
           createType={route?.params?.createType}
           createRequest={route?.params?.createRequest}
           query={query}
+          onOpenTask={taskId => navigation.navigate('Tasks', {
+            section: 'tasks',
+            taskId,
+            taskRequest: Date.now(),
+          })}
         />
       ) : <CanvasNotesWorkspace query={query} />}
     </SafeAreaView>

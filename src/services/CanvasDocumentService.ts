@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 
 import { CANVAS_DOCUMENT_VERSION, type CanvasObject, type InfiniteCanvasNote } from '@/types/note';
 import { getCanvasConnectorGeometry } from '@/utils/canvasConnectors';
+import { attachmentById, attachmentDisplayUri } from '@/services/AttachmentService';
 
 export type CanvasExportFormat = 'pdf' | 'png' | 'jpeg' | 'markdown' | 'text' | 'omnitask';
 export type CanvasExportQuality = 'standard' | 'high' | 'ultra';
@@ -60,7 +61,12 @@ const canvasHtml = (note: InfiniteCanvasNote, options: CanvasExportOptions) => {
       const transform = `translate(${32 - minX * scale} ${72 - minY * scale}) scale(${scale})`;
       return `<svg style="position:absolute;inset:0;width:${rawWidth}px;height:${rawHeight}px;overflow:visible"><g transform="${transform}"><path d="${geometry.path}" fill="none" stroke="${object.style.color}" stroke-width="${object.style.strokeWidth ?? 3}" stroke-linecap="round" />${object.connector?.arrowEnd ? `<path d="${geometry.arrowPath}" fill="none" stroke="${object.style.color}" stroke-width="${object.style.strokeWidth ?? 3}" stroke-linecap="round" stroke-linejoin="round" />` : ''}</g></svg>`;
     }
-    if (object.type === 'image' && object.imageUri) return `<img src="${escapeHtml(object.imageUri)}" style="${common}object-fit:contain;border-radius:10px" />`;
+    if (object.type === 'image') {
+      const imageUri = attachmentDisplayUri(attachmentById(object.attachmentId))
+        ?? object.attachmentRemoteUrl
+        ?? object.imageUri;
+      if (imageUri) return `<img src="${escapeHtml(imageUri)}" style="${common}object-fit:contain;border-radius:10px" />`;
+    }
     if (object.type === 'text' || object.type === 'sticky') return `<div style="${common}padding:${object.type === 'sticky' ? 12 : 2}px;background:transparent;color:${object.style.color};font-size:${(object.style.fontSize ?? 18) * scale}px;font-weight:${object.style.bold ? 700 : 400};font-style:${object.style.italic ? 'italic' : 'normal'};text-decoration:${object.style.underline ? 'underline' : 'none'};white-space:pre-wrap">${escapeHtml(object.content ?? '')}</div>`;
     if (object.type === 'rectangle' || object.type === 'circle') return `<div style="${common}border:2px solid ${object.style.color};background:transparent;border-radius:${object.type === 'circle' ? '50%' : '8px'}"></div>`;
     if (object.type === 'line' || object.type === 'arrow') return `<div style="${common}height:${object.style.strokeWidth ?? 3}px;background:${object.style.color};margin-top:${height / 2}px"></div>`;

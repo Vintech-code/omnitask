@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '@/context/ThemeContext';
 
-export type OrganizerSection = 'notes' | 'canvas' | 'events';
+export type OrganizerSection = 'tasks' | 'notes' | 'canvas' | 'events';
 
 interface OrganizerSwitchProps {
   value: OrganizerSection;
@@ -16,8 +16,9 @@ interface OrganizerSwitchProps {
 const OPTIONS: Array<{
   value: OrganizerSection;
   label: string;
-  icon: 'document-text-outline' | 'expand-outline' | 'calendar-outline';
+  icon: 'checkbox-outline' | 'document-text-outline' | 'expand-outline' | 'calendar-outline';
 }> = [
+  { value: 'tasks', label: 'Tasks', icon: 'checkbox-outline' },
   { value: 'notes', label: 'Notes', icon: 'document-text-outline' },
   { value: 'canvas', label: 'Canvas', icon: 'expand-outline' },
   { value: 'events', label: 'Events', icon: 'calendar-outline' },
@@ -55,9 +56,9 @@ export function OrganizerSwitch({ value, onChange }: OrganizerSwitchProps) {
             <Ionicons
               name={option.icon}
               size={17}
-              color={selected ? theme.accent.base : theme.textSub}
+              color={selected ? theme.accent.base : theme.content.secondary}
             />
-            <Text style={[styles.label, { color: selected ? theme.accent.base : theme.textSub }]}>
+            <Text style={[styles.label, { color: selected ? theme.accent.base : theme.content.secondary }]}>
               {option.label}
             </Text>
           </TouchableOpacity>
@@ -87,7 +88,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
+    gap: 4,
   },
-  label: { fontSize: 13, fontFamily: fontFamily.bold },
+  label: { fontSize: 11, fontFamily: fontFamily.bold },
 });

@@ -25,20 +25,6 @@ export interface Theme {
   semantic: { success: string; warning: string; danger: string; info: string };
   divider: string;
   icon: string;
-
-  // Compatibility aliases while legacy screens migrate to semantic tokens.
-  bg: string;
-  bg2: string;
-  card: string;
-  border: string;
-  text: string;
-  textSub: string;
-  textDim: string;
-  tabBar: string;
-  tabBorder: string;
-  segBg: string;
-  segActive: string;
-  iconColor: string;
 }
 
 const createTheme = (dark: boolean): Theme => {
@@ -76,18 +62,6 @@ const createTheme = (dark: boolean): Theme => {
     semantic,
     divider,
     icon: dark ? '#EDEDEF' : '#171A1A',
-    bg: background.base,
-    bg2: dark ? OMNITASK_PALETTE.darkGradientTop : OMNITASK_PALETTE.pearlIce,
-    card: glass.solid,
-    border: glass.border,
-    text: content.primary,
-    textSub: content.secondary,
-    textDim: content.muted,
-    tabBar: glass.solid,
-    tabBorder: glass.border,
-    segBg: glass.secondary,
-    segActive: glass.solid,
-    iconColor: dark ? '#EDEDEF' : '#171A1A',
   };
 };
 

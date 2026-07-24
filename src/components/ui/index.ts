@@ -4,5 +4,7 @@ export * from './GlassCard';
 export * from './GlassIconButton';
 export * from './PillButton';
 export * from './OmniLoader';
+export * from './WheelPickerColumn';
+export * from './ProgressRing';
 export * from './AppDialog';
 export * from './Skeleton';
